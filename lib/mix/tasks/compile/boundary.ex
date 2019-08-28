@@ -188,14 +188,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   @impl Mix.Task.Compiler
   def run(_) do
-    app = Keyword.fetch!(Mix.Project.config(), :app)
-    Application.load(app)
-
-    boundaries = load_boundaries!()
-    calls = calls()
-    app_modules = app_modules(app, calls)
-
-    case Boundary.check(boundaries, app_modules, calls) do
+    case Boundary.MixCompiler.check() do
       :ok ->
         {:ok, []}
 
@@ -203,34 +196,6 @@ defmodule Mix.Tasks.Compile.Boundary do
         print_diagnostic_errors(errors)
         {:ok, errors}
     end
-  end
-
-  defp load_boundaries!() do
-    with {:ok, config_string} <- config_string(),
-         {:ok, boundaries} <- Boundary.from_string(config_string) do
-      boundaries
-    else
-      {:error, reason} -> Mix.raise(reason)
-    end
-  end
-
-  defp config_string() do
-    with {:error, _reason} <- File.read("boundaries.exs"),
-         do: {:error, "could not open `boundaries.exs`"}
-  end
-
-  defp calls() do
-    Enum.map(
-      Mix.Tasks.Xref.calls(),
-      fn %{callee: {mod, _fun, _arg}} = entry -> Map.put(entry, :callee_module, mod) end
-    )
-  end
-
-  defp app_modules(app, calls) do
-    calls
-    |> Stream.map(& &1.caller_module)
-    |> MapSet.new()
-    |> MapSet.union(MapSet.new(Application.spec(app, :modules)))
   end
 
   defp print_diagnostic_errors(errors) do

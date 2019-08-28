@@ -1,14 +1,14 @@
 defmodule Boundary.Checker do
   @moduledoc false
 
-  def check(boundaries, app_modules, calls) do
-    with :ok <- check_duplicates(boundaries),
-         boundaries = Map.new(boundaries),
+  def check(application) do
+    with :ok <- check_duplicates(application.boundaries),
+         boundaries = Map.new(application.boundaries),
          :ok <- check_valid_deps(boundaries),
          :ok <- check_cycles(boundaries),
-         {:ok, classified_modules} <- classify_modules(boundaries, app_modules),
+         {:ok, classified_modules} <- classify_modules(boundaries, application.modules),
          :ok <- check_unused_boundaries(boundaries, classified_modules),
-         do: check_calls(boundaries, classified_modules, calls)
+         do: check_calls(boundaries, classified_modules, application.calls)
   end
 
   defp check_duplicates(normalized_boundaries) do
