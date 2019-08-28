@@ -1,8 +1,8 @@
-defmodule Boundaries.Test.Generator do
+defmodule Boundary.Test.Generator do
   import StreamData
   import ExUnitProperties, only: [gen: 1, gen: 2]
 
-  alias Boundaries.Test.Project
+  alias Boundary.Test.Project
 
   def generate() do
     gen all roots <- module_tree(),
@@ -70,7 +70,7 @@ defmodule Boundaries.Test.Generator do
 
   defp diagnostic(call, message) do
     %Mix.Task.Compiler.Diagnostic{
-      compiler_name: "boundaries",
+      compiler_name: "boundary",
       details: nil,
       severity: :warning,
       file: call.file,

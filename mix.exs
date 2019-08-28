@@ -1,9 +1,9 @@
-defmodule Boundaries.MixProject do
+defmodule Boundary.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :boundaries,
+      app: :boundary,
       version: "0.1.0",
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
@@ -31,5 +31,5 @@ defmodule Boundaries.MixProject do
   defp elixirc_paths(_), do: ~w(lib)
 
   defp extra_compilers(:prod), do: []
-  defp extra_compilers(_env), do: [:boundaries]
+  defp extra_compilers(_env), do: [:boundary]
 end

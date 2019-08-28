@@ -1,4 +1,4 @@
-defmodule Boundaries do
+defmodule Boundary do
   @moduledoc false
 
   def from_string(string) do
@@ -29,7 +29,7 @@ defmodule Boundaries do
   defp defaults(mod), do: %{deps: [], exports: [mod]}
 
   def check(boundaries, app_modules, calls) do
-    with {:error, error} <- Boundaries.Checker.check(boundaries, app_modules, calls),
+    with {:error, error} <- Boundary.Checker.check(boundaries, app_modules, calls),
          do: {:error, diagnostic_errors(error)}
   end
 
@@ -91,7 +91,7 @@ defmodule Boundaries do
 
   def diagnostic(message, opts \\ []) do
     %Mix.Task.Compiler.Diagnostic{
-      compiler_name: "boundaries",
+      compiler_name: "boundary",
       details: nil,
       file: "boundaries.exs",
       message: message,

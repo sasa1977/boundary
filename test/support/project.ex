@@ -1,12 +1,12 @@
-defmodule Boundaries.Test.Project do
+defmodule Boundary.Test.Project do
   def empty() do
     %{modules: MapSet.new(), boundaries: [], ownership: %{}, membership: %{}}
   end
 
   def check(project, calls) do
     config_string = inspect(project.boundaries, limit: :infinity, pretty: true)
-    {:ok, boundaries} = Boundaries.from_string(config_string)
-    Boundaries.check(boundaries, project.modules, calls)
+    {:ok, boundaries} = Boundary.from_string(config_string)
+    Boundary.check(boundaries, project.modules, calls)
   end
 
   def merge(project1, project2) do

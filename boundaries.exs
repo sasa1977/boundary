@@ -1,4 +1,4 @@
 [
-  {Boundaries, deps: []},
-  {Mix.Tasks.Compile.Boundaries, deps: [Boundaries]}
+  {Boundary, deps: []},
+  {Mix.Tasks.Compile.Boundary, deps: [Boundary]}
 ]

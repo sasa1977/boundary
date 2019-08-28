@@ -1,4 +1,4 @@
-defmodule Boundaries.Checker do
+defmodule Boundary.Checker do
   @moduledoc false
 
   def check(boundaries, app_modules, calls) do

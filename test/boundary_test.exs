@@ -1,9 +1,9 @@
-defmodule BoundariesTest do
+defmodule BoundaryTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
-  alias Boundaries.Test.Generator
-  alias Boundaries.Test.Project
+  alias Boundary.Test.Generator
+  alias Boundary.Test.Project
 
   describe "boundaries.exs errors" do
     property "duplicate deps are reported" do
@@ -12,7 +12,7 @@ defmodule BoundariesTest do
                 expected_errors =
                   Enum.map(
                     duplicates,
-                    &Boundaries.diagnostic("#{inspect(&1)} is declared as a boundary more than once")
+                    &Boundary.diagnostic("#{inspect(&1)} is declared as a boundary more than once")
                   ),
                 max_runs: 10 do
         assert {:error, errors} = Project.check(project, [])
@@ -26,7 +26,7 @@ defmodule BoundariesTest do
                 expected_errors =
                   Enum.map(
                     invalid_deps,
-                    &Boundaries.diagnostic("#{inspect(&1)} is listed as a dependency but not declared as a boundary")
+                    &Boundary.diagnostic("#{inspect(&1)} is listed as a dependency but not declared as a boundary")
                   ),
                 max_runs: 10 do
         assert {:error, errors} = Project.check(project, [])
@@ -61,7 +61,7 @@ defmodule BoundariesTest do
                   Enum.map(
                     unclassified_modules,
                     # Note: passing file: "" option, because module doesn't exist, so it's file can't be determined
-                    &Boundaries.diagnostic("#{inspect(&1)} is not included in any boundary", file: "")
+                    &Boundary.diagnostic("#{inspect(&1)} is not included in any boundary", file: "")
                   ),
                 max_runs: 10 do
         assert {:error, errors} = Project.check(project, [])
@@ -75,7 +75,7 @@ defmodule BoundariesTest do
                 expected_errors =
                   Enum.map(
                     empty_boundaries,
-                    &Boundaries.diagnostic("boundary #{inspect(&1)} doesn't include any module")
+                    &Boundary.diagnostic("boundary #{inspect(&1)} doesn't include any module")
                   ),
                 max_runs: 10 do
         assert {:error, errors} = Project.check(project, [])

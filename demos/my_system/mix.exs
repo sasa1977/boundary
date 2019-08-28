@@ -7,7 +7,7 @@ defmodule MySystem.MixProject do
       version: "0.1.0",
       elixir: "~> 1.5",
       elixirc_paths: elixirc_paths(Mix.env()),
-      compilers: [:phoenix, :gettext] ++ Mix.compilers() ++ [:boundaries],
+      compilers: [:phoenix, :gettext] ++ Mix.compilers() ++ [:boundary],
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
@@ -37,7 +37,7 @@ defmodule MySystem.MixProject do
       {:gettext, "~> 0.11"},
       {:jason, "~> 1.0"},
       {:plug_cowboy, "~> 2.0"},
-      {:boundaries, path: "../..", runtime: false}
+      {:boundary, path: "../..", runtime: false}
     ]
   end
 end

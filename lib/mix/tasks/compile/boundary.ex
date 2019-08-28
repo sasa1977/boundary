@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.Compile.Boundaries do
+defmodule Mix.Tasks.Compile.Boundary do
   use Mix.Task.Compiler
 
   @moduledoc """
@@ -137,7 +137,7 @@ defmodule Mix.Tasks.Compile.Boundaries do
   When developing a library, it's advised to use boundaries only in `:dev` and `:test` environments:
 
   ```
-  defmodule Boundaries.MixProject do
+  defmodule Boundary.MixProject do
     # ...
 
     def project do
@@ -195,7 +195,7 @@ defmodule Mix.Tasks.Compile.Boundaries do
     calls = calls()
     app_modules = app_modules(app, calls)
 
-    case Boundaries.check(boundaries, app_modules, calls) do
+    case Boundary.check(boundaries, app_modules, calls) do
       :ok ->
         {:ok, []}
 
@@ -207,7 +207,7 @@ defmodule Mix.Tasks.Compile.Boundaries do
 
   defp load_boundaries!() do
     with {:ok, config_string} <- config_string(),
-         {:ok, boundaries} <- Boundaries.from_string(config_string) do
+         {:ok, boundaries} <- Boundary.from_string(config_string) do
       boundaries
     else
       {:error, reason} -> Mix.raise(reason)
