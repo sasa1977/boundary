@@ -1,0 +1,19 @@
+language: elixir
+matrix:
+  include:
+    - otp_release: 21.3
+      elixir: 1.9
+env:
+  global:
+    - MIX_HOME=$HOME/.mix
+cache:
+  directories:
+  - $HOME/.mix
+  - deps
+  - _build
+script:
+  - mix docs
+  - mix test
+  - mix format
+  - mix credo list
+  - mix dialyzer
