@@ -192,7 +192,7 @@ defmodule Boundary do
         }
 
   @type name :: module
-  @type definition :: %{deps: [name], exports: [module], ignore: boolean}
+  @type definition :: %{deps: [name], exports: [module], ignore?: boolean, file: String.t(), line: pos_integer}
 
   require Boundary.Definition
   Boundary.Definition.generate(deps: [], exports: [Definition, MixCompiler])

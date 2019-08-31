@@ -10,19 +10,24 @@ defmodule Boundary.Checker do
         }
 
   @type error ::
-          {:invalid_deps, [{:unknown | :ignored, Boundary.name()}]}
-          | {:cycles, [Boundary.name()]}
-          | {:unclassified_modules, [module]}
-          | {:invalid_calls, [call]}
+          {:unknown_dep, dep_error}
+          | {:ignored_dep, dep_error}
+          | {:cycle, [Boundary.name()]}
+          | {:unclassified_module, [module]}
+          | {:invalid_call, [call]}
 
-  @spec check(application: Boundary.application(), calls: [call]) :: :ok | {:error, error}
-  def check(opts \\ []) do
+  @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
+
+  @spec errors(application: Boundary.application(), calls: [call]) :: [error]
+  def errors(opts \\ []) do
     app = Keyword.get_lazy(opts, :application, &current_app/0)
 
-    with :ok <- check_valid_deps(app.boundaries),
-         :ok <- check_cycles(app.boundaries),
-         :ok <- check_unclassified_modules(app.modules.unclassified),
-         do: check_calls(app.boundaries, app.modules.classified, Keyword.get_lazy(opts, :calls, &calls/0))
+    Enum.concat([
+      invalid_deps(app.boundaries),
+      cycles(app.boundaries),
+      unclassified_modules(app.modules.unclassified),
+      invalid_calls(app.boundaries, app.modules.classified, Keyword.get_lazy(opts, :calls, &calls/0))
+    ])
   end
 
   defp current_app do
@@ -48,28 +53,23 @@ defmodule Boundary.Checker do
     |> Enum.map(fn {_, calls} -> Enum.max_by(calls, &String.length(inspect(&1.caller_module))) end)
   end
 
-  defp check_valid_deps(boundaries) do
+  defp invalid_deps(boundaries) do
     boundaries
-    |> Stream.flat_map(fn {_boundary, data} -> data.deps end)
+    |> Stream.flat_map(fn {_boundary, data} -> Enum.map(data.deps, &%{name: &1, file: data.file, line: data.line}) end)
     |> Stream.map(&validate_dep(boundaries, &1))
     |> Stream.reject(&is_nil/1)
     |> Stream.uniq()
-    |> Enum.sort()
-    |> case do
-      [] -> :ok
-      invalid_deps -> {:error, {:invalid_deps, invalid_deps}}
-    end
   end
 
   defp validate_dep(boundaries, dep) do
     cond do
-      not Map.has_key?(boundaries, dep) -> {:unknown, dep}
-      Map.fetch!(boundaries, dep).ignore? -> {:ignored, dep}
+      not Map.has_key?(boundaries, dep.name) -> {:unknown_dep, dep}
+      Map.fetch!(boundaries, dep.name).ignore? -> {:ignored_dep, dep}
       true -> nil
     end
   end
 
-  defp check_cycles(boundaries) do
+  defp cycles(boundaries) do
     graph = :digraph.new([:cyclic])
 
     try do
@@ -77,39 +77,31 @@ defmodule Boundary.Checker do
 
       boundaries
       |> Stream.flat_map(fn {boundary, data} -> Stream.map(data.deps, &{boundary, &1}) end)
-      |> Enum.each(fn {boundary, dep} -> false = match?({:error, _}, :digraph.add_edge(graph, boundary, dep)) end)
+      |> Enum.each(fn {boundary, dep} -> :digraph.add_edge(graph, boundary, dep) end)
 
       :digraph.vertices(graph)
       |> Stream.map(&:digraph.get_short_cycle(graph, &1))
       |> Stream.reject(&(&1 == false))
-      |> Enum.uniq_by(&MapSet.new/1)
-      |> Enum.sort_by(&length/1)
-      |> case do
-        [] -> :ok
-        cycles -> {:error, {:cycles, cycles}}
-      end
+      |> Stream.uniq_by(&MapSet.new/1)
+      |> Enum.map(&{:cycle, &1})
     after
       :digraph.delete(graph)
     end
   end
 
-  defp check_unclassified_modules([]), do: :ok
-  defp check_unclassified_modules(unclassified_modules), do: {:error, {:unclassified_modules, unclassified_modules}}
+  defp unclassified_modules(unclassified_modules),
+    do: Stream.map(unclassified_modules, &{:unclassified_module, &1})
 
-  defp check_calls(boundaries, classified_modules, calls) do
+  defp invalid_calls(boundaries, classified_modules, calls) do
     calls
     |> Stream.filter(&Map.has_key?(classified_modules, &1.callee_module))
     |> Enum.sort_by(&{&1.file, &1.line})
-    |> Stream.map(&check_call(&1, boundaries, classified_modules))
+    |> Stream.map(&call_error(&1, boundaries, classified_modules))
     |> Stream.reject(&is_nil/1)
-    |> Enum.sort_by(&{&1.file, &1.line})
-    |> case do
-      [] -> :ok
-      invalid_calls -> {:error, {:invalid_calls, invalid_calls}}
-    end
+    |> Stream.map(&{:invalid_call, &1})
   end
 
-  defp check_call(entry, boundaries, classified_modules) do
+  defp call_error(entry, boundaries, classified_modules) do
     from_boundary = Map.fetch!(classified_modules, entry.caller_module)
     to_boundary = Map.fetch!(classified_modules, entry.callee_module)
 

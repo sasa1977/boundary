@@ -3,38 +3,29 @@ defmodule Boundary.MixCompiler do
   # credo:disable-for-this-file Credo.Check.Readability.Specs
 
   def check(opts \\ []) do
-    with {:error, error} <- Boundary.Checker.check(opts),
-         do: {:error, diagnostic_errors(error)}
+    opts
+    |> Boundary.Checker.errors()
+    |> Stream.map(&to_diagnostic_error/1)
+    |> Enum.sort_by(&{&1.file, &1.position})
   end
 
-  defp diagnostic_errors(error), do: Enum.sort_by(to_diagnostic_errors(error), &{&1.file, &1.position})
+  defp to_diagnostic_error({:unclassified_module, module}),
+    do: diagnostic("#{inspect(module)} is not included in any boundary", file: module_source(module))
 
-  defp to_diagnostic_errors({:unclassified_modules, modules}),
-    do: Enum.map(modules, &diagnostic("#{inspect(&1)} is not included in any boundary", file: module_source(&1)))
-
-  defp to_diagnostic_errors({:invalid_deps, boundaries}) do
-    Enum.map(
-      boundaries,
-      fn
-        {:unknown, dep} -> diagnostic("unknown boundary #{inspect(dep)} is listed as a dependency")
-        {:ignored, dep} -> diagnostic("ignored boundary #{inspect(dep)} is listed as a dependency")
-      end
-    )
+  defp to_diagnostic_error({:unknown_dep, dep}) do
+    diagnostic("unknown boundary #{inspect(dep.name)} is listed as a dependency", file: dep.file, position: dep.line)
   end
 
-  defp to_diagnostic_errors({:cycles, cycles}) do
-    cycles =
-      cycles
-      |> Stream.map(fn cycle -> cycle |> Stream.map(&inspect/1) |> Enum.join(" -> ") end)
-      |> Stream.map(&"  #{&1}")
-      |> Enum.join("\n")
-
-    [diagnostic("dependency cycles found:\n#{cycles}\n")]
+  defp to_diagnostic_error({:ignored_dep, dep}) do
+    diagnostic("ignored boundary #{inspect(dep.name)} is listed as a dependency", file: dep.file, position: dep.line)
   end
 
-  defp to_diagnostic_errors({:invalid_calls, calls}), do: Enum.map(calls, &invalid_call_error/1)
+  defp to_diagnostic_error({:cycle, cycle}) do
+    cycle = cycle |> Stream.map(&inspect/1) |> Enum.join(" -> ")
+    diagnostic("dependency cycle found:\n#{cycle}\n")
+  end
 
-  defp invalid_call_error(%{type: :invalid_cross_boundary_call} = error) do
+  defp to_diagnostic_error({:invalid_call, %{type: :invalid_cross_boundary_call} = error}) do
     {m, f, a} = error.callee
 
     message =
@@ -44,7 +35,7 @@ defmodule Boundary.MixCompiler do
     diagnostic(message, file: error.file, position: error.line)
   end
 
-  defp invalid_call_error(%{type: :not_exported} = error) do
+  defp to_diagnostic_error({:invalid_call, %{type: :not_exported} = error}) do
     {m, f, a} = error.callee
 
     message =
@@ -67,7 +58,7 @@ defmodule Boundary.MixCompiler do
     %Mix.Task.Compiler.Diagnostic{
       compiler_name: "boundary",
       details: nil,
-      file: "boundaries.exs",
+      file: "unknown",
       message: message,
       position: nil,
       severity: :warning

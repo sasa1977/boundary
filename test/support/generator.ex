@@ -118,7 +118,8 @@ defmodule Boundary.Test.Generator do
   end
 
   def with_ignored_deps(app) do
-    gen all ignored_deps <- list_of(unknown_boundary(app, atom(:alias)), min_length: 1, max_length: 20),
+    gen all ignored_deps <- uniq_list_of(unknown_boundary(app, atom(:alias)), min_length: 1, max_length: 20),
+            app <- add_deps(app, ignored_deps),
             app =
               Enum.reduce(
                 ignored_deps,
@@ -129,7 +130,6 @@ defmodule Boundary.Test.Generator do
                   |> Application.add_module({boundary, boundary})
                 end
               ),
-            app <- add_deps(app, ignored_deps),
             do: {ignored_deps, app}
   end
 

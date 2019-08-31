@@ -84,19 +84,22 @@ defmodule Mix.Tasks.Compile.Boundary do
   @recursive true
 
   @impl Mix.Task.Compiler
-  def run(_) do
-    case Boundary.MixCompiler.check() do
-      :ok ->
-        {:ok, []}
+  def run(argv) do
+    errors = Boundary.MixCompiler.check()
+    print_diagnostic_errors(errors)
+    {status(errors, argv), errors}
+  end
 
-      {:error, errors} ->
-        print_diagnostic_errors(errors)
-        {:ok, errors}
-    end
+  defp status([], _), do: :ok
+  defp status([_ | _], argv), do: if(warnings_as_errors?(argv), do: :error, else: :ok)
+
+  defp warnings_as_errors?(argv) do
+    {parsed, _argv, _errors} = OptionParser.parse(argv, strict: [warnings_as_errors: :boolean])
+    Keyword.get(parsed, :warnings_as_errors, false)
   end
 
   defp print_diagnostic_errors(errors) do
-    IO.puts("")
+    if errors != [], do: IO.puts("")
     Enum.each(errors, &print_diagnostic_error/1)
   end
 

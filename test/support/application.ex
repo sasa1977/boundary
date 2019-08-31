@@ -39,7 +39,7 @@ defmodule Boundary.Test.Application do
       Map.put(
         app.boundaries,
         boundary,
-        Map.merge(%{exports: [], deps: [], ignore?: false}, Map.new(boundary_data))
+        Map.merge(%{exports: [], deps: [], ignore?: false, file: "unknown", line: nil}, Map.new(boundary_data))
       )
 
     ownership = Map.put_new(app.ownership, boundary, MapSet.new())

@@ -5,7 +5,7 @@ defmodule Boundary.Definition do
   defmacro generate(opts) do
     quote bind_quoted: [opts: opts] do
       Module.register_attribute(__MODULE__, Boundary, persist: true, accumulate: false)
-      Module.put_attribute(__MODULE__, Boundary, Boundary.Definition.normalize(__MODULE__, opts))
+      Module.put_attribute(__MODULE__, Boundary, Boundary.Definition.normalize(__MODULE__, opts, __ENV__))
     end
   end
 
@@ -54,11 +54,12 @@ defmodule Boundary.Definition do
     end
   end
 
-  def normalize(boundary, definition) do
+  def normalize(boundary, definition, env) do
     defaults()
     |> Map.merge(Map.new(definition))
     |> validate!()
     |> expand_exports(boundary)
+    |> Map.merge(%{file: env.file, line: env.line})
   end
 
   defp defaults, do: %{deps: [], exports: [], ignore?: false}

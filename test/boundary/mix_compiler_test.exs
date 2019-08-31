@@ -14,7 +14,7 @@ defmodule Boundary.MixCompilerTest do
                   &Boundary.MixCompiler.diagnostic("unknown boundary #{inspect(&1)} is listed as a dependency")
                 ),
               max_runs: 10 do
-      assert {:error, errors} = Application.check(app, [])
+      assert errors = Application.check(app, [])
       assert Enum.sort(errors) == Enum.sort(expected_errors)
     end
   end
@@ -28,7 +28,7 @@ defmodule Boundary.MixCompilerTest do
                   &Boundary.MixCompiler.diagnostic("ignored boundary #{inspect(&1)} is listed as a dependency")
                 ),
               max_runs: 10 do
-      assert {:error, errors} = Application.check(app, [])
+      assert errors = Application.check(app, [])
       assert Enum.sort(errors) == Enum.sort(expected_errors)
     end
   end
@@ -38,12 +38,12 @@ defmodule Boundary.MixCompilerTest do
               Application.num_boundaries(app) >= 2,
               {boundaries_in_cycle, app} <- Generator.with_cycle(app),
               max_runs: 10 do
-      assert {:error, errors} = Application.check(app, [])
-      assert cycle_error = Enum.find(errors, &String.starts_with?(&1.message, "dependency cycles found"))
+      assert errors = Application.check(app, [])
+      assert cycle_error = Enum.find(errors, &String.starts_with?(&1.message, "dependency cycle found"))
 
       reported_cycle_boundaries =
         cycle_error.message
-        |> String.replace("dependency cycles found:\n", "")
+        |> String.replace("dependency cycle found:\n", "")
         |> String.trim()
         |> String.split(" -> ")
         |> Enum.map(&Module.concat([&1]))
@@ -63,7 +63,7 @@ defmodule Boundary.MixCompilerTest do
                   &Boundary.MixCompiler.diagnostic("#{inspect(&1)} is not included in any boundary", file: "")
                 ),
               max_runs: 10 do
-      assert {:error, errors} = Application.check(app, [])
+      assert errors = Application.check(app, [])
       assert Enum.sort(errors) == Enum.sort(expected_errors)
     end
   end
@@ -73,20 +73,20 @@ defmodule Boundary.MixCompilerTest do
               {unclassified_modules, app} <- Generator.with_unclassified_modules(app),
               app = Enum.reduce(unclassified_modules, app, &Application.add_boundary(&2, &1, ignore?: true)),
               max_runs: 10 do
-      assert :ok = Application.check(app, [])
+      assert Application.check(app, []) == []
     end
   end
 
   test "empty app with no calls is valid" do
     app = Application.empty()
-    assert Application.check(app, []) == :ok
+    assert Application.check(app, []) == []
   end
 
   property "valid app passes the check" do
     check all app <- Generator.app(),
               Application.num_boundaries(app) >= 2,
               {calls, app} <- Generator.with_valid_calls(app) do
-      assert Application.check(app, calls) == :ok
+      assert Application.check(app, calls) == []
     end
   end
 
@@ -96,7 +96,7 @@ defmodule Boundary.MixCompilerTest do
               {valid_calls, app} <- Generator.with_valid_calls(app),
               {invalid_calls, expected_errors} <- Generator.with_invalid_calls(app),
               all_calls = Enum.shuffle(valid_calls ++ invalid_calls) do
-      assert {:error, errors} = Application.check(app, all_calls)
+      assert errors = Application.check(app, all_calls)
       assert errors == expected_errors
     end
   end
@@ -108,7 +108,7 @@ defmodule Boundary.MixCompilerTest do
               {invalid_calls, _expected_errors} <- Generator.with_invalid_calls(app),
               all_calls = Enum.shuffle(valid_calls ++ invalid_calls),
               app = Enum.reduce(invalid_calls, app, &ignore_call_boundaries(&2, &1)) do
-      assert Application.check(app, all_calls) == :ok
+      assert Application.check(app, all_calls) == []
     end
   end
 
