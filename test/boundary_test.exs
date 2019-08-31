@@ -5,29 +5,23 @@ defmodule BoundaryTest do
 
   describe "application/0" do
     test "modules" do
-      application = Boundary.application()
+      modules = Boundary.application(current_app_name()).modules.classified
 
-      assert Enum.member?(application.modules, A)
-      assert Enum.member?(application.modules, B)
-    end
-
-    test "calls" do
-      application = Boundary.application()
-
-      test_calls =
-        application.calls
-        |> Stream.filter(&String.starts_with?(inspect(&1.caller_module), "TestBoundaries"))
-        |> Stream.filter(&String.starts_with?(inspect(&1.callee_module), "TestBoundaries"))
-        |> Enum.map(&{&1.caller_module, &1.callee_module})
-
-      assert MapSet.new(test_calls) == MapSet.new([{A, B}])
+      assert Map.fetch(modules, A) == {:ok, A}
+      assert Map.fetch(modules, B) == {:ok, B}
     end
 
     test "boundaries" do
-      boundaries = Boundary.application().boundaries
+      boundaries = Boundary.application(current_app_name()).boundaries
 
       assert Enum.member?(boundaries, {A, %{deps: [Boundary, B], exports: [A]}})
       assert Enum.member?(boundaries, {B, %{deps: [Boundary], exports: [B]}})
     end
+  end
+
+  defp current_app_name() do
+    app = Keyword.fetch!(Mix.Project.config(), :app)
+    Application.load(app)
+    app
   end
 end

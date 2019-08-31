@@ -1,8 +1,8 @@
 defmodule Boundary.MixCompiler do
   @moduledoc false
 
-  def check(application \\ Boundary.application()) do
-    with {:error, error} <- Boundary.Checker.check(application),
+  def check(opts \\ []) do
+    with {:error, error} <- Boundary.Checker.check(opts),
          do: {:error, diagnostic_errors(error)}
   end
 

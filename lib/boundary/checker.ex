@@ -1,12 +1,36 @@
 defmodule Boundary.Checker do
   @moduledoc false
 
-  def check(application) do
-    with :ok <- check_valid_deps(application.boundaries),
-         :ok <- check_cycles(application.boundaries),
-         {:ok, classified_modules} <- classify_modules(application.boundaries, application.modules),
-         :ok <- check_unused_boundaries(application.boundaries, classified_modules),
-         do: check_calls(application.boundaries, classified_modules, application.calls)
+  def check(opts \\ []) do
+    with app = Keyword.get_lazy(opts, :application, &current_app/0),
+         :ok <- check_valid_deps(app.boundaries),
+         :ok <- check_cycles(app.boundaries),
+         :ok <- check_unclassified_modules(app.modules.unclassified),
+         :ok <- check_unused_boundaries(app.boundaries, app.modules.classified),
+         do: check_calls(app.boundaries, app.modules.classified, Keyword.get_lazy(opts, :calls, &calls/0))
+  end
+
+  defp current_app() do
+    app = Keyword.fetch!(Mix.Project.config(), :app)
+    Application.load(app)
+    Boundary.application(app)
+  end
+
+  @doc false
+  def calls() do
+    Mix.Tasks.Xref.calls()
+    |> Stream.map(fn %{callee: {mod, _fun, _arg}} = entry -> Map.put(entry, :callee_module, mod) end)
+    |> Enum.reject(&(&1.callee_module == &1.caller_module))
+    |> resolve_duplicates()
+  end
+
+  defp resolve_duplicates(calls) do
+    # If there is a call from `Foo.Bar`, xref may include two entries, one with `Foo` and another with `Foo.Bar` as the
+    # caller. In such case, we'll consider only the call with the "deepest" caller (i.e. `Foo.Bar`).
+
+    calls
+    |> Enum.group_by(&{&1.file, &1.line, &1.callee})
+    |> Enum.map(fn {_, calls} -> Enum.max_by(calls, &String.length(inspect(&1.caller_module))) end)
   end
 
   defp check_valid_deps(boundaries) do
@@ -46,30 +70,8 @@ defmodule Boundary.Checker do
     end
   end
 
-  defp classify_modules(boundaries, app_modules) do
-    boundaries_search_space =
-      boundaries
-      |> Map.keys()
-      |> Enum.sort(&>=/2)
-      |> Enum.map(&%{name: &1, parts: Module.split(&1)})
-
-    Enum.reduce(
-      app_modules,
-      {%{}, []},
-      fn module, {classified, unclassified} ->
-        parts = Module.split(module)
-
-        case Enum.find(boundaries_search_space, &List.starts_with?(parts, &1.parts)) do
-          nil -> {classified, [module | unclassified]}
-          boundary -> {Map.put(classified, module, boundary.name), unclassified}
-        end
-      end
-    )
-    |> case do
-      {classified, []} -> {:ok, classified}
-      {_classified, unclassified} -> {:error, {:unclassified_modules, unclassified}}
-    end
-  end
+  defp check_unclassified_modules([]), do: :ok
+  defp check_unclassified_modules(unclassified_modules), do: {:error, {:unclassified_modules, unclassified_modules}}
 
   defp check_unused_boundaries(boundaries, classified_modules) do
     all_boundaries = boundaries |> Map.keys() |> MapSet.new()

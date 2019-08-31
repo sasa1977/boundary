@@ -4,10 +4,12 @@ defmodule Boundary.Test.Application do
   end
 
   def check(app, calls) do
-    app
-    |> Map.take(~w/boundaries modules/a)
-    |> Map.put(:calls, calls)
-    |> Boundary.MixCompiler.check()
+    modules = Boundary.Definition.classify_modules(app.boundaries, app.modules)
+
+    Boundary.MixCompiler.check(
+      application: %{boundaries: app.boundaries, modules: modules},
+      calls: calls
+    )
   end
 
   def merge(app1, app2) do
