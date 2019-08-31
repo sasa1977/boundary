@@ -1,6 +1,6 @@
-# Boundaries
+# Boundary
 
-Mix compiler which allows you to define and enforce boundaries in your Elixir projects without needing to turn your code into an umbrella application. Compared to umbrellas, boundaries requires much less ceremony, while giving you a finer-grained control over cross-module dependencies.
+Library which allows you to define and enforce boundaries in your Elixir projects without needing to turn your code into an umbrella application. Compared to umbrellas, `boundary` requires much less ceremony, while giving you a finer-grained control over cross-module dependencies.
 
 ## Status
 
@@ -8,7 +8,7 @@ Highly experimental, untested, and unstable.
 
 ## Documentation
 
-For a detailed reference check the [compiler docs](lib/mix/tasks/compile/boundaries.ex).
+For a detailed reference see moduledoc [here](lib/boundary.ex) and [here](lib/mix/tasks/compile/boundary.ex).
 
 ## Basic usage
 
@@ -16,14 +16,23 @@ To use this library, you first need to define the boundaries of your project. A 
 
 ### Example
 
-Boundaries are configured in the `boundaries.exs` file in the root folder of the project. Here's an example configuration:
+The following code defines boundaries for a typical Phoenix based project generated with `mix phx.new`.
 
 ```elixir
-[
-  {MySystem, deps: [], exports: [User]},
-  {MySystemWeb, deps: [MySystem], exports: [Endpoint]},
-  {MySystem.Application, deps: [MySystem, MySystemWeb]}
-]
+defmodule MySystem do
+  use Boundary, deps: [], exports: []
+  # ...
+end
+
+defmodule MySystemWeb do
+  use Boundary, deps: [MySystem], exports: [Endpoint]
+  # ...
+end
+
+defmodule MySystem.Application do
+  use Boundary, deps: [MySystem, MySystemWeb]
+  # ...
+end
 ```
 
 The configuration above defines three boundaries: `MySystem`, `MySystemWeb`, and `MySystem.Application`.
@@ -45,7 +54,7 @@ defmodule MySystem.MixProject do
 
   def project do
     [
-      compilers: [:phoenix, :gettext] ++ Mix.compilers() ++ [:boundaries],
+      compilers: [:phoenix, :gettext] ++ Mix.compilers() ++ [:boundary],
       # ...
     ]
   end
@@ -77,7 +86,7 @@ warning: forbidden call to MySystemWeb.Endpoint.url/0
 
 The complete working example is available [here](demos/my_system).
 
-Because `boundaries` is implemented as a mix compiler, it integrates seamlessly with editors which can work with mix compiler. For example, in VS Code with [Elixir LS](https://github.com/JakeBecker/vscode-elixir-ls):
+Because `boundary` is implemented as a mix compiler, it integrates seamlessly with editors which can work with mix compiler. For example, in VS Code with [Elixir LS](https://github.com/JakeBecker/vscode-elixir-ls):
 
 ![VS Code warning 1](images/vscode_warning_1.png)
 

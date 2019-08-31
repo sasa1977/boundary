@@ -5,116 +5,9 @@ defmodule Mix.Tasks.Compile.Boundary do
   @moduledoc """
   Verifies cross-module function calls according to defined boundaries.
 
-  A boundary is a named group of one or more modules. Each boundary exports some (but not all!)
-  of its modules, and can depend on other boundaries. During compilation, the boundary compiler
-  finds and reports all cross-module function calls which are not permitted according to the
-  boundary configuration.
-
-  ## Configuration
-
-  Boundaries are configured in the `boundaries.exs` file in the root folder of the project. Here is
-  a simple configuration example which defines two boundaries, `MySystem` and `MySystemWeb`:
-
-  ```
-  [
-    {MySystem, deps: [], exports: [User]},
-    {MySystemWeb, deps: [MySystem]}
-  ]
-  ```
-
-  A boundary is an alias which contains one or more modules. Boundary modules are determined
-  automatically from the boundary name. For example, the `MySystem` boundary contains the `MySystem`
-  module, as well as any module whose name starts with `MySystem.` (e.g. `MySystem.User`,
-  `MySystem.User.Schema`, ...).
-
-  Each boundary must contain at least one module, and each module must be a part of some boundary.
-  If these conditions are not met, the compiler will emit corresponding warnings.
-
-  ### Dependencies
-
-  Function calls between modules belonging to different boundaries are by default forbidden. You
-  have to explicitly permit such calls through the `:deps` option:
-
-  ```
-  {MySystemWeb, deps: [MySystem]}
-  ```
-
-  Here, we allow invocations from `MySystemWeb` modules to `MySystem` modules.
-
-  Dependencies are not transient. If `A` depends on `B`, and `B` depends on `C`, calls from
-  `A` to `C` are still considered invalid. In addition, circular dependencies (direct or indirect)
-  are not allowed.
-
-  ### Exports
-
-  Cross-boundary calls can only be made to the exported modules. By default, a boundary only
-  exports the root module (i.e. the module having the same name as the boundary).
-
-  Consider the following configuration:
-
-  ```
-  [
-    {MySystem, deps: []},
-    {MySystemWeb, deps: [MySystem]}
-  ]
-  ```
-
-  With such configuration, all modules from the `MySystemWeb` boundary can make calls to functions
-  from the `MySystem` module. However, calls to other modules, such as `MySystem.User`, are still
-  not permitted.
-
-  You can export additional modules from the boundary by providing the `:exports` option:
-
-  ```
-  [
-    {MySystem, deps: [], exports: [User, Order]},
-    {MySystemWeb, deps: [MySystem]}
-  ]
-  ```
-
-  With such configuration, `MySystemWeb` modules can invoke functions from `MySystem`,
-  `MySystem.User`, and `MySystem.Order`.
-
-  Note that the root module is always exported.
-
-  ### Promoting modules to boundaries
-
-  It's worth mentioning that the example configurations you've seen so far won't work on a typical
-  Phoenix project. The reason is that when you generate a Phoenix project with `mix phx.new`,
-  the code in `MySystem.Application` references `MySystemWeb.Endpoint`:
-
-  ```
-  defmodule MySystem.Application do
-    # ...
-
-    def start(_type, _args) do
-      children = [
-        # reference to `MySystemWeb.Endpoint`
-        MySystemWeb.Endpoint
-
-        # ...
-      ]
-
-      # ...
-    end
-
-    # ...
-  end
-  ```
-
-  To make this work, you need to turn `MySystem.Application` into a boundary, and export
-  `Endpoint` in `MySystemWeb`:
-
-  ```
-  [
-    {MySystem, deps: [], exports: [User]},
-    {MySystemWeb, deps: [MySystem], exports: [Endpoint]},
-    {MySystem.Application, deps: [MySystem, MySystemWeb]}
-  ]
-  ```
-
-  With such configuration, the `MySystem` boundary won't include modules from `MySystem.Application`.
-  These modules are now extracted into a separate boundary.
+  This compiler reports all cross-boundary function calls which are not permitted, according to
+  the current definition of boundaries. For details on defining boundaries, see the docs for the
+  `Boundary` module.
 
   ## Usage
 
@@ -126,7 +19,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
     def project do
       [
-        compilers: Mix.compilers() ++ [:boundaries],
+        compilers: Mix.compilers() ++ [:boundary],
         # ...
       ]
     end
@@ -135,7 +28,8 @@ defmodule Mix.Tasks.Compile.Boundary do
   end
   ```
 
-  When developing a library, it's advised to use boundaries only in `:dev` and `:test` environments:
+  When developing a library, it's advised to use this compiler only in `:dev` and `:test`
+  environments:
 
   ```
   defmodule Boundary.MixProject do
