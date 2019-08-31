@@ -2,26 +2,11 @@ defmodule Boundary.Checker do
   @moduledoc false
 
   def check(application) do
-    with :ok <- check_duplicates(application.boundaries),
-         boundaries = Map.new(application.boundaries),
-         :ok <- check_valid_deps(boundaries),
-         :ok <- check_cycles(boundaries),
-         {:ok, classified_modules} <- classify_modules(boundaries, application.modules),
-         :ok <- check_unused_boundaries(boundaries, classified_modules),
-         do: check_calls(boundaries, classified_modules, application.calls)
-  end
-
-  defp check_duplicates(normalized_boundaries) do
-    for {boundary, _} <- normalized_boundaries, reduce: %{} do
-      histogram -> Map.update(histogram, boundary, 1, &(&1 + 1))
-    end
-    |> Stream.filter(fn {_boundary, count} -> count > 1 end)
-    |> Stream.map(fn {boundary, _count} -> boundary end)
-    |> Enum.sort()
-    |> case do
-      [] -> :ok
-      duplicates -> {:error, {:duplicate_boundaries, duplicates}}
-    end
+    with :ok <- check_valid_deps(application.boundaries),
+         :ok <- check_cycles(application.boundaries),
+         {:ok, classified_modules} <- classify_modules(application.boundaries, application.modules),
+         :ok <- check_unused_boundaries(application.boundaries, classified_modules),
+         do: check_calls(application.boundaries, classified_modules, application.calls)
   end
 
   defp check_valid_deps(boundaries) do

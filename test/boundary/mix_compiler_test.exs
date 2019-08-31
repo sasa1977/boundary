@@ -6,20 +6,6 @@ defmodule Boundary.MixCompilerTest do
   alias Boundary.Test.Application
 
   describe "boundaries.exs errors" do
-    property "duplicate deps are reported" do
-      check all app <- Generator.app(),
-                {duplicates, app} <- Generator.with_duplicate_boundaries(app),
-                expected_errors =
-                  Enum.map(
-                    duplicates,
-                    &Boundary.MixCompiler.diagnostic("#{inspect(&1)} is declared as a boundary more than once")
-                  ),
-                max_runs: 10 do
-        assert {:error, errors} = Application.check(app, [])
-        assert Enum.sort(errors) == Enum.sort(expected_errors)
-      end
-    end
-
     property "invalid deps are reported" do
       check all app <- Generator.app(),
                 {invalid_deps, app} <- Generator.with_invalid_deps(app),

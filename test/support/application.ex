@@ -1,15 +1,19 @@
 defmodule Boundary.Test.Application do
   def empty() do
-    %{modules: MapSet.new(), boundaries: [], ownership: %{}, membership: %{}}
+    %{modules: MapSet.new(), boundaries: %{}, ownership: %{}, membership: %{}}
   end
 
-  def check(app, calls),
-    do: Boundary.MixCompiler.check(%{boundaries: app.boundaries, modules: app.modules, calls: calls})
+  def check(app, calls) do
+    app
+    |> Map.take(~w/boundaries modules/a)
+    |> Map.put(:calls, calls)
+    |> Boundary.MixCompiler.check()
+  end
 
   def merge(app1, app2) do
     %{
       app1
-      | boundaries: app1.boundaries ++ app2.boundaries,
+      | boundaries: Map.merge(app1.boundaries, app2.boundaries),
         modules: MapSet.union(app1.modules, app2.modules),
         ownership: Map.merge(app1.ownership, app2.ownership),
         membership: Map.merge(app1.membership, app2.membership)
@@ -26,7 +30,7 @@ defmodule Boundary.Test.Application do
   def num_boundaries(app), do: map_size(app.ownership)
 
   def add_boundary(app, boundary, boundary_data \\ []) do
-    boundaries = [{boundary, Map.merge(%{exports: [], deps: []}, Map.new(boundary_data))} | app.boundaries]
+    boundaries = Map.put(app.boundaries, boundary, Map.merge(%{exports: [], deps: []}, Map.new(boundary_data)))
     ownership = Map.put_new(app.ownership, boundary, MapSet.new())
     %{app | boundaries: boundaries, ownership: ownership}
   end
@@ -94,11 +98,7 @@ defmodule Boundary.Test.Application do
 
   defp boundary_name({name, _}), do: name
 
-  defp add_dep([{from, data} | rest], {from, to}), do: [{from, %{data | deps: Enum.uniq([to | data.deps])}} | rest]
-  defp add_dep([other | rest], {from, to}), do: [other | add_dep(rest, {from, to})]
+  defp add_dep(boundaries, {from, to}), do: update_in(boundaries[from].deps, &Enum.uniq([to | &1]))
 
-  defp boundary_exports(app, boundary_name) do
-    {^boundary_name, data} = Enum.find(app.boundaries, &match?({^boundary_name, _data}, &1))
-    data.exports
-  end
+  defp boundary_exports(app, boundary_name), do: Map.fetch!(app.boundaries, boundary_name).exports
 end

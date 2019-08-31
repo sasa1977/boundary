@@ -14,7 +14,7 @@ defmodule Boundary.Test.Generator do
 
   def with_valid_calls(app) do
     unshrinkable(
-      gen all length <- integer(2..length(app.boundaries)),
+      gen all length <- integer(2..map_size(app.boundaries)),
               boundaries = app |> Application.boundaries() |> Enum.take_random(length),
               valid_deps = make_deps(boundaries),
               valid_calls <- calls(app, Application.allowed_deps(app)),
@@ -107,13 +107,6 @@ defmodule Boundary.Test.Generator do
 
   defp make_deps([a, b]), do: [{a, b}]
   defp make_deps([a | rest]), do: Enum.map(rest, &{a, &1}) ++ make_deps(rest)
-
-  def with_duplicate_boundaries(app) do
-    gen all duplicate_boundaries <- nonempty(list_of(member_of(Application.boundaries(app)))),
-            duplicate_boundaries = Enum.uniq(duplicate_boundaries),
-            app = Enum.reduce(duplicate_boundaries, app, &Application.add_boundary(&2, &1)),
-            do: {duplicate_boundaries, app}
-  end
 
   def with_invalid_deps(app) do
     gen all invalid_deps <- list_of(unknown_boundary(app, atom(:alias)), min_length: 1, max_length: 20),

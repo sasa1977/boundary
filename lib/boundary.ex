@@ -27,6 +27,7 @@ defmodule Boundary do
       modules
       |> Stream.map(&{&1, Boundary.Definition.get(&1)})
       |> Enum.reject(&match?({_module, nil}, &1))
+      |> Map.new()
 
     %{modules: modules, boundaries: boundaries, calls: calls}
   end
