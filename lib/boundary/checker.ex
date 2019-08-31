@@ -1,6 +1,22 @@
 defmodule Boundary.Checker do
   @moduledoc false
 
+  @type call :: %{
+          callee: mfa,
+          callee_module: module,
+          caller_module: module,
+          file: String.t(),
+          line: pos_integer
+        }
+
+  @type error ::
+          {:invalid_deps, [Boundary.name()]}
+          | {:cycles, [Boundary.name()]}
+          | {:unclassified_modules, [module]}
+          | {:unused_boundaries, [Boundary.name()]}
+          | {:invalid_calls, [call]}
+
+  @spec check(application: Boundary.application(), calls: [call]) :: :ok | {:error, error}
   def check(opts \\ []) do
     with app = Keyword.get_lazy(opts, :application, &current_app/0),
          :ok <- check_valid_deps(app.boundaries),

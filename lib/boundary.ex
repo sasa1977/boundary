@@ -1,5 +1,14 @@
 defmodule Boundary do
-  @moduledoc false
+  @type application :: %{
+          boundaries: %{name => definition},
+          modules: %{
+            classified: %{module => name},
+            unclassified: [module]
+          }
+        }
+
+  @type name :: module
+  @type definition :: %{deps: [name], exports: [module]}
 
   require Boundary.Definition
   Boundary.Definition.generate(deps: [], exports: [Definition, MixCompiler])
@@ -11,8 +20,9 @@ defmodule Boundary do
     end
   end
 
-  def application(app) do
-    app
+  @spec application(atom) :: application
+  def application(app_name) do
+    app_name
     |> Application.spec(:modules)
     |> Boundary.Definition.boundaries()
   end

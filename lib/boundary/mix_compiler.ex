@@ -6,11 +6,7 @@ defmodule Boundary.MixCompiler do
          do: {:error, diagnostic_errors(error)}
   end
 
-  defp diagnostic_errors(error) when is_binary(error), do: raise(error)
   defp diagnostic_errors(error), do: Enum.sort_by(to_diagnostic_errors(error), &{&1.file, &1.position})
-
-  defp to_diagnostic_errors({:duplicate_boundaries, boundaries}),
-    do: Enum.map(boundaries, &diagnostic("#{inspect(&1)} is declared as a boundary more than once"))
 
   defp to_diagnostic_errors({:unclassified_modules, modules}),
     do: Enum.map(modules, &diagnostic("#{inspect(&1)} is not included in any boundary", file: module_source(&1)))
