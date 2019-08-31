@@ -143,6 +143,5 @@ defmodule Boundary.Checker do
       Enum.any?(Map.fetch!(boundaries, from_boundary).deps, &(&1 == to_boundary))
   end
 
-  defp exported?(_boundaries, boundary, boundary), do: true
   defp exported?(boundaries, boundary, module), do: Enum.any?(Map.fetch!(boundaries, boundary).exports, &(&1 == module))
 end

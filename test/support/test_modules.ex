@@ -1,7 +1,13 @@
-defmodule Boundary.TestModules.Foo do
-  def some_fun(), do: Boundary.TestModules.Bar.some_fun()
-end
+defmodule TestBoundaries do
+  use Boundary, deps: [Boundary]
 
-defmodule Boundary.TestModules.Bar do
-  def some_fun(), do: Boundary.TestModules.Foo.some_fun()
+  defmodule A do
+    use Boundary, deps: [Boundary, TestBoundaries.B]
+    def some_fun(), do: TestBoundaries.B.some_fun()
+  end
+
+  defmodule B do
+    use Boundary, deps: [Boundary]
+    def some_fun(), do: :ok
+  end
 end

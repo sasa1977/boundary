@@ -1,4 +1,5 @@
 defmodule Mix.Tasks.Compile.Boundary do
+  use Boundary, deps: [Boundary]
   use Mix.Task.Compiler
 
   @moduledoc """

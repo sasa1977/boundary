@@ -17,6 +17,8 @@ defmodule MySystemWeb do
   and import those modules here.
   """
 
+  use Boundary, deps: [MySystem], exports: [Endpoint]
+
   def controller do
     quote do
       use Phoenix.Controller, namespace: MySystemWeb

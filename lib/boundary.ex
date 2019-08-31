@@ -1,59 +1,42 @@
 defmodule Boundary do
   @moduledoc false
 
+  require Boundary.Definition
+  Boundary.Definition.generate(deps: [], exports: [Definition, MixCompiler])
+
+  defmacro __using__(opts) do
+    quote bind_quoted: [opts: opts] do
+      require Boundary.Definition
+      Boundary.Definition.generate(opts)
+    end
+  end
+
   def application() do
     calls =
       Mix.Tasks.Xref.calls()
       |> Stream.map(fn %{callee: {mod, _fun, _arg}} = entry -> Map.put(entry, :callee_module, mod) end)
       |> Enum.reject(&(&1.callee_module == &1.caller_module))
+      |> resolve_duplicates()
 
     modules =
       calls
       |> Stream.map(& &1.caller_module)
       |> MapSet.new()
 
-    %{modules: modules, boundaries: load_boundaries!(), calls: calls}
+    boundaries =
+      modules
+      |> Stream.map(&{&1, Boundary.Definition.get(&1)})
+      |> Enum.reject(&match?({_module, nil}, &1))
+
+    %{modules: modules, boundaries: boundaries, calls: calls}
   end
 
-  defp load_boundaries!() do
-    with {:ok, config_string} <- config_string(),
-         {:ok, boundaries} <- from_string(config_string) do
-      boundaries
-    else
-      {:error, reason} -> Mix.raise(reason)
-    end
+  defp resolve_duplicates(calls) do
+    # If there is a call from `Foo.Bar`, xref may include two entries, one with `Foo` and another with `Foo.Bar` as the
+    # caller. In such case, we'll consider only the call with the "deepest" caller (i.e. `Foo.Bar`).
+
+    calls
+    |> Enum.group_by(&{&1.file, &1.line, &1.callee})
+    |> Enum.map(fn {_, calls} -> Enum.max_by(calls, &String.length(inspect(&1.caller_module))) end)
   end
-
-  defp config_string() do
-    with {:error, _reason} <- File.read("boundaries.exs"),
-         do: {:error, "could not open `boundaries.exs`"}
-  end
-
-  @doc false
-  def from_string(string) do
-    {boundaries, _} = Code.eval_string(string)
-
-    if is_list(boundaries),
-      do: {:ok, Enum.map(boundaries, &normalize_boundary/1)},
-      else: {:error, "boundaries must be provided as a list"}
-  end
-
-  defp normalize_boundary(mod) when is_atom(mod), do: {mod, defaults(mod)}
-  defp normalize_boundary({mod, opts}), do: {mod, Map.merge(defaults(mod), normalize_opts(mod, opts))}
-  defp normalize_boundary(other), do: Mix.raise("Invalid boundary definition: #{inspect(other)}")
-
-  defp normalize_opts(mod, opts) do
-    opts
-    |> Map.new()
-    |> Map.take([:deps, :exports])
-    |> update_in(
-      [:exports],
-      fn
-        nil -> []
-        exports -> Enum.map(exports, &Module.concat(mod, &1))
-      end
-    )
-  end
-
-  defp defaults(mod), do: %{deps: [], exports: [mod]}
 end

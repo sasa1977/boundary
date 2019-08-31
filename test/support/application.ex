@@ -3,11 +3,8 @@ defmodule Boundary.Test.Application do
     %{modules: MapSet.new(), boundaries: [], ownership: %{}, membership: %{}}
   end
 
-  def check(app, calls) do
-    config_string = inspect(app.boundaries, limit: :infinity, pretty: true)
-    {:ok, boundaries} = Boundary.from_string(config_string)
-    Boundary.MixCompiler.check(%{boundaries: boundaries, modules: app.modules, calls: calls})
-  end
+  def check(app, calls),
+    do: Boundary.MixCompiler.check(%{boundaries: app.boundaries, modules: app.modules, calls: calls})
 
   def merge(app1, app2) do
     %{
