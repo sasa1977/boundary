@@ -19,7 +19,7 @@ defmodule BoundaryTest do
     end
   end
 
-  defp current_app_name() do
+  defp current_app_name do
     app = Keyword.fetch!(Mix.Project.config(), :app)
     Application.load(app)
     app

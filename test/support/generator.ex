@@ -1,10 +1,13 @@
 defmodule Boundary.Test.Generator do
+  @moduledoc false
+  # credo:disable-for-this-file Credo.Check.Readability.Specs
+
   import StreamData
   import ExUnitProperties, only: [gen: 1, gen: 2]
 
   alias Boundary.Test.Application
 
-  def app() do
+  def app do
     gen all roots <- module_tree(),
             roots = Enum.map(roots, &with_node_sizes/1),
             roots <- roots |> Enum.map(&pick_modules/1) |> fixed_list(),
@@ -239,7 +242,7 @@ defmodule Boundary.Test.Generator do
     frequency([{positive, constant(boolean)}, {negative, constant(not boolean)}])
   end
 
-  defp module_tree() do
+  defp module_tree do
     nonempty(
       tree(
         constant([]),
@@ -253,7 +256,7 @@ defmodule Boundary.Test.Generator do
     |> scale(&max(2, &1))
   end
 
-  defp module_part(), do: map(atom(:alias), fn full_alias -> :"Elixir.#{full_alias |> Module.split() |> hd()}" end)
+  defp module_part, do: map(atom(:alias), fn full_alias -> :"Elixir.#{full_alias |> Module.split() |> hd()}" end)
 
   defp concat(nil, name), do: name
   defp concat(name, nil), do: name

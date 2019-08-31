@@ -1,4 +1,6 @@
 defmodule Mix.Tasks.Compile.Boundary do
+  # credo:disable-for-this-file Credo.Check.Readability.Specs
+
   use Boundary, deps: [Boundary]
   use Mix.Task.Compiler
 

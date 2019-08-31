@@ -18,22 +18,23 @@ defmodule Boundary.Checker do
 
   @spec check(application: Boundary.application(), calls: [call]) :: :ok | {:error, error}
   def check(opts \\ []) do
-    with app = Keyword.get_lazy(opts, :application, &current_app/0),
-         :ok <- check_valid_deps(app.boundaries),
+    app = Keyword.get_lazy(opts, :application, &current_app/0)
+
+    with :ok <- check_valid_deps(app.boundaries),
          :ok <- check_cycles(app.boundaries),
          :ok <- check_unclassified_modules(app.modules.unclassified),
          :ok <- check_unused_boundaries(app.boundaries, app.modules.classified),
          do: check_calls(app.boundaries, app.modules.classified, Keyword.get_lazy(opts, :calls, &calls/0))
   end
 
-  defp current_app() do
+  defp current_app do
     app = Keyword.fetch!(Mix.Project.config(), :app)
     Application.load(app)
     Boundary.application(app)
   end
 
   @doc false
-  def calls() do
+  def calls do
     Mix.Tasks.Xref.calls()
     |> Stream.map(fn %{callee: {mod, _fun, _arg}} = entry -> Map.put(entry, :callee_module, mod) end)
     |> Enum.reject(&(&1.callee_module == &1.caller_module))

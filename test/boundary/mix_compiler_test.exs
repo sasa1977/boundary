@@ -2,8 +2,8 @@ defmodule Boundary.MixCompilerTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
-  alias Boundary.Test.Generator
   alias Boundary.Test.Application
+  alias Boundary.Test.Generator
 
   describe "boundaries.exs errors" do
     property "invalid deps are reported" do

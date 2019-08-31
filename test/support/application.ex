@@ -1,5 +1,8 @@
 defmodule Boundary.Test.Application do
-  def empty() do
+  @moduledoc false
+  # credo:disable-for-this-file Credo.Check.Readability.Specs
+
+  def empty do
     %{modules: MapSet.new(), boundaries: %{}, ownership: %{}, membership: %{}}
   end
 
