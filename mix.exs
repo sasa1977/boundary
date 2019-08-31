@@ -9,7 +9,8 @@ defmodule Boundary.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       compilers: Mix.compilers() ++ extra_compilers(Mix.env()),
-      elixirc_paths: elixirc_paths(Mix.env())
+      elixirc_paths: elixirc_paths(Mix.env()),
+      docs: docs()
     ]
   end
 
@@ -24,7 +25,8 @@ defmodule Boundary.MixProject do
   defp deps do
     [
       {:stream_data, "~> 0.4.0", only: :test},
-      {:dialyxir, "~> 0.5", only: [:dev], runtime: false}
+      {:dialyxir, "~> 0.5", only: [:dev], runtime: false},
+      {:ex_doc, "~> 0.21", only: :dev, runtime: false}
     ]
   end
 
@@ -33,4 +35,11 @@ defmodule Boundary.MixProject do
 
   defp extra_compilers(:prod), do: []
   defp extra_compilers(_env), do: [:boundary]
+
+  defp docs() do
+    [
+      main: "Boundary",
+      extras: ["README.md"]
+    ]
+  end
 end
