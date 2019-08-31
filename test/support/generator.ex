@@ -162,17 +162,6 @@ defmodule Boundary.Test.Generator do
             do: {new_modules, Application.add_modules(app, new_modules)}
   end
 
-  def with_empty_boundaries(app) do
-    gen all new_roots <- list_of(unknown_boundary(app, module_part()), min_length: 1, max_length: 10),
-            new_boundaries <-
-              new_roots
-              |> Enum.map(&map(atom(:alias), fn rest -> Module.concat(&1, rest) end))
-              |> fixed_list()
-              |> map(&Enum.uniq/1),
-            app = Enum.reduce(new_boundaries, app, &Application.add_boundary(&2, &1)),
-            do: {new_boundaries, app}
-  end
-
   defp unknown_boundary(app, generator),
     do: filter(generator, &is_nil(Enum.find(app.boundaries, fn {boundary, _} -> boundary == &1 end)))
 

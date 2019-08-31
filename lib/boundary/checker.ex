@@ -13,7 +13,6 @@ defmodule Boundary.Checker do
           {:invalid_deps, [{:unknown | :ignored, Boundary.name()}]}
           | {:cycles, [Boundary.name()]}
           | {:unclassified_modules, [module]}
-          | {:empty_boundaries, [Boundary.name()]}
           | {:invalid_calls, [call]}
 
   @spec check(application: Boundary.application(), calls: [call]) :: :ok | {:error, error}
@@ -23,7 +22,6 @@ defmodule Boundary.Checker do
     with :ok <- check_valid_deps(app.boundaries),
          :ok <- check_cycles(app.boundaries),
          :ok <- check_unclassified_modules(app.modules.unclassified),
-         :ok <- check_empty_boundaries(app.boundaries, app.modules.classified),
          do: check_calls(app.boundaries, app.modules.classified, Keyword.get_lazy(opts, :calls, &calls/0))
   end
 
@@ -97,16 +95,6 @@ defmodule Boundary.Checker do
 
   defp check_unclassified_modules([]), do: :ok
   defp check_unclassified_modules(unclassified_modules), do: {:error, {:unclassified_modules, unclassified_modules}}
-
-  defp check_empty_boundaries(boundaries, classified_modules) do
-    all_boundaries = boundaries |> Map.keys() |> MapSet.new()
-    used_boundaries = classified_modules |> Map.values() |> MapSet.new()
-    empty_boundaries = MapSet.difference(all_boundaries, used_boundaries)
-
-    if MapSet.size(empty_boundaries) == 0,
-      do: :ok,
-      else: {:error, {:empty_boundaries, empty_boundaries |> Enum.sort()}}
-  end
 
   defp check_calls(boundaries, classified_modules, calls) do
     calls

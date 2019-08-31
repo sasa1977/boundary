@@ -77,20 +77,6 @@ defmodule Boundary.MixCompilerTest do
     end
   end
 
-  property "empty boundaries are reported" do
-    check all app <- Generator.app(),
-              {empty_boundaries, app} <- Generator.with_empty_boundaries(app),
-              expected_errors =
-                Enum.map(
-                  empty_boundaries,
-                  &Boundary.MixCompiler.diagnostic("boundary #{inspect(&1)} doesn't include any module")
-                ),
-              max_runs: 10 do
-      assert {:error, errors} = Application.check(app, [])
-      assert Enum.sort(errors) == Enum.sort(expected_errors)
-    end
-  end
-
   test "empty app with no calls is valid" do
     app = Application.empty()
     assert Application.check(app, []) == :ok

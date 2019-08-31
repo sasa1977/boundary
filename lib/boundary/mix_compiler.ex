@@ -22,9 +22,6 @@ defmodule Boundary.MixCompiler do
     )
   end
 
-  defp to_diagnostic_errors({:empty_boundaries, boundaries}),
-    do: Enum.map(boundaries, &diagnostic("boundary #{inspect(&1)} doesn't include any module"))
-
   defp to_diagnostic_errors({:cycles, cycles}) do
     cycles =
       cycles
