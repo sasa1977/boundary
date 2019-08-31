@@ -14,8 +14,9 @@ defmodule BoundaryTest do
     test "boundaries" do
       boundaries = Boundary.application(current_app_name()).boundaries
 
-      assert Enum.member?(boundaries, {A, %{deps: [Boundary, B], exports: [A]}})
-      assert Enum.member?(boundaries, {B, %{deps: [Boundary], exports: [B]}})
+      assert Enum.member?(boundaries, {TestBoundaries, %{deps: [], exports: [], ignore?: true}})
+      assert Enum.member?(boundaries, {A, %{deps: [Boundary, B], exports: [A], ignore?: false}})
+      assert Enum.member?(boundaries, {B, %{deps: [Boundary], exports: [B], ignore?: false}})
     end
   end
 

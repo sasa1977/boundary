@@ -54,20 +54,40 @@ defmodule Boundary.Definition do
     end
   end
 
-  def normalize(boundary, definition), do: Map.merge(defaults(boundary), normalize_opts(boundary, definition))
+  def normalize(boundary, definition) do
+    defaults()
+    |> Map.merge(Map.new(definition))
+    |> validate!()
+    |> expand_exports(boundary)
+  end
 
-  defp defaults(boundary), do: %{deps: [], exports: [boundary]}
+  defp defaults, do: %{deps: [], exports: [], ignore?: false}
 
-  defp normalize_opts(boundary, definition) do
+  defp validate!(definition) do
+    valid_keys = ~w/deps exports ignore?/a
+
+    with [_ | _] = invalid_options <- definition |> Map.keys() |> Enum.reject(&(&1 in valid_keys)) do
+      error = "Invalid options: #{invalid_options |> Stream.map(&inspect/1) |> Enum.join(", ")}"
+      raise ArgumentError, error
+    end
+
+    if definition.ignore? do
+      if definition.deps != [], do: raise(ArgumentError, message: "deps are not allowed in ignored boundaries")
+      if definition.exports != [], do: raise(ArgumentError, message: "exports are not allowed in ignored boundaries")
+    end
+
     definition
-    |> Map.new()
-    |> Map.take([:deps, :exports])
-    |> update_in(
-      [:exports],
-      fn
-        nil -> [boundary]
-        exports -> [boundary | Enum.map(exports, &Module.concat(boundary, &1))]
-      end
-    )
+  end
+
+  defp expand_exports(definition, boundary) do
+    with %{ignore?: false} <- definition do
+      update_in(
+        definition.exports,
+        fn exports ->
+          expanded_aliases = Enum.map(exports, &Module.concat(boundary, &1))
+          [boundary | expanded_aliases]
+        end
+      )
+    end
   end
 end

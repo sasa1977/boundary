@@ -122,6 +122,66 @@ defmodule Boundary do
 
   Of course, in-boundary cross-module dependencies are always allowed (any module may use all
   other modules from the same boundary).
+
+  ## Ignored boundaries
+
+  It is possible to exclude some modules from cross-boundary checks by defining an __ignored__ boundary:
+
+  ```
+  defmodule MySystem do
+    use Boundary, ignore?: true
+  end
+  ```
+
+  When a boundary is ignored, all modules belonging to it can use any other module, and can be used
+  by any other module.
+
+  The purpose of this options is to support relaxing rules in some parts of your code. For example,
+  you may wish to ignore boundary constraints for your test support modules. By introducing a
+  top-level boundary for such modules (e.g. `MySystemTest`), and marking this boundary as ignored,
+  you can easily achieve that.
+
+  Another scenario is when introducing boundaries in an existing, possibly large project, which
+  has many complex dependencies that can't be untangled trivially. In such case, ignored
+  boundaries provide a mechanism for gradually introducing boundaries into the project.
+
+  For example, you could first define ignored boundaries which encompass the entire system:
+
+  ```
+  defmodule MySystem do
+    use Boundary, ignore?: true
+  end
+
+  defmodule MySystemWeb do
+    use Boundary, ignore?: true
+  end
+  ```
+
+  Now, you can pick smaller parts of your code where you can clean up the dependencies:
+
+  ```
+  defmodule MySystem.Context1 do
+    use Boundary, exports: [...], deps: []
+  end
+
+  defmodule MySystemWeb.Controller1 do
+    use Boundary, exports: [], deps: [MySystem.Context1]
+  end
+  ```
+
+  Going further, you can gradually expand the parts of your code covered by non-ignored boundaries.
+  Once you're properly covering the entire system, you can remove the intermediate finer-grained
+  boundaries, and specify the rules at the higher-level:
+
+  ```
+  defmodule MySystem do
+    use Boundary, exports: [...], deps: []
+  end
+
+  defmodule MySystemWeb do
+    use Boundary, exports: [Endpoint], deps: [...]
+  end
+  ```
   """
   @type application :: %{
           boundaries: %{name => definition},
@@ -132,7 +192,7 @@ defmodule Boundary do
         }
 
   @type name :: module
-  @type definition :: %{deps: [name], exports: [module]}
+  @type definition :: %{deps: [name], exports: [module], ignore: boolean}
 
   require Boundary.Definition
   Boundary.Definition.generate(deps: [], exports: [Definition, MixCompiler])

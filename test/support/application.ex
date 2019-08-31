@@ -35,7 +35,13 @@ defmodule Boundary.Test.Application do
   def num_boundaries(app), do: map_size(app.ownership)
 
   def add_boundary(app, boundary, boundary_data \\ []) do
-    boundaries = Map.put(app.boundaries, boundary, Map.merge(%{exports: [], deps: []}, Map.new(boundary_data)))
+    boundaries =
+      Map.put(
+        app.boundaries,
+        boundary,
+        Map.merge(%{exports: [], deps: [], ignore?: false}, Map.new(boundary_data))
+      )
+
     ownership = Map.put_new(app.ownership, boundary, MapSet.new())
     %{app | boundaries: boundaries, ownership: ownership}
   end
@@ -80,6 +86,20 @@ defmodule Boundary.Test.Application do
     }
     |> Stream.reject(fn {_key, elements} -> Enum.empty?(elements) end)
     |> Map.new()
+  end
+
+  def ignore_boundary(app, boundary) do
+    boundaries =
+      app.boundaries
+      |> Enum.into(
+        %{},
+        fn {name, definition} ->
+          {name, update_in(definition.deps, fn deps -> Enum.reject(deps, &(&1 == boundary)) end)}
+        end
+      )
+      |> Map.update!(boundary, &%{&1 | deps: [], exports: [], ignore?: true})
+
+    %{app | boundaries: boundaries}
   end
 
   defp invalid_cross_boundary_calls(app) do

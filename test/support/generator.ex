@@ -111,13 +111,34 @@ defmodule Boundary.Test.Generator do
   defp make_deps([a, b]), do: [{a, b}]
   defp make_deps([a | rest]), do: Enum.map(rest, &{a, &1}) ++ make_deps(rest)
 
-  def with_invalid_deps(app) do
-    gen all invalid_deps <- list_of(unknown_boundary(app, atom(:alias)), min_length: 1, max_length: 20),
-            length = length(invalid_deps),
-            invalid_boundaries <- list_of(member_of(app.boundaries), min_length: length, max_length: length),
+  def with_unknown_deps(app) do
+    gen all unknown_boundaries <- list_of(unknown_boundary(app, atom(:alias)), min_length: 1, max_length: 20),
+            app <- add_deps(app, unknown_boundaries),
+            do: {unknown_boundaries, app}
+  end
+
+  def with_ignored_deps(app) do
+    gen all ignored_deps <- list_of(unknown_boundary(app, atom(:alias)), min_length: 1, max_length: 20),
+            app =
+              Enum.reduce(
+                ignored_deps,
+                app,
+                fn boundary, app ->
+                  app
+                  |> Application.add_boundary(boundary, ignore?: true)
+                  |> Application.add_module({boundary, boundary})
+                end
+              ),
+            app <- add_deps(app, ignored_deps),
+            do: {ignored_deps, app}
+  end
+
+  defp add_deps(app, deps) do
+    length = length(deps)
+
+    gen all invalid_boundaries <- list_of(member_of(app.boundaries), min_length: length, max_length: length),
             invalid_boundaries = Enum.map(invalid_boundaries, fn {boundary, _} -> boundary end),
-            app = Application.add_deps(app, Enum.zip(invalid_boundaries, invalid_deps)),
-            do: {invalid_deps, app}
+            do: Application.add_deps(app, Enum.zip(invalid_boundaries, deps))
   end
 
   def with_cycle(app) do

@@ -12,10 +12,17 @@ defmodule Boundary.MixCompiler do
   defp to_diagnostic_errors({:unclassified_modules, modules}),
     do: Enum.map(modules, &diagnostic("#{inspect(&1)} is not included in any boundary", file: module_source(&1)))
 
-  defp to_diagnostic_errors({:invalid_deps, boundaries}),
-    do: Enum.map(boundaries, &diagnostic("#{inspect(&1)} is listed as a dependency but not declared as a boundary"))
+  defp to_diagnostic_errors({:invalid_deps, boundaries}) do
+    Enum.map(
+      boundaries,
+      fn
+        {:unknown, dep} -> diagnostic("unknown boundary #{inspect(dep)} is listed as a dependency")
+        {:ignored, dep} -> diagnostic("ignored boundary #{inspect(dep)} is listed as a dependency")
+      end
+    )
+  end
 
-  defp to_diagnostic_errors({:unused_boundaries, boundaries}),
+  defp to_diagnostic_errors({:empty_boundaries, boundaries}),
     do: Enum.map(boundaries, &diagnostic("boundary #{inspect(&1)} doesn't include any module"))
 
   defp to_diagnostic_errors({:cycles, cycles}) do

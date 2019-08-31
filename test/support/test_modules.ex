@@ -1,7 +1,7 @@
 defmodule TestBoundaries do
   @moduledoc false
 
-  use Boundary, deps: [Boundary]
+  use Boundary, ignore?: true
 
   defmodule A do
     @moduledoc false
