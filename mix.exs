@@ -10,7 +10,8 @@ defmodule Boundary.MixProject do
       deps: deps(),
       compilers: Mix.compilers() ++ extra_compilers(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
-      docs: docs()
+      docs: docs(),
+      dialyzer: dialyzer()
     ]
   end
 
@@ -41,6 +42,12 @@ defmodule Boundary.MixProject do
     [
       main: "Boundary",
       extras: ["README.md"]
+    ]
+  end
+
+  defp dialyzer() do
+    [
+      plt_add_apps: [:mix]
     ]
   end
 end
