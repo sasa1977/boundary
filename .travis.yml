@@ -12,8 +12,9 @@ cache:
   - deps
   - _build
 script:
+  - MIX_ENV=test mix compile --force --warnings-as-errors
   - mix docs
   - mix test
   - mix format
-  - mix credo list
+  - MIX_ENV=test mix credo list
   - mix dialyzer
