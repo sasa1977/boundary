@@ -153,13 +153,23 @@ defmodule Boundary.Test.Generator do
     do: (boundaries ++ [hd(boundaries)]) |> Stream.chunk_every(2, 1, :discard) |> Enum.map(&List.to_tuple/1)
 
   def with_unclassified_modules(app) do
+    gen all new_modules <- new_modules(app),
+            do: {new_modules, Application.add_modules(app, new_modules)}
+  end
+
+  def with_unclassified_protocol_impls(app) do
+    gen all new_modules <- new_modules(app),
+            do: Enum.reduce(new_modules, app, &Application.add_module(&2, {nil, &1}, protocol_impl?: true))
+  end
+
+  defp new_modules(app) do
     gen all new_roots <- list_of(unknown_boundary(app, module_part()), min_length: 1, max_length: 10),
             new_modules <-
               new_roots
               |> Enum.map(&map(atom(:alias), fn rest -> Module.concat(&1, rest) end))
               |> fixed_list()
               |> map(&Enum.uniq/1),
-            do: {new_modules, Application.add_modules(app, new_modules)}
+            do: new_modules
   end
 
   defp unknown_boundary(app, generator),

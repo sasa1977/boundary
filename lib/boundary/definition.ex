@@ -10,8 +10,8 @@ defmodule Boundary.Definition do
   end
 
   def boundaries(modules) do
-    modules = MapSet.new(modules)
-    boundaries = load_boundaries(modules)
+    module_names = Enum.into(modules, MapSet.new(), & &1.name)
+    boundaries = load_boundaries(module_names)
     %{modules: classify_modules(boundaries, modules), boundaries: boundaries}
   end
 
@@ -28,16 +28,16 @@ defmodule Boundary.Definition do
         modules,
         {%{}, MapSet.new()},
         fn module, {classified, unclassified} ->
-          parts = Module.split(module)
+          parts = Module.split(module.name)
 
           case Enum.find(boundaries_search_space, &List.starts_with?(parts, &1.parts)) do
             nil -> {classified, MapSet.put(unclassified, module)}
-            boundary -> {Map.put(classified, module, boundary.name), unclassified}
+            boundary -> {Map.put(classified, module.name, boundary.name), unclassified}
           end
         end
       )
 
-    %{classified: classified, unclassified: MapSet.to_list(unclassified)}
+    %{classified: classified, unclassified: unclassified}
   end
 
   defp load_boundaries(modules) do

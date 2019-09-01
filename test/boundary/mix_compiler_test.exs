@@ -68,6 +68,14 @@ defmodule Boundary.MixCompilerTest do
     end
   end
 
+  property "unclassified protocol implementations are not reported" do
+    check all app <- Generator.app(),
+              app <- Generator.with_unclassified_protocol_impls(app),
+              max_runs: 10 do
+      assert Application.check(app, []) == []
+    end
+  end
+
   property "ignored boundaries are not reported as unclassified" do
     check all app <- Generator.app(),
               {unclassified_modules, app} <- Generator.with_unclassified_modules(app),

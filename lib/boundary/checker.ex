@@ -89,12 +89,16 @@ defmodule Boundary.Checker do
     end
   end
 
-  defp unclassified_modules(unclassified_modules),
-    do: Stream.map(unclassified_modules, &{:unclassified_module, &1})
+  defp unclassified_modules(unclassified_modules) do
+    unclassified_modules
+    |> Stream.reject(& &1.protocol_impl?)
+    |> Stream.map(&{:unclassified_module, &1.name})
+  end
 
   defp invalid_calls(boundaries, classified_modules, calls) do
     calls
     |> Stream.filter(&Map.has_key?(classified_modules, &1.callee_module))
+    |> Stream.filter(&Map.has_key?(classified_modules, &1.caller_module))
     |> Enum.sort_by(&{&1.file, &1.line})
     |> Stream.map(&call_error(&1, boundaries, classified_modules))
     |> Stream.reject(&is_nil/1)

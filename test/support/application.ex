@@ -46,14 +46,15 @@ defmodule Boundary.Test.Application do
     %{app | boundaries: boundaries, ownership: ownership}
   end
 
-  def add_module(app, {boundary, module}) do
+  def add_module(app, {boundary, module_name}, opts \\ []) do
+    module = Map.merge(%{name: module_name, protocol_impl?: false}, Map.new(opts))
     modules = MapSet.put(app.modules, module)
 
     {ownership, membership} =
       if boundary != nil do
         {
-          Map.update!(app.ownership, boundary, &MapSet.put(&1, module)),
-          Map.put(app.membership, module, boundary)
+          Map.update!(app.ownership, boundary, &MapSet.put(&1, module_name)),
+          Map.put(app.membership, module_name, boundary)
         }
       else
         {app.ownership, app.membership}

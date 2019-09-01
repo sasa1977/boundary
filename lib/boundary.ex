@@ -187,7 +187,7 @@ defmodule Boundary do
           boundaries: %{name => definition},
           modules: %{
             classified: %{module => name},
-            unclassified: [module]
+            unclassified: [%{name: module, protocol_impl?: boolean}]
           }
         }
 
@@ -209,6 +209,10 @@ defmodule Boundary do
   def application(app_name) do
     app_name
     |> Application.spec(:modules)
+    |> Stream.map(&%{name: &1, protocol_impl?: protocol_impl?(&1)})
     |> Boundary.Definition.boundaries()
   end
+
+  defp protocol_impl?(module),
+    do: function_exported?(module, :__impl__, 1)
 end
