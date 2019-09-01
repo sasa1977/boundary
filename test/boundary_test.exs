@@ -3,18 +3,13 @@ defmodule BoundaryTest do
 
   alias TestBoundaries.{A, B}
 
-  test "classified modules" do
-    modules = Boundary.application(current_app_name()).modules.classified
+  test "classification" do
+    modules = Boundary.application(current_app_name()).modules
 
-    assert Map.fetch(modules, A) == {:ok, A}
-    assert Map.fetch(modules, B) == {:ok, B}
-  end
-
-  test "unclassified modules" do
-    assert Enum.member?(
-             Boundary.application(current_app_name()).modules.unclassified,
-             %{name: Inspect.TestBoundaries.A, protocol_impl?: true}
-           )
+    assert Map.fetch(modules.classified, A) == {:ok, A}
+    assert Map.fetch(modules.classified, B) == {:ok, B}
+    assert Map.fetch(modules.classified, String.Chars.TestBoundaries.A) == {:ok, A}
+    assert Enum.member?(modules.unclassified, %{name: Inspect.TestBoundaries.A, protocol_impl?: true})
   end
 
   test "boundaries" do

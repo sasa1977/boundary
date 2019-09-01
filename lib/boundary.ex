@@ -78,6 +78,38 @@ defmodule Boundary do
   child. At the moment, nesting of boundaries (defining internal boundaries within other
   boundaries) is not supported by this library.
 
+  ### Protocol implementation
+
+  Consider the following protocol implementation:
+
+  ```
+  defimpl String.Chars, for: MySchema, do: # ...
+  ```
+
+  This code will generate the module `String.Chars.MySchema`. Therefore, the module sits in a
+  completely different "namespace". In addition, the desired boundary of such module can vary from
+  one case to another. In some cases, a protocol implementation might be a UI concern, while in
+  others, it might be a domain concern.
+
+  For these reasons, protocol implementations are treated in a special way. A protocol
+  implementation is by default unclassified (it doesn't belong to any boundary). However, the
+  boundary checker will not emit a warning for unclassified protocol implementations.
+
+  In addition, you can manually classify the protocol implementation, as demonstrated in the
+  following example:
+
+  ```
+  defimpl String.Chars, for: MySchema do
+    use Boundary, classify_to: MySystem
+    # ...
+  end
+  ```
+
+  Here, we're manually assigning the module (`String.Chars.MySchema`) to the `MySystem` boundary.
+
+  Notice that `:classify_to` option is only allowed for protocol implementations. Plain modules
+  (the ones which don't implement a protocol) can't be manually classified.
+
   ## Exports
 
   Exports are boundary modules which can be used by modules from other boundaries. A boundary
@@ -136,7 +168,7 @@ defmodule Boundary do
   When a boundary is ignored, all modules belonging to it can use any other module, and can be used
   by any other module.
 
-  The purpose of this options is to support relaxing rules in some parts of your code. For example,
+  The purpose of this option is to support relaxing rules in some parts of your code. For example,
   you may wish to ignore boundary constraints for your test support modules. By introducing a
   top-level boundary for such modules (e.g. `MySystemTest`), and marking this boundary as ignored,
   you can easily achieve that.
@@ -209,10 +241,17 @@ defmodule Boundary do
   def application(app_name) do
     app_name
     |> Application.spec(:modules)
-    |> Stream.map(&%{name: &1, protocol_impl?: protocol_impl?(&1)})
+    |> Stream.map(&%{name: &1, protocol_impl?: protocol_impl?(&1), classify_to: classify_to(&1)})
     |> Boundary.Definition.boundaries()
   end
 
   defp protocol_impl?(module),
     do: function_exported?(module, :__impl__, 1)
+
+  defp classify_to(module) do
+    case Keyword.get(module.__info__(:attributes), Boundary.Target) do
+      [classify_to] -> classify_to
+      nil -> nil
+    end
+  end
 end

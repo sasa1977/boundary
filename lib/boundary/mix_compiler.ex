@@ -7,6 +7,9 @@ defmodule Boundary.MixCompiler do
     |> Boundary.Checker.errors()
     |> Stream.map(&to_diagnostic_error/1)
     |> Enum.sort_by(&{&1.file, &1.position})
+  rescue
+    e in Boundary.DefinitionError ->
+      [diagnostic(e.message, file: e.file, position: e.line)]
   end
 
   defp to_diagnostic_error({:unclassified_module, module}),

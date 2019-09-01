@@ -47,7 +47,7 @@ defmodule Boundary.Test.Application do
   end
 
   def add_module(app, {boundary, module_name}, opts \\ []) do
-    module = Map.merge(%{name: module_name, protocol_impl?: false}, Map.new(opts))
+    module = Map.merge(%{name: module_name, protocol_impl?: false, classify_to: nil}, Map.new(opts))
     modules = MapSet.put(app.modules, module)
 
     {ownership, membership} =
