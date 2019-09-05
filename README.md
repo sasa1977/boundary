@@ -84,7 +84,7 @@ warning: forbidden call to MySystemWeb.Endpoint.url/0
   lib/my_system/user.ex:3
 ```
 
-The complete working example is available [here](demos/my_system).
+The complete working example is available [here](test/fixtures/my_system).
 
 Because `boundary` is implemented as a mix compiler, it integrates seamlessly with editors which can work with mix compiler. For example, in VS Code with [Elixir LS](https://github.com/JakeBecker/vscode-elixir-ls):
 

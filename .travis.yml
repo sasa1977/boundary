@@ -11,10 +11,12 @@ cache:
   - $HOME/.mix
   - deps
   - _build
+  - demos/my_system/deps
+  - demos/my_system/_build
 script:
   - MIX_ENV=test mix compile --force --warnings-as-errors
   - mix docs
-  - mix test
+  - mix test --include integration
   - mix format
   - MIX_ENV=test mix credo list
   - mix dialyzer
