@@ -13,12 +13,18 @@ defmodule Boundary.IntegrationTest do
     {output, _code} = mix("my_system", ~w/compile/)
 
     warnings = warnings(output)
-    assert length(warnings) == 1
+    assert length(warnings) == 2
 
     assert Enum.member?(warnings, %{
              explanation: "(calls from MySystem to MySystemWeb are not allowed)",
              location: "lib/my_system/user.ex:3",
              warning: "forbidden call to MySystemWeb.Endpoint.url/0"
+           })
+
+    assert Enum.member?(warnings, %{
+             explanation: "(calls from MySystemWeb to MySystem.Application are not allowed)",
+             location: "lib/my_system_web/templates/error/index.html.eex:1",
+             warning: "forbidden call to MySystem.Application.foo/0"
            })
   end
 

@@ -1,0 +1,1 @@
+<%= MySystem.Application.foo() %>

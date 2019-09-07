@@ -40,9 +40,13 @@ defmodule Boundary.Checker do
   def calls do
     Mix.Tasks.Xref.calls()
     |> Stream.map(fn %{callee: {mod, _fun, _arg}} = entry -> Map.put(entry, :callee_module, mod) end)
-    |> Enum.reject(&(&1.callee_module == &1.caller_module))
+    |> Stream.reject(&(&1.callee_module == &1.caller_module))
+    |> Stream.map(&normalize_line/1)
     |> resolve_duplicates()
   end
+
+  defp normalize_line(%{line: {file, line}} = call), do: %{call | file: file, line: line}
+  defp normalize_line(call), do: call
 
   defp resolve_duplicates(calls) do
     # If there is a call from `Foo.Bar`, xref may include two entries, one with `Foo` and another with `Foo.Bar` as the

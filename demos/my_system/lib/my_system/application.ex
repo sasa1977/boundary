@@ -27,4 +27,6 @@ defmodule MySystem.Application do
     MySystemWeb.Endpoint.config_change(changed, removed)
     :ok
   end
+
+  def foo(), do: :ok
 end
