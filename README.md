@@ -1,6 +1,6 @@
 # Boundary
 
-Library which allows you to define and enforce boundaries in your Elixir projects without needing to turn your code into an umbrella application. Compared to umbrellas, `boundary` requires much less ceremony, while giving you a finer-grained control over cross-module dependencies.
+Boundary is a library which helps managing and restraining cross-module dependencies in Elixir projects.
 
 ## Status
 
