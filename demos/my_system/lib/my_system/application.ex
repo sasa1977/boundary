@@ -3,6 +3,7 @@ defmodule MySystem.Application do
   # for more information on OTP Applications
   @moduledoc false
 
+  use Boundary, deps: [MySystem, MySystemWeb]
   use Application
 
   def start(_type, _args) do
