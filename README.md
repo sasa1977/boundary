@@ -92,6 +92,20 @@ Because `boundary` is implemented as a mix compiler, it integrates seamlessly wi
 
 ![VS Code warning 2](images/vscode_warning_2.png)
 
+## Troubleshooting
+
+### Boundary loads the application
+
+Boundary loads the applications because it needs to fetch module attributes.
+If you're loading your application in your code, for example in test. Treat the case when the application is already loaded as a success case.
+
+```elixir
+case Application.load(:my_app) do
+  :ok -> :ok
+  {:error, {:already_loaded, :my_app}} -> :ok
+end
+```
+
 ## Roadmap
 
 - [ ] support nested boundaries (defining internal boundaries within a boundary)
