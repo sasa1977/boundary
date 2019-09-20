@@ -33,7 +33,8 @@ defmodule Boundary.MixCompiler do
 
     message =
       "forbidden call to #{Exception.format_mfa(m, f, a)}\n" <>
-        "  (calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
+        "  (calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)\n" <>
+        "  (call originated from #{inspect(error.caller)})"
 
     diagnostic(message, file: error.file, position: error.line)
   end

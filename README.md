@@ -81,6 +81,7 @@ $ mix compile
 
 warning: forbidden call to MySystemWeb.Endpoint.url/0
   (calls from MySystem to MySystemWeb are not allowed)
+  (call originated from MySystem.User)
   lib/my_system/user.ex:3
 ```
 
