@@ -17,12 +17,14 @@ defmodule Boundary.IntegrationTest do
 
     assert Enum.member?(warnings, %{
              explanation: "(calls from MySystem to MySystemWeb are not allowed)",
+             callee: "(call originated from MySystem.User)",
              location: "lib/my_system/user.ex:3",
              warning: "forbidden call to MySystemWeb.Endpoint.url/0"
            })
 
     assert Enum.member?(warnings, %{
              explanation: "(calls from MySystemWeb to MySystem.Application are not allowed)",
+             callee: "(call originated from MySystemWeb.ErrorView)",
              location: "lib/my_system_web/templates/error/index.html.eex:1",
              warning: "forbidden call to MySystem.Application.foo/0"
            })
@@ -55,11 +57,11 @@ defmodule Boundary.IntegrationTest do
     output
     |> String.split(~r/\n|\r/)
     |> Stream.map(&String.trim/1)
-    |> Stream.chunk_every(3, 1)
+    |> Stream.chunk_every(4, 1)
     |> Stream.filter(&match?("warning: " <> _, hd(&1)))
-    |> Enum.map(fn ["warning: " <> warning, line_2, line_3] ->
+    |> Enum.map(fn ["warning: " <> warning, line_2, line_3, line_4] ->
       if(String.starts_with?(line_2, "("),
-        do: %{explanation: line_2, location: line_3},
+        do: %{explanation: line_2, callee: line_3, location: line_4},
         else: %{location: line_2}
       )
       |> Map.put(:warning, String.trim(warning))
