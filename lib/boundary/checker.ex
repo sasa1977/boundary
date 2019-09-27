@@ -123,6 +123,7 @@ defmodule Boundary.Checker do
           from_boundary: from_boundary,
           to_boundary: to_boundary,
           callee: entry.callee,
+          caller: entry.caller_module,
           file: entry.file,
           line: entry.line
         }

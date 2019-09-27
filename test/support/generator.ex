@@ -56,7 +56,8 @@ defmodule Boundary.Test.Generator do
     diagnostic(
       call,
       "forbidden call to #{Exception.format_mfa(m, f, a)}\n" <>
-        "  (calls from #{inspect(from_boundary)} to #{inspect(to_boundary)} are not allowed)"
+        "  (calls from #{inspect(from_boundary)} to #{inspect(to_boundary)} are not allowed)\n" <>
+        "  (call originated from #{inspect(call.caller_module)})"
     )
   end
 
