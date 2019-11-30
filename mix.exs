@@ -5,7 +5,7 @@ defmodule Boundary.MixProject do
     [
       app: :boundary,
       version: "0.1.0",
-      elixir: "~> 1.9",
+      elixir: "~> 1.10.0-dev",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       compilers: Mix.compilers() ++ extra_compilers(Mix.env()),
