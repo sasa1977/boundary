@@ -38,7 +38,7 @@ defmodule Boundary.Checker do
 
   @doc false
   def calls do
-    Mix.Tasks.Xref.calls()
+    Mix.Tasks.Compile.BoundaryXref.calls()
     |> Stream.map(fn %{callee: {mod, _fun, _arg}} = entry -> Map.put(entry, :callee_module, mod) end)
     |> Stream.reject(&(&1.callee_module == &1.caller_module))
     |> Stream.map(&normalize_line/1)

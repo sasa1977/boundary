@@ -8,7 +8,7 @@ defmodule Boundary.MixProject do
       elixir: "~> 1.10.0-dev",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      compilers: Mix.compilers() ++ extra_compilers(Mix.env()),
+      compilers: Enum.concat([leading_compilers(Mix.env()), Mix.compilers(), trailing_compilers(Mix.env())]),
       elixirc_paths: elixirc_paths(Mix.env()),
       docs: docs(),
       dialyzer: dialyzer()
@@ -28,15 +28,19 @@ defmodule Boundary.MixProject do
       {:stream_data, "~> 0.4.0", only: :test},
       {:dialyxir, "~> 0.5", only: :dev, runtime: false},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
-      {:credo, "~> 1.1", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.1", only: [:dev, :test], runtime: false},
+      {:boundary_xref, path: "boundary_xref", runtime: false}
     ]
   end
 
   defp elixirc_paths(:test), do: ~w(lib test/support)
   defp elixirc_paths(_), do: ~w(lib)
 
-  defp extra_compilers(:prod), do: []
-  defp extra_compilers(_env), do: [:boundary]
+  defp leading_compilers(:prod), do: []
+  defp leading_compilers(_env), do: [:boundary_xref]
+
+  defp trailing_compilers(:prod), do: []
+  defp trailing_compilers(_env), do: [:boundary]
 
   defp docs() do
     [
