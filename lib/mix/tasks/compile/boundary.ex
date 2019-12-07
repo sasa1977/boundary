@@ -110,7 +110,9 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   def trace(_event, _env), do: :ok
 
-  defp after_compiler({:ok, diagnostics}, argv) do
+  defp after_compiler({:error, _} = status, _argv), do: status
+
+  defp after_compiler({status, diagnostics}, argv) when status in [:ok, :noop] do
     tracers = Enum.reject(Code.get_compiler_option(:tracers), &(&1 == __MODULE__))
     Code.put_compiler_option(:tracers, tracers)
 
@@ -120,8 +122,6 @@ defmodule Mix.Tasks.Compile.Boundary do
     print_diagnostic_errors(errors)
     {status(errors, argv), diagnostics ++ errors}
   end
-
-  defp after_compiler(status, _argv), do: status
 
   defp app_modules do
     app = Keyword.fetch!(Mix.Project.config(), :app)
