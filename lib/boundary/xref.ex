@@ -3,66 +3,68 @@ defmodule Boundary.Xref do
   use GenServer
 
   def start_link(path), do: GenServer.start_link(__MODULE__, path, name: __MODULE__)
-  def add_call(caller, call), do: GenServer.cast(__MODULE__, {:add_call, {caller, call}})
+
+  def add_call(caller, call) do
+    if :ets.insert_new(:boundary_xref_seen_modules, {caller}),
+      do: :ets.delete(:boundary_xref_calls, caller)
+
+    :ets.insert(:boundary_xref_calls, {caller, call})
+  end
 
   def calls(path, app_modules) do
-    with pid when not is_nil(pid) <- Process.whereis(__MODULE__),
-         do: GenServer.call(pid, {:finalize, app_modules}, :infinity)
+    if not is_nil(app_modules), do: purge_deleted_modules(app_modules)
+    :ets.tab2file(:boundary_xref_calls, to_charlist(path))
+    GenServer.stop(__MODULE__)
 
-    db = open_db!(path)
+    table = load_file(path)
 
     try do
-      db
-      |> :dets.match(:"$1")
-      |> Stream.concat()
+      table
+      |> :ets.tab2list()
       |> Stream.map(fn {caller, meta} -> Map.put(meta, :caller_module, caller) end)
       |> Stream.map(fn %{callee: {mod, _fun, _arg}} = entry -> Map.put(entry, :callee_module, mod) end)
-      |> Stream.reject(&(&1.callee_module == &1.caller_module))
+      |> Enum.reject(&(&1.callee_module == &1.caller_module))
     after
-      :dets.close(db)
+      :ets.delete(table)
     end
   end
 
   @impl GenServer
   def init(path) do
-    {:ok, %{seen_modules: :ets.new(:seen_modules, [:set, :private]), calls: open_db!(path), path: path}}
+    :ets.new(
+      :boundary_xref_seen_modules,
+      [:set, :public, :named_table, read_concurrency: true, write_concurrency: true]
+    )
+
+    load_file(path) ||
+      :ets.new(:boundary_xref_calls, [
+        :named_table,
+        :public,
+        :duplicate_bag,
+        write_concurrency: true
+      ])
+
+    {:ok, nil}
   end
 
-  @impl GenServer
-  def handle_call({:finalize, app_modules}, _from, state) do
-    if not is_nil(app_modules), do: purge_deleted_modules(state, app_modules)
-    :dets.close(state.calls)
-    {:stop, :normal, :ok, state}
-  end
-
-  @impl GenServer
-  def handle_cast({:add_call, {caller, _call} = call}, state) when not is_nil(state) do
-    if :ets.insert_new(state.seen_modules, {caller}),
-      do: :dets.delete(state.calls, caller)
-
-    :dets.insert(state.calls, call)
-
-    {:noreply, state}
-  end
-
-  defp purge_deleted_modules(state, app_modules) do
-    state
-    |> recorded_modules()
+  defp purge_deleted_modules(app_modules) do
+    recorded_modules()
     |> MapSet.new()
     |> MapSet.difference(MapSet.new(app_modules))
-    |> Enum.each(&:dets.delete(state.calls, &1))
+    |> Enum.each(&:ets.delete(:boundary_xref_calls, &1))
   end
 
-  defp recorded_modules(state) do
-    state.calls
-    |> :dets.match({:"$1", :_})
+  defp recorded_modules() do
+    :boundary_xref_calls
+    |> :ets.match({:"$1", :_})
     |> Stream.concat()
   end
 
-  defp open_db!(path) do
-    {:ok, state} =
-      :dets.open_file(make_ref(), file: to_char_list(path), access: :read_write, auto_save: 0, type: :duplicate_bag)
-
-    state
+  defp load_file(path) do
+    {:ok, tab} = :ets.file2tab(to_charlist(path))
+    tab
+  catch
+    _, _ ->
+      nil
   end
 end

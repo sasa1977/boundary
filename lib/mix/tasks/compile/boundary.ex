@@ -159,5 +159,5 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp color(:error), do: :red
   defp color(:warning), do: :yellow
 
-  defp path(), do: Path.join(Mix.Project.build_path(), "boundary_calls.dets")
+  defp path(), do: Path.join(Mix.Project.build_path(), "boundary_calls.ets")
 end
