@@ -121,6 +121,8 @@ defmodule Mix.Tasks.Compile.Boundary do
     {status(errors, argv), diagnostics ++ errors}
   end
 
+  defp after_compiler(status, _argv), do: status
+
   defp app_modules() do
     app = Keyword.fetch!(Mix.Project.config(), :app)
     Application.load(app)
