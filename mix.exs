@@ -8,7 +8,7 @@ defmodule Boundary.MixProject do
       elixir: "~> 1.10.0-dev",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      compilers: Enum.concat([leading_compilers(Mix.env()), Mix.compilers(), trailing_compilers(Mix.env())]),
+      compilers: Mix.compilers(),
       elixirc_paths: elixirc_paths(Mix.env()),
       docs: docs(),
       dialyzer: dialyzer()
@@ -35,12 +35,6 @@ defmodule Boundary.MixProject do
 
   defp elixirc_paths(:test), do: ~w(lib test/support)
   defp elixirc_paths(_), do: ~w(lib)
-
-  defp leading_compilers(:prod), do: []
-  defp leading_compilers(_env), do: [:boundary_xref]
-
-  defp trailing_compilers(:prod), do: []
-  defp trailing_compilers(_env), do: [:boundary]
 
   defp docs() do
     [
