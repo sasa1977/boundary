@@ -18,14 +18,10 @@ defmodule Boundary.Xref do
       |> Stream.map(fn {caller, meta} -> Map.put(meta, :caller_module, caller) end)
       |> Stream.map(fn %{callee: {mod, _fun, _arg}} = entry -> Map.put(entry, :callee_module, mod) end)
       |> Stream.reject(&(&1.callee_module == &1.caller_module))
-      |> Enum.map(&normalize_line/1)
     after
       :dets.close(db)
     end
   end
-
-  defp normalize_line(%{line: {file, line}} = call), do: %{call | file: file, line: line}
-  defp normalize_line(call), do: call
 
   @impl GenServer
   def init(path) do
