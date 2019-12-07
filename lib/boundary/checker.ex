@@ -1,24 +1,16 @@
 defmodule Boundary.Checker do
   @moduledoc false
 
-  @type call :: %{
-          callee: mfa,
-          callee_module: module,
-          caller_module: module,
-          file: String.t(),
-          line: pos_integer
-        }
-
   @type error ::
           {:unknown_dep, dep_error}
           | {:ignored_dep, dep_error}
           | {:cycle, [Boundary.name()]}
           | {:unclassified_module, [module]}
-          | {:invalid_call, [call]}
+          | {:invalid_call, [Boundary.Xref.call()]}
 
   @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
 
-  @spec errors(application: Boundary.application(), calls: [call]) :: [error]
+  @spec errors(application: Boundary.application(), calls: [Boundary.Xref.call()]) :: [error]
   def errors(opts \\ []) do
     app = Keyword.get_lazy(opts, :application, &current_app/0)
 

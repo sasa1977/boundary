@@ -123,10 +123,10 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   defp after_compiler(status, _argv), do: status
 
-  defp app_modules() do
+  defp app_modules do
     app = Keyword.fetch!(Mix.Project.config(), :app)
     Application.load(app)
-    MapSet.new(Application.spec(app, :modules))
+    Application.spec(app, :modules)
   end
 
   defp status([], _), do: :ok
@@ -159,5 +159,5 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp color(:error), do: :red
   defp color(:warning), do: :yellow
 
-  defp path(), do: Path.join(Mix.Project.build_path(), "boundary_calls.ets")
+  defp path, do: Path.join(Mix.Project.build_path(), "boundary_calls.ets")
 end

@@ -80,5 +80,5 @@ defmodule Boundary.XrefTest do
 
   defp add_calls(calls), do: Enum.each(calls, fn {caller, call} -> Xref.add_call(caller, call) end)
 
-  defp new_path(), do: Path.join("tmp", "db_#{:erlang.unique_integer([:positive, :monotonic])}")
+  defp new_path, do: Path.join("tmp", "db_#{:erlang.unique_integer([:positive, :monotonic])}")
 end
