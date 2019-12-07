@@ -14,7 +14,7 @@ defmodule Mix.Tasks.Compile.BoundaryXref do
   @impl Mix.Task.Compiler
   def run(_argv) do
     BoundaryXref.start_link(path())
-    Mix.Task.Compiler.after_compile(&after_compile/1)
+    Mix.Task.Compiler.after_compiler(:app, &after_compiler/1)
 
     tracers = Code.get_compiler_option(:tracers)
     Code.put_compiler_option(:tracers, [__MODULE__ | tracers])
@@ -36,10 +36,11 @@ defmodule Mix.Tasks.Compile.BoundaryXref do
 
   def trace(_event, _env), do: :ok
 
-  defp after_compile(_status) do
+  defp after_compiler(status) do
     BoundaryXref.finalize()
     tracers = Enum.reject(Code.get_compiler_option(:tracers), &(&1 == __MODULE__))
     Code.put_compiler_option(:tracers, tracers)
+    status
   end
 
   defp path(), do: Path.join(Mix.Project.build_path(), "boundary_calls.dets")
