@@ -54,7 +54,7 @@ defmodule MySystem.MixProject do
 
   def project do
     [
-      compilers: [:phoenix, :gettext] ++ Mix.compilers() ++ [:boundary],
+      compilers: [:boundary, :phoenix, :gettext] ++ Mix.compilers(),
       # ...
     ]
   end
