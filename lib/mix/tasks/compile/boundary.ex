@@ -3,6 +3,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   use Boundary, deps: [Boundary]
   use Mix.Task.Compiler
+  alias Boundary.Xref
 
   @moduledoc """
   Verifies cross-module function calls according to defined boundaries.
@@ -86,7 +87,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   @impl Mix.Task.Compiler
   def run(argv) do
-    BoundaryXref.start_link(path())
+    Xref.start_link(path())
     Mix.Task.Compiler.after_compiler(:app, &after_compiler(&1, argv))
 
     tracers = Code.get_compiler_option(:tracers)
@@ -98,7 +99,7 @@ defmodule Mix.Tasks.Compile.Boundary do
   @doc false
   def trace({remote, meta, callee_module, name, arity}, env) when remote in ~w/remote_function remote_macro/a do
     if env.module != nil do
-      BoundaryXref.add_call(
+      Xref.add_call(
         env.module,
         %{callee: {callee_module, name, arity}, file: Path.relative_to_cwd(env.file), line: meta[:line]}
       )
@@ -116,10 +117,10 @@ defmodule Mix.Tasks.Compile.Boundary do
     app = Keyword.fetch!(Mix.Project.config(), :app)
     Application.load(app)
     app_modules = MapSet.new(Application.spec(app, :modules))
-    BoundaryXref.finalize(app_modules)
+    Xref.finalize(app_modules)
 
     calls =
-      BoundaryXref.calls(path())
+      Xref.calls(path())
       |> Stream.map(fn {caller, meta} -> Map.put(meta, :caller_module, caller) end)
       |> Stream.map(fn %{callee: {mod, _fun, _arg}} = entry -> Map.put(entry, :callee_module, mod) end)
       |> Stream.reject(&(&1.callee_module == &1.caller_module))

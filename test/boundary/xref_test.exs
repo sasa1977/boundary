@@ -1,8 +1,9 @@
-defmodule BoundaryXrefTest do
+defmodule Boundary.XrefTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
   import StreamData
+  alias Boundary.Xref
 
   setup_all do
     File.rm_rf("tmp")
@@ -21,17 +22,17 @@ defmodule BoundaryXrefTest do
       db_path = new_path()
       on_exit(fn -> File.rm_rf(db_path) end)
 
-      BoundaryXref.start_link(db_path)
+      Xref.start_link(db_path)
       add_calls(initial_calls)
 
-      BoundaryXref.finalize(callers ++ callees)
-      recorded_calls = BoundaryXref.calls(db_path)
+      Xref.finalize(callers ++ callees)
+      recorded_calls = Xref.calls(db_path)
       assert Enum.sort(recorded_calls) == Enum.sort(initial_calls)
 
-      BoundaryXref.start_link(db_path)
+      Xref.start_link(db_path)
       add_calls(modified_calls)
-      BoundaryXref.finalize(original_callers)
-      recorded_calls = BoundaryXref.calls(db_path)
+      Xref.finalize(original_callers)
+      recorded_calls = Xref.calls(db_path)
 
       changed_modules =
         modified_calls
@@ -67,7 +68,7 @@ defmodule BoundaryXrefTest do
     end
   end
 
-  defp add_calls(calls), do: Enum.each(calls, fn {caller, call} -> BoundaryXref.add_call(caller, call) end)
+  defp add_calls(calls), do: Enum.each(calls, fn {caller, call} -> Xref.add_call(caller, call) end)
 
   defp new_path(), do: Path.join("tmp", "db_#{:erlang.unique_integer([:positive, :monotonic])}")
 end
