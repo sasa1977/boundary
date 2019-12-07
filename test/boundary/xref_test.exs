@@ -25,14 +25,12 @@ defmodule Boundary.XrefTest do
       Xref.start_link(db_path)
       add_calls(initial_calls)
 
-      Xref.finalize(callers ++ callees)
-      recorded_calls = Xref.calls(db_path)
-      assert Enum.sort(recorded_calls) == Enum.sort(initial_calls)
+      recorded_calls = Xref.calls(db_path, callers ++ callees)
+      assert_calls(recorded_calls, initial_calls)
 
       Xref.start_link(db_path)
       add_calls(modified_calls)
-      Xref.finalize(original_callers)
-      recorded_calls = Xref.calls(db_path)
+      recorded_calls = Xref.calls(db_path, original_callers)
 
       changed_modules =
         modified_calls
@@ -45,8 +43,20 @@ defmodule Boundary.XrefTest do
         |> Stream.reject(fn {caller, _call} -> MapSet.member?(changed_modules, caller) end)
         |> Enum.concat(modified_calls)
 
-      assert Enum.sort(recorded_calls) == Enum.sort(expected_calls)
+      assert_calls(recorded_calls, expected_calls)
     end
+  end
+
+  defp assert_calls(recorded_calls, expected_calls) do
+    expected_calls =
+      Enum.map(
+        expected_calls,
+        fn {caller_module, %{callee: {callee_module, _, _}} = call} ->
+          Map.merge(call, %{caller_module: caller_module, callee_module: callee_module})
+        end
+      )
+
+    assert Enum.sort(recorded_calls) == Enum.sort(expected_calls)
   end
 
   defp calls(callers, callees) do
@@ -57,7 +67,7 @@ defmodule Boundary.XrefTest do
 
   defp call(callers, callees) do
     gen all caller <- member_of(callers),
-            callee <- member_of(callees),
+            callee <- {member_of(callees), atom(:alphanumeric), positive_integer()},
             caller != callee,
             function <- atom(:alphanumeric),
             arity <- positive_integer(),

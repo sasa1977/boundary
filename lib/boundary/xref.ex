@@ -5,24 +5,27 @@ defmodule Boundary.Xref do
   def start_link(path), do: GenServer.start_link(__MODULE__, path, name: __MODULE__)
   def add_call(caller, call), do: GenServer.cast(__MODULE__, {:add_call, {caller, call}})
 
-  def finalize(app_modules \\ nil) do
+  def calls(path, app_modules) do
     with pid when not is_nil(pid) <- Process.whereis(__MODULE__),
          do: GenServer.call(pid, {:finalize, app_modules}, :infinity)
 
-    :ok
-  end
-
-  def calls(path) do
     db = open_db!(path)
 
     try do
       db
       |> :dets.match(:"$1")
-      |> Enum.concat()
+      |> Stream.concat()
+      |> Stream.map(fn {caller, meta} -> Map.put(meta, :caller_module, caller) end)
+      |> Stream.map(fn %{callee: {mod, _fun, _arg}} = entry -> Map.put(entry, :callee_module, mod) end)
+      |> Stream.reject(&(&1.callee_module == &1.caller_module))
+      |> Enum.map(&normalize_line/1)
     after
       :dets.close(db)
     end
   end
+
+  defp normalize_line(%{line: {file, line}} = call), do: %{call | file: file, line: line}
+  defp normalize_line(call), do: call
 
   @impl GenServer
   def init(path) do

@@ -114,25 +114,18 @@ defmodule Mix.Tasks.Compile.Boundary do
     tracers = Enum.reject(Code.get_compiler_option(:tracers), &(&1 == __MODULE__))
     Code.put_compiler_option(:tracers, tracers)
 
-    app = Keyword.fetch!(Mix.Project.config(), :app)
-    Application.load(app)
-    app_modules = MapSet.new(Application.spec(app, :modules))
-    Xref.finalize(app_modules)
-
-    calls =
-      Xref.calls(path())
-      |> Stream.map(fn {caller, meta} -> Map.put(meta, :caller_module, caller) end)
-      |> Stream.map(fn %{callee: {mod, _fun, _arg}} = entry -> Map.put(entry, :callee_module, mod) end)
-      |> Stream.reject(&(&1.callee_module == &1.caller_module))
-      |> Enum.map(&normalize_line/1)
+    calls = Xref.calls(path(), app_modules())
 
     errors = Boundary.MixCompiler.check(calls: calls)
     print_diagnostic_errors(errors)
     {status(errors, argv), diagnostics ++ errors}
   end
 
-  defp normalize_line(%{line: {file, line}} = call), do: %{call | file: file, line: line}
-  defp normalize_line(call), do: call
+  defp app_modules() do
+    app = Keyword.fetch!(Mix.Project.config(), :app)
+    Application.load(app)
+    MapSet.new(Application.spec(app, :modules))
+  end
 
   defp status([], _), do: :ok
   defp status([_ | _], argv), do: if(warnings_as_errors?(argv), do: :error, else: :ok)
