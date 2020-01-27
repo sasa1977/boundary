@@ -1,5 +1,9 @@
 # Boundary
 
+[![hex.pm](https://img.shields.io/hexpm/v/boundary.svg?style=flat-square)](https://hex.pm/packages/boundary)
+[![hexdocs.pm](https://img.shields.io/badge/docs-latest-green.svg?style=flat-square)](https://hexdocs.pm/boundary/)
+[![Build Status](https://travis-ci.org/sasa1977/boundary.svg?branch=master)](https://travis-ci.org/sasa1977/boundary)
+
 Boundary is a library which helps managing and restraining cross-module dependencies in Elixir projects.
 
 ## Status
@@ -8,7 +12,7 @@ Highly experimental, untested, and unstable.
 
 ## Documentation
 
-For a detailed reference see moduledoc [here](lib/boundary.ex) and [here](lib/mix/tasks/compile/boundary.ex).
+For a detailed reference see docs for [Boundary module](https://hexdocs.pm/boundary/Boundary.html) and [mix compiler](https://hexdocs.pm/boundary/Mix.Tasks.Compile.Boundary.html).
 
 ## Basic usage
 
