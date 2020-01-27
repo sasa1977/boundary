@@ -13,7 +13,8 @@ defmodule Boundary.MixProject do
       compilers: Mix.compilers() ++ extra_compilers(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
       docs: docs(),
-      dialyzer: dialyzer()
+      dialyzer: dialyzer(),
+      package: package()
     ]
   end
 
@@ -46,6 +47,19 @@ defmodule Boundary.MixProject do
       extras: ["README.md"],
       source_url: "https://github.com/sasa1977/boundary/",
       source_ref: @version
+    ]
+  end
+
+  defp package() do
+    [
+      description: "Managing cross-module dependencies in Elixir projects.",
+      maintainers: ["Saša Jurić"],
+      licenses: ["MIT"],
+      links: %{
+        "Github" => "https://github.com/sasa1977/boundary",
+        "Changelog" =>
+          "https://github.com/sasa1977/boundary/blob/#{@version}/CHANGELOG.md##{String.replace(@version, ".", "")}"
+      }
     ]
   end
 
