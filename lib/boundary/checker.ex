@@ -1,24 +1,16 @@
 defmodule Boundary.Checker do
   @moduledoc false
 
-  @type call :: %{
-          callee: mfa,
-          callee_module: module,
-          caller_module: module,
-          file: String.t(),
-          line: pos_integer
-        }
-
   @type error ::
           {:unknown_dep, dep_error}
           | {:ignored_dep, dep_error}
           | {:cycle, [Boundary.name()]}
           | {:unclassified_module, [module]}
-          | {:invalid_call, [call]}
+          | {:invalid_call, [Boundary.Xref.call()]}
 
   @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
 
-  @spec errors(application: Boundary.application(), calls: [call]) :: [error]
+  @spec errors(application: Boundary.application(), calls: [Boundary.Xref.call()]) :: [error]
   def errors(opts \\ []) do
     app = Keyword.get_lazy(opts, :application, &current_app/0)
 
@@ -26,7 +18,7 @@ defmodule Boundary.Checker do
       invalid_deps(app.boundaries),
       cycles(app.boundaries),
       unclassified_modules(app.modules.unclassified),
-      invalid_calls(app.boundaries, app.modules.classified, Keyword.get_lazy(opts, :calls, &calls/0))
+      invalid_calls(app.boundaries, app.modules.classified, Keyword.fetch!(opts, :calls))
     ])
   end
 
@@ -34,27 +26,6 @@ defmodule Boundary.Checker do
     app = Keyword.fetch!(Mix.Project.config(), :app)
     Application.load(app)
     Boundary.application(app)
-  end
-
-  @doc false
-  def calls do
-    Mix.Tasks.Xref.calls()
-    |> Stream.map(fn %{callee: {mod, _fun, _arg}} = entry -> Map.put(entry, :callee_module, mod) end)
-    |> Stream.reject(&(&1.callee_module == &1.caller_module))
-    |> Stream.map(&normalize_line/1)
-    |> resolve_duplicates()
-  end
-
-  defp normalize_line(%{line: {file, line}} = call), do: %{call | file: file, line: line}
-  defp normalize_line(call), do: call
-
-  defp resolve_duplicates(calls) do
-    # If there is a call from `Foo.Bar`, xref may include two entries, one with `Foo` and another with `Foo.Bar` as the
-    # caller. In such case, we'll consider only the call with the "deepest" caller (i.e. `Foo.Bar`).
-
-    calls
-    |> Enum.group_by(&{&1.file, &1.line, &1.callee})
-    |> Enum.map(fn {_, calls} -> Enum.max_by(calls, &String.length(inspect(&1.caller_module))) end)
   end
 
   defp invalid_deps(boundaries) do

@@ -1,16 +1,16 @@
 defmodule Boundary.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.2.0"
 
   def project do
     [
       app: :boundary,
-      version: "0.1.0",
-      elixir: "~> 1.9",
+      version: @version,
+      elixir: "~> 1.10.0",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      compilers: Mix.compilers() ++ extra_compilers(Mix.env()),
+      compilers: Mix.compilers(),
       elixirc_paths: elixirc_paths(Mix.env()),
       docs: docs(),
       dialyzer: dialyzer(),
@@ -37,9 +37,6 @@ defmodule Boundary.MixProject do
 
   defp elixirc_paths(:test), do: ~w(lib test/support)
   defp elixirc_paths(_), do: ~w(lib)
-
-  defp extra_compilers(:prod), do: []
-  defp extra_compilers(_env), do: [:boundary]
 
   defp docs() do
     [

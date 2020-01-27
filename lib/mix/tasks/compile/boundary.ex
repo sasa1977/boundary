@@ -3,6 +3,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   use Boundary, deps: [Boundary]
   use Mix.Task.Compiler
+  alias Boundary.Xref
 
   @moduledoc """
   Verifies cross-module function calls according to defined boundaries.
@@ -21,7 +22,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
     def project do
       [
-        compilers: Mix.compilers() ++ [:boundary],
+        compilers: [:boundary] ++ Mix.compilers(),
         # ...
       ]
     end
@@ -39,7 +40,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
     def project do
       [
-        compilers: Mix.compilers() ++ extra_compilers(Mix.env()),
+        compilers: extra_compilers(Mix.env()) ++ Mix.compilers(),
         # ...
       ]
     end
@@ -86,9 +87,46 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   @impl Mix.Task.Compiler
   def run(argv) do
-    errors = Boundary.MixCompiler.check()
+    Xref.start_link(path())
+    Mix.Task.Compiler.after_compiler(:app, &after_compiler(&1, argv))
+
+    tracers = Code.get_compiler_option(:tracers)
+    Code.put_compiler_option(:tracers, [__MODULE__ | tracers])
+
+    {:ok, []}
+  end
+
+  @doc false
+  def trace({remote, meta, callee_module, name, arity}, env) when remote in ~w/remote_function remote_macro/a do
+    if env.module != nil do
+      Xref.add_call(
+        env.module,
+        %{callee: {callee_module, name, arity}, file: Path.relative_to_cwd(env.file), line: meta[:line]}
+      )
+    end
+
+    :ok
+  end
+
+  def trace(_event, _env), do: :ok
+
+  defp after_compiler({:error, _} = status, _argv), do: status
+
+  defp after_compiler({status, diagnostics}, argv) when status in [:ok, :noop] do
+    tracers = Enum.reject(Code.get_compiler_option(:tracers), &(&1 == __MODULE__))
+    Code.put_compiler_option(:tracers, tracers)
+
+    calls = Xref.calls(path(), app_modules())
+
+    errors = Boundary.MixCompiler.check(calls: calls)
     print_diagnostic_errors(errors)
-    {status(errors, argv), errors}
+    {status(errors, argv), diagnostics ++ errors}
+  end
+
+  defp app_modules do
+    app = Keyword.fetch!(Mix.Project.config(), :app)
+    Application.load(app)
+    Application.spec(app, :modules)
   end
 
   defp status([], _), do: :ok
@@ -120,4 +158,6 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp severity(severity), do: [:bright, color(severity), "#{severity}: ", :reset]
   defp color(:error), do: :red
   defp color(:warning), do: :yellow
+
+  defp path, do: Path.join(Mix.Project.compile_path(), "boundary_calls.ets")
 end
