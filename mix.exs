@@ -1,6 +1,8 @@
 defmodule Boundary.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
+
   def project do
     [
       app: :boundary,
@@ -41,7 +43,9 @@ defmodule Boundary.MixProject do
   defp docs() do
     [
       main: "Boundary",
-      extras: ["README.md"]
+      extras: ["README.md"],
+      source_url: "https://github.com/sasa1977/boundary/",
+      source_ref: @version
     ]
   end
 
