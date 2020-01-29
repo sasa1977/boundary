@@ -111,13 +111,6 @@ case Application.load(:my_app) do
 end
 ```
 
-## Known Issues
-
-* Boundary will report incorrect invalid calls when multiple modules are defined in the same file (which often happens with Protocol implementations)
-  * This is caused by an Elixir bug that will be fixed in 1.10 (but will also be solved by moving to compilation tracers in https://github.com/sasa1977/boundary/issues/7)
-  * More info in the Elixir bug report: https://github.com/elixir-lang/elixir/issues/9322
-  * As a workaround do not define multiple modules in one file (especially modules that are not in the same boundary)
-
 ## Roadmap
 
 - [ ] support nested boundaries (defining internal boundaries within a boundary)
