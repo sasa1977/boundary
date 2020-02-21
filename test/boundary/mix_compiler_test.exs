@@ -1,127 +1,155 @@
 defmodule Boundary.MixCompilerTest do
   use ExUnit.Case, async: true
-  use ExUnitProperties
 
-  alias Boundary.Test.Application
-  alias Boundary.Test.Generator
+  describe "check" do
+    test "reports no errors on empty app" do
+      assert check(modules: [], calls: []) == []
+    end
 
-  property "unknown boundaries as deps are reported" do
-    check all app <- Generator.app(),
-              {invalid_deps, app} <- Generator.with_unknown_deps(app),
-              expected_errors =
-                Enum.map(
-                  invalid_deps,
-                  &Boundary.MixCompiler.diagnostic("unknown boundary #{inspect(&1)} is listed as a dependency")
-                ),
-              max_runs: 10 do
-      assert errors = Application.check(app, [])
-      assert Enum.sort(errors) == Enum.sort(expected_errors)
+    test "allows valid calls" do
+      assert check(
+               modules: [
+                 {Foo, boundary: [deps: [Baz]]},
+                 Foo.Bar,
+                 {Baz, boundary: [exports: [Qux]]},
+                 Baz.Qux,
+                 {Ignored, boundary: [ignore?: true]},
+                 {Classified, classify_to: %{boundary: Foo}},
+                 {ProtocolImpl, protocol_impl?: true}
+               ],
+               calls: [
+                 {Foo, Baz},
+                 {Foo.Bar, Baz},
+                 {Foo, Baz.Qux},
+                 {Ignored, Foo},
+                 {Classified, Baz},
+                 {ProtocolImpl, Foo}
+               ]
+             ) == []
+    end
+
+    test "disallows call to undeclared dep" do
+      assert [error] = check(modules: [{Foo, boundary: []}, {Bar, boundary: []}], calls: [{Foo, Bar}])
+
+      assert error.message <> "\n" ==
+               """
+               forbidden call to Bar.fun/1
+                 (calls from Foo to Bar are not allowed)
+                 (call originated from Foo)
+               """
+    end
+
+    test "disallows call to unexported module" do
+      assert [error] =
+               check(
+                 modules: [{Foo, boundary: [deps: [Bar]]}, {Bar, boundary: []}, Bar.Baz],
+                 calls: [{Foo, Bar.Baz}]
+               )
+
+      assert error.message <> "\n" ==
+               """
+               forbidden call to Bar.Baz.fun/1
+                 (module Bar.Baz is not exported by its owner boundary Bar)
+                 (call originated from Foo)
+               """
+    end
+
+    test "treats inner boundary as a top-level one" do
+      assert [error] =
+               check(
+                 modules: [{Foo, boundary: [deps: [Baz]]}, {Foo.Bar, boundary: []}, {Baz, boundary: []}],
+                 calls: [{Foo.Bar, Baz}]
+               )
+
+      assert error.message <> "\n" ==
+               """
+               forbidden call to Baz.fun/1
+                 (calls from Foo.Bar to Baz are not allowed)
+                 (call originated from Foo.Bar)
+               """
+    end
+
+    test "reports unclassified modules" do
+      assert [error1, error2] = check(modules: [{Foo, boundary: []}, Bar, Foo.Bar, Baz, Foo.Baz])
+      assert error1.message == "Bar is not included in any boundary"
+      assert error2.message == "Baz is not included in any boundary"
+    end
+
+    test "doesn't report unclassified protocol implementations" do
+      assert check(modules: [{Foo, boundary: []}, {Bar, [protocol_impl?: true]}]) == []
+    end
+
+    test "reports unknown boundaries in deps" do
+      assert [error] = check(modules: [{Foo, boundary: [deps: [Bar]]}])
+      assert error.message == "unknown boundary Bar is listed as a dependency"
+    end
+
+    test "reports ignored boundaries is deps" do
+      assert [error] = check(modules: [{Foo, boundary: [deps: [Bar]]}, {Bar, boundary: [ignore?: true]}])
+      assert error.message == "ignored boundary Bar is listed as a dependency"
+    end
+
+    test "reports cycles" do
+      modules = [
+        {Foo, boundary: [deps: [Bar]]},
+        {Bar, boundary: [deps: [Baz]]},
+        {Baz, boundary: [deps: [Foo]]}
+      ]
+
+      assert [error] = check(modules: modules)
+
+      assert error.message ==
+               """
+               dependency cycle found:
+               Foo -> Bar -> Baz -> Foo
+               """
     end
   end
 
-  property "ignored boundaries as deps are reported" do
-    check all app <- Generator.app(),
-              {invalid_deps, app} <- Generator.with_ignored_deps(app),
-              expected_errors =
-                Enum.map(
-                  invalid_deps,
-                  &Boundary.MixCompiler.diagnostic("ignored boundary #{inspect(&1)} is listed as a dependency")
-                ),
-              max_runs: 10 do
-      assert errors = Application.check(app, [])
-      assert Enum.sort(errors) == Enum.sort(expected_errors)
-    end
+  defp check(opts) do
+    modules = def_modules(Keyword.get(opts, :modules, []))
+    application = Boundary.Definition.boundaries(modules)
+
+    Boundary.MixCompiler.check(
+      application: application,
+      calls: opts |> Keyword.get(:calls, []) |> Enum.map(&call/1)
+    )
   end
 
-  property "cycles are reported" do
-    check all app <- Generator.app(),
-              Application.num_boundaries(app) >= 2,
-              {boundaries_in_cycle, app} <- Generator.with_cycle(app),
-              max_runs: 10 do
-      assert errors = Application.check(app, [])
-      assert cycle_error = Enum.find(errors, &String.starts_with?(&1.message, "dependency cycle found"))
+  defp def_modules(modules), do: Enum.map(modules, &define_module/1)
 
-      reported_cycle_boundaries =
-        cycle_error.message
-        |> String.replace("dependency cycle found:\n", "")
-        |> String.trim()
-        |> String.split(" -> ")
-        |> Enum.map(&Module.concat([&1]))
-        |> MapSet.new()
+  defp define_module(module) when is_atom(module), do: define_module({module, []})
 
-      assert reported_cycle_boundaries == MapSet.new(boundaries_in_cycle)
-    end
+  defp define_module({module, opts}) do
+    {boundary_opts, other_opts} = Keyword.pop(opts, :boundary)
+
+    {{:module, ^module, _code, _}, _bindings} =
+      Code.eval_quoted(
+        quote bind_quoted: [module: module, boundary_opts: boundary_opts] do
+          defmodule module do
+            if not is_nil(boundary_opts), do: use(Boundary, boundary_opts)
+          end
+        end
+      )
+
+    on_exit(fn ->
+      :code.delete(module)
+      :code.purge(module)
+    end)
+
+    Map.merge(
+      %{name: module, protocol_impl?: false, classify_to: nil},
+      Map.new(other_opts)
+    )
   end
 
-  property "unclassified modules are reported" do
-    check all app <- Generator.app(),
-              {unclassified_modules, app} <- Generator.with_unclassified_modules(app),
-              expected_errors =
-                Enum.map(
-                  unclassified_modules,
-                  # Note: passing file: "" option, because module doesn't exist, so it's file can't be determined
-                  &Boundary.MixCompiler.diagnostic("#{inspect(&1)} is not included in any boundary", file: "")
-                ),
-              max_runs: 10 do
-      assert errors = Application.check(app, [])
-      assert Enum.sort(errors) == Enum.sort(expected_errors)
-    end
+  defp call({from, to}) do
+    %{
+      callee: {to, :fun, 1},
+      callee_module: to,
+      caller_module: from,
+      file: "nofile",
+      line: 1
+    }
   end
-
-  property "unclassified protocol implementations are not reported" do
-    check all app <- Generator.app(),
-              app <- Generator.with_unclassified_protocol_impls(app),
-              max_runs: 10 do
-      assert Application.check(app, []) == []
-    end
-  end
-
-  property "ignored boundaries are not reported as unclassified" do
-    check all app <- Generator.app(),
-              {unclassified_modules, app} <- Generator.with_unclassified_modules(app),
-              app = Enum.reduce(unclassified_modules, app, &Application.add_boundary(&2, &1, ignore?: true)),
-              max_runs: 10 do
-      assert Application.check(app, []) == []
-    end
-  end
-
-  test "empty app with no calls is valid" do
-    app = Application.empty()
-    assert Application.check(app, []) == []
-  end
-
-  property "valid app passes the check" do
-    check all app <- Generator.app(),
-              Application.num_boundaries(app) >= 2,
-              {calls, app} <- Generator.with_valid_calls(app) do
-      assert Application.check(app, calls) == []
-    end
-  end
-
-  property "all forbidden calls are reported" do
-    check all app <- Generator.app(),
-              Application.num_boundaries(app) >= 2,
-              {valid_calls, app} <- Generator.with_valid_calls(app),
-              {invalid_calls, expected_errors} <- Generator.with_invalid_calls(app),
-              all_calls = Enum.shuffle(valid_calls ++ invalid_calls) do
-      assert errors = Application.check(app, all_calls)
-      assert errors == expected_errors
-    end
-  end
-
-  property "forbidden calls are not reported on ignored boundaries" do
-    check all app <- Generator.app(),
-              Application.num_boundaries(app) >= 2,
-              {valid_calls, app} <- Generator.with_valid_calls(app),
-              {invalid_calls, _expected_errors} <- Generator.with_invalid_calls(app),
-              all_calls = Enum.shuffle(valid_calls ++ invalid_calls),
-              app = Enum.reduce(invalid_calls, app, &ignore_call_boundaries(&2, &1)) do
-      assert Application.check(app, all_calls) == []
-    end
-  end
-
-  defp ignore_call_boundaries(app, call),
-    do: app |> ignore_boundary(call.callee_module) |> ignore_boundary(call.caller_module)
-
-  defp ignore_boundary(app, module), do: Application.ignore_boundary(app, Application.module_boundary(app, module))
 end

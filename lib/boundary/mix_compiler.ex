@@ -45,7 +45,8 @@ defmodule Boundary.MixCompiler do
 
     message =
       "forbidden call to #{Exception.format_mfa(m, f, a)}\n" <>
-        "  (module #{inspect(m)} is not exported by its owner boundary #{inspect(error.boundary)})"
+        "  (module #{inspect(m)} is not exported by its owner boundary #{inspect(error.boundary)})\n" <>
+        "  (call originated from #{inspect(error.caller)})"
 
     diagnostic(message, file: error.file, position: error.line)
   end

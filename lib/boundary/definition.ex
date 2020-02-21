@@ -1,5 +1,6 @@
 defmodule Boundary.Definition do
   @moduledoc false
+
   # credo:disable-for-this-file Credo.Check.Readability.Specs
 
   defmacro generate(opts) do

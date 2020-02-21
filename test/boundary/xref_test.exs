@@ -1,8 +1,5 @@
 defmodule Boundary.XrefTest do
   use ExUnit.Case, async: true
-  use ExUnitProperties
-
-  import StreamData
   alias Boundary.Xref
 
   setup_all do
@@ -11,72 +8,46 @@ defmodule Boundary.XrefTest do
     on_exit(fn -> File.rm_rf("tmp") end)
   end
 
-  property "properly reports all stored calls" do
-    check all callees <- uniq_list_of(atom(:alias)),
-              original_callers <- uniq_list_of(atom(:alias)),
-              deleted_modules <- uniq_list_of(atom(:alias)),
-              callers = original_callers ++ deleted_modules,
-              Enum.empty?(MapSet.intersection(MapSet.new(callers), MapSet.new(callees))),
-              initial_calls <- calls(callers, callees),
-              modified_calls <- calls(original_callers, callees) do
-      db_path = new_path()
-      on_exit(fn -> File.rm_rf(db_path) end)
+  test "records all stored calls" do
+    db_path = new_path()
+    on_exit(fn -> File.rm_rf(db_path) end)
+    Xref.start_link(db_path)
 
-      Xref.start_link(db_path)
-      add_calls(initial_calls)
+    add_calls([
+      {Foo, call({Bar, :fun1, 0})},
+      {Foo, call({Baz, :fun2, 0})},
+      {Bar, call({Qux, :fun3, 0})}
+    ])
 
-      recorded_calls = Xref.calls(db_path, callers ++ callees)
-      assert_calls(recorded_calls, initial_calls)
+    assert [call1, call2, call3] = Xref.calls(db_path, [Foo, Bar, Baz, Qux])
 
-      Xref.start_link(db_path)
-      add_calls(modified_calls)
-      recorded_calls = Xref.calls(db_path, original_callers)
-
-      changed_modules =
-        modified_calls
-        |> Stream.map(fn {caller, _call} -> caller end)
-        |> Stream.concat(deleted_modules)
-        |> MapSet.new()
-
-      expected_calls =
-        initial_calls
-        |> Stream.reject(fn {caller, _call} -> MapSet.member?(changed_modules, caller) end)
-        |> Enum.concat(modified_calls)
-
-      assert_calls(recorded_calls, expected_calls)
-    end
+    assert %{caller_module: Foo, callee: {Bar, :fun1, 0}} = call1
+    assert %{caller_module: Foo, callee: {Baz, :fun2, 0}} = call2
+    assert %{caller_module: Bar, callee: {Qux, :fun3, 0}} = call3
   end
 
-  defp assert_calls(recorded_calls, expected_calls) do
-    expected_calls =
-      Enum.map(
-        expected_calls,
-        fn {caller_module, %{callee: {callee_module, _, _}} = call} ->
-          Map.merge(call, %{caller_module: caller_module, callee_module: callee_module})
-        end
-      )
+  test "after restart, previous calls are preserved unless the module is rescanned" do
+    db_path = new_path()
+    on_exit(fn -> File.rm_rf(db_path) end)
+    Xref.start_link(db_path)
 
-    assert Enum.sort(recorded_calls) == Enum.sort(expected_calls)
+    add_calls([
+      {Foo, call({Bar, :fun1, 0})},
+      {Foo, call({Baz, :fun2, 0})},
+      {Bar, call({Qux, :fun3, 0})}
+    ])
+
+    Xref.calls(db_path, [Foo, Bar, Baz, Qux])
+    Xref.start_link(db_path)
+
+    add_calls([{Foo, call({Bar, :fun4, 0})}])
+    assert [call1, call2] = Xref.calls(db_path, [Foo, Bar, Baz, Qux])
+
+    assert %{caller_module: Foo, callee: {Bar, :fun4, 0}} = call1
+    assert %{caller_module: Bar, callee: {Qux, :fun3, 0}} = call2
   end
 
-  defp calls(callers, callees) do
-    if Enum.empty?(callers) or Enum.empty?(callees),
-      do: constant([]),
-      else: list_of(call(callers, callees))
-  end
-
-  defp call(callers, callees) do
-    gen all caller <- member_of(callers),
-            callee <- {member_of(callees), atom(:alphanumeric), positive_integer()},
-            caller != callee,
-            function <- atom(:alphanumeric),
-            arity <- positive_integer(),
-            line <- positive_integer() do
-      file = "#{Macro.underscore(caller)}"
-      call = %{callee: callee, function: function, arity: arity, file: file, line: line}
-      {caller, call}
-    end
-  end
+  defp call(callee), do: %{callee: callee, file: "nofile", line: 1}
 
   defp add_calls(calls), do: Enum.each(calls, fn {caller, call} -> Xref.add_call(caller, call) end)
 

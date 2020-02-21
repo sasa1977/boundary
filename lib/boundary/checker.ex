@@ -103,6 +103,7 @@ defmodule Boundary.Checker do
         %{
           type: :not_exported,
           boundary: to_boundary,
+          caller: entry.caller_module,
           callee: entry.callee,
           file: entry.file,
           line: entry.line
