@@ -215,7 +215,7 @@ defmodule Boundary do
   end
   ```
   """
-  @type application :: %{
+  @type spec :: %{
           boundaries: %{name => definition},
           modules: %{
             classified: %{module => name},
@@ -254,13 +254,13 @@ defmodule Boundary do
   end
 
   @doc "Returns the boundary-specific view of the given application."
-  @spec application(atom) :: application
-  def application(app_name) do
+  @spec spec(atom) :: spec
+  def spec(app_name) do
     app_name
     |> Application.spec(:modules)
-    |> Boundary.Definition.boundaries()
+    |> Boundary.Definition.spec()
   end
 
-  @spec errors(application(), [Boundary.call()]) :: [error]
-  def errors(application, calls), do: Boundary.Checker.errors(application, calls)
+  @spec errors(spec(), [Boundary.call()]) :: [error]
+  def errors(spec, calls), do: Boundary.Checker.errors(spec, calls)
 end

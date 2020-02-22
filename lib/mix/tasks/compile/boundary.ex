@@ -119,7 +119,7 @@ defmodule Mix.Tasks.Compile.Boundary do
     calls = Xref.calls()
     Xref.stop()
 
-    errors = Boundary.Mix.Compiler.check(Boundary.application(app_name()), calls)
+    errors = Boundary.Mix.Compiler.check(Boundary.spec(app_name()), calls)
     print_diagnostic_errors(errors)
     {status(errors, argv), diagnostics ++ errors}
   end

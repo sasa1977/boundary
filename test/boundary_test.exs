@@ -4,7 +4,7 @@ defmodule BoundaryTest do
   alias TestBoundaries.{A, B}
 
   test "classification" do
-    modules = Boundary.application(current_app_name()).modules
+    modules = Boundary.spec(current_app_name()).modules
 
     assert Map.fetch(modules.classified, A) == {:ok, A}
     assert Map.fetch(modules.classified, B) == {:ok, B}
@@ -13,7 +13,7 @@ defmodule BoundaryTest do
   end
 
   test "boundaries" do
-    boundaries = Boundary.application(current_app_name()).boundaries
+    boundaries = Boundary.spec(current_app_name()).boundaries
 
     assert Enum.any?(boundaries, &match?({A, %{deps: [Boundary, B], exports: [A], ignore?: false}}, &1))
     assert Enum.any?(boundaries, &match?({B, %{deps: [Boundary], exports: [B], ignore?: false}}, &1))

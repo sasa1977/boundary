@@ -35,7 +35,7 @@ defmodule Boundary.Definition do
     end
   end
 
-  def boundaries(module_names) do
+  def spec(module_names) do
     modules = Enum.map(module_names, &%{name: &1, protocol_impl?: protocol_impl?(&1), classify_to: classify_to(&1)})
     boundaries = load_boundaries(module_names)
     %{modules: classify_modules(boundaries, modules), boundaries: boundaries}
