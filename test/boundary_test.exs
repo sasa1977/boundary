@@ -1,4 +1,6 @@
 defmodule BoundaryTest do
+  # credo:disable-for-this-file Credo.Check.Readability.Specs
+
   use ExUnit.Case, async: true
 
   defprotocol SomeProtocol do
