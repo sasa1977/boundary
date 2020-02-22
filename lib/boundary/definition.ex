@@ -38,7 +38,18 @@ defmodule Boundary.Definition do
   def spec(module_names) do
     modules = Enum.map(module_names, &%{name: &1, protocol_impl?: protocol_impl?(&1), classify_to: classify_to(&1)})
     boundaries = load_boundaries(module_names)
-    %{modules: classify_modules(boundaries, modules), boundaries: boundaries}
+
+    module_to_app =
+      for {app, _description, _vsn} <- Application.loaded_applications(),
+          module <- Application.spec(app, :modules),
+          into: %{erlang: :erlang},
+          do: {module, app}
+
+    %{
+      modules: classify_modules(boundaries, modules),
+      boundaries: boundaries,
+      module_to_app: module_to_app
+    }
   end
 
   defp protocol_impl?(module) do

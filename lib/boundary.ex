@@ -220,7 +220,8 @@ defmodule Boundary do
           modules: %{
             classified: %{module => name},
             unclassified: [%{name: module, protocol_impl?: boolean}]
-          }
+          },
+          module_to_app: %{module => atom}
         }
 
   @type name :: module

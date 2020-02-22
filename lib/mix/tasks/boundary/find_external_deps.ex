@@ -34,19 +34,13 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
   defp find_external_deps(boundary_spec) do
     load_compile_time_deps()
 
-    module_to_app =
-      for {app, _description, _vsn} <- Application.loaded_applications(),
-          module <- Application.spec(app, :modules),
-          into: %{erlang: :erlang},
-          do: {module, app}
-
     Xref.start_link()
 
     for call <- Xref.calls(),
         boundary = Map.get(boundary_spec.modules.classified, call.caller_module),
         not is_nil(boundary),
         not Map.fetch!(boundary_spec.boundaries, boundary).ignore?,
-        app = Map.get(module_to_app, call.callee_module),
+        app = Map.get(boundary_spec.module_to_app, call.callee_module),
         app not in [:boundary, Boundary.Mix.app_name(), nil],
         reduce: %{} do
       acc ->
