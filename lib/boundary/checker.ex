@@ -58,14 +58,12 @@ defmodule Boundary.Checker do
     for call <- calls,
         from_boundary = Map.get(spec.modules.classified, call.caller_module),
         not is_nil(from_boundary) and not Map.fetch!(spec.boundaries, from_boundary).ignore?,
-        to_boundary = Map.get(spec.modules.classified, call.callee_module),
-        not is_nil(to_boundary) and not Map.fetch!(spec.boundaries, to_boundary).ignore?,
+        to_boundary = Map.get(spec.modules.classified, call.callee_module, :unknown),
         from_boundary != to_boundary,
-        error = call_error(spec, call, from_boundary, to_boundary),
-        not is_nil(error) do
+        {type, to_boundary} <- [call_error(spec, call, from_boundary, to_boundary)] do
       {:invalid_call,
        %{
-         type: error,
+         type: type,
          from_boundary: from_boundary,
          to_boundary: to_boundary,
          callee: call.callee,
@@ -77,9 +75,37 @@ defmodule Boundary.Checker do
   end
 
   defp call_error(spec, call, from_boundary, to_boundary) do
+    if to_boundary == :unknown,
+      do: external_app_call_error(spec, call, from_boundary),
+      else: in_app_call_error(spec, call, from_boundary, to_boundary)
+  end
+
+  defp external_app_call_error(spec, call, from_boundary) do
+    app = Map.get(spec.module_to_app, call.callee_module)
+
+    if is_nil(app) or external_dep_allowed?(spec, call, from_boundary, app),
+      do: nil,
+      else: {:invalid_external_dep_call, call.callee_module}
+  end
+
+  defp external_dep_allowed?(spec, call, from_boundary, app) do
+    externals = Map.fetch!(spec.boundaries, from_boundary).externals
+
+    case Map.fetch(externals, app) do
+      :error -> true
+      {:ok, allowed} -> Enum.any?(allowed, &prefix?(Module.split(&1), Module.split(call.callee_module)))
+    end
+  end
+
+  defp prefix?([], _), do: true
+  defp prefix?([head | tail1], [head | tail2]), do: prefix?(tail1, tail2)
+  defp prefix?(_, _), do: false
+
+  defp in_app_call_error(spec, call, from_boundary, to_boundary) do
     cond do
-      not allowed?(spec.boundaries, from_boundary, to_boundary) -> :invalid_cross_boundary_call
-      not exported?(spec.boundaries, to_boundary, call.callee_module) -> :not_exported
+      Map.fetch!(spec.boundaries, to_boundary).ignore? -> nil
+      not allowed?(spec.boundaries, from_boundary, to_boundary) -> {:invalid_cross_boundary_call, to_boundary}
+      not exported?(spec.boundaries, to_boundary, call.callee_module) -> {:not_exported, to_boundary}
       true -> nil
     end
   end

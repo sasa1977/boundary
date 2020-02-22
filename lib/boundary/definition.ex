@@ -123,13 +123,14 @@ defmodule Boundary.Definition do
     |> Map.merge(Map.new(definition))
     |> validate!()
     |> expand_exports(boundary)
+    |> Map.update!(:externals, &Map.new/1)
     |> Map.merge(%{file: env.file, line: env.line})
   end
 
-  defp defaults, do: %{deps: [], exports: [], ignore?: false}
+  defp defaults, do: %{deps: [], exports: [], ignore?: false, externals: []}
 
   defp validate!(definition) do
-    valid_keys = ~w/deps exports ignore?/a
+    valid_keys = ~w/deps exports ignore? externals/a
 
     with [_ | _] = invalid_options <- definition |> Map.keys() |> Enum.reject(&(&1 in valid_keys)) do
       error = "Invalid options: #{invalid_options |> Stream.map(&inspect/1) |> Enum.join(", ")}"

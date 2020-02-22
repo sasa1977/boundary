@@ -11,7 +11,7 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
   @impl Mix.Task
   def run(_argv) do
     Mix.Task.run("compile")
-    Application.load(Boundary.Mix.app_name())
+    Boundary.Mix.load_app()
 
     message =
       Boundary.Mix.app_name()
@@ -32,8 +32,6 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
   end
 
   defp find_external_deps(boundary_spec) do
-    load_compile_time_deps()
-
     Xref.start_link()
 
     for call <- Xref.calls(),
@@ -46,19 +44,5 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
       acc ->
         Map.update(acc, boundary, MapSet.new([app]), &MapSet.put(&1, app))
     end
-  end
-
-  defp load_compile_time_deps do
-    Mix.Project.config()
-    |> Keyword.get(:deps, [])
-    |> Stream.filter(fn
-      spec ->
-        spec
-        |> Tuple.to_list()
-        |> Stream.filter(&is_list/1)
-        |> Enum.any?(&(Keyword.get(&1, :runtime) == false))
-    end)
-    |> Stream.map(fn spec -> elem(spec, 0) end)
-    |> Enum.each(&Application.load/1)
   end
 end
