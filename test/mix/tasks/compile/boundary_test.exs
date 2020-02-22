@@ -8,12 +8,11 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
   setup do
     File.rm_rf(tmp_folder())
+    File.mkdir_p(tmp_folder())
     :ok
   end
 
   test "reports all warnings" do
-    File.mkdir_p(tmp_folder())
-
     File.write!(
       Path.join(tmp_folder(), "source.ex"),
       """
@@ -54,10 +53,8 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
       """
     )
 
-    {output, _code} = mix(~w/compile/)
+    output = mix!(~w/compile/)
     warnings = warnings(output)
-
-    IO.inspect(warnings)
 
     assert Enum.member?(warnings, %{
              location: "lib/tmp/source.ex",
@@ -91,6 +88,89 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     assert Enum.member?(warnings, %{
              warning: "dependency cycle found:",
              location: "Boundary6 -> Boundary5 -> Boundary6"
+           })
+  end
+
+  test "reports warnings if recompilation doesn't happen" do
+    File.write!(
+      Path.join(tmp_folder(), "boundary1.ex"),
+      """
+      defmodule Boundary1 do
+        use Boundary, deps: [], exports: []
+        def fun(), do: Boundary2.fun()
+      end
+      """
+    )
+
+    File.write!(
+      Path.join(tmp_folder(), "boundary2.ex"),
+      """
+      defmodule Boundary2 do
+        use Boundary, deps: [], exports: []
+        def fun(), do: :ok
+      end
+      """
+    )
+
+    # We're deliberatly compiling twice. The first compilation will collect data through the tracer, while the second
+    # compilation will actually not compile anything (since there are no code changes). By doing this, we want to verify
+    # that tracing data has been preserved, and all the warnings will still be reported.
+    mix!(~w/compile/)
+    output = mix!(~w/compile/)
+
+    warnings = warnings(output)
+
+    assert Enum.member?(warnings, %{
+             location: "lib/tmp/boundary1.ex:3",
+             warning: "forbidden call to Boundary2.fun/0",
+             explanation: "(calls from Boundary1 to Boundary2 are not allowed)",
+             callee: "(call originated from Boundary1)"
+           })
+  end
+
+  test "records new warnings on code change" do
+    File.write!(
+      Path.join(tmp_folder(), "boundary1.ex"),
+      """
+      defmodule Boundary1 do
+        use Boundary, deps: [], exports: []
+        def fun(), do: Boundary2.fun()
+      end
+      """
+    )
+
+    File.write!(
+      Path.join(tmp_folder(), "boundary2.ex"),
+      """
+      defmodule Boundary2 do
+        use Boundary, deps: [], exports: []
+        def fun(), do: :ok
+        def another_fun(), do: :ok
+      end
+      """
+    )
+
+    mix!(~w/compile/)
+
+    File.write!(
+      Path.join(tmp_folder(), "boundary1.ex"),
+      """
+      defmodule Boundary1 do
+        use Boundary, deps: [], exports: []
+        def fun(), do: Boundary2.another_fun()
+      end
+      """
+    )
+
+    output = mix!(~w/compile/)
+
+    warnings = warnings(output)
+
+    assert Enum.member?(warnings, %{
+             location: "lib/tmp/boundary1.ex:3",
+             warning: "forbidden call to Boundary2.another_fun/0",
+             explanation: "(calls from Boundary1 to Boundary2 are not allowed)",
+             callee: "(call originated from Boundary1)"
            })
   end
 
