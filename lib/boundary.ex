@@ -244,7 +244,7 @@ defmodule Boundary do
   @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
 
   require Boundary.Definition
-  Boundary.Definition.generate(deps: [], exports: [Definition, Mix.Compiler])
+  Boundary.Definition.generate(deps: [], exports: [])
 
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
