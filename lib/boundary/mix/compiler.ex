@@ -1,4 +1,4 @@
-defmodule Boundary.MixCompiler do
+defmodule Boundary.Mix.Compiler do
   @moduledoc false
 
   # credo:disable-for-this-file Credo.Check.Readability.Specs

@@ -1,4 +1,4 @@
-defmodule Boundary.MixCompilerTest do
+defmodule Boundary.Mix.CompilerTest do
   use ExUnit.Case, async: true
 
   describe "check" do
@@ -110,7 +110,7 @@ defmodule Boundary.MixCompilerTest do
     modules = def_modules(Keyword.get(opts, :modules, []))
     application = Boundary.Definition.boundaries(modules)
 
-    Boundary.MixCompiler.check(
+    Boundary.Mix.Compiler.check(
       application: application,
       calls: opts |> Keyword.get(:calls, []) |> Enum.map(&call/1)
     )

@@ -3,7 +3,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   use Boundary, deps: [Boundary]
   use Mix.Task.Compiler
-  alias Boundary.Xref
+  alias Boundary.Mix.Xref
 
   @moduledoc """
   Verifies cross-module function calls according to defined boundaries.
@@ -119,7 +119,7 @@ defmodule Mix.Tasks.Compile.Boundary do
     calls = Xref.calls()
     Xref.stop()
 
-    errors = Boundary.MixCompiler.check(calls: calls)
+    errors = Boundary.Mix.Compiler.check(calls: calls)
     print_diagnostic_errors(errors)
     {status(errors, argv), diagnostics ++ errors}
   end

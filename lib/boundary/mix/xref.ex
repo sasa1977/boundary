@@ -1,4 +1,4 @@
-defmodule Boundary.Xref do
+defmodule Boundary.Mix.Xref do
   @moduledoc false
   use GenServer
 

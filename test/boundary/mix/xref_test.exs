@@ -1,6 +1,6 @@
-defmodule Boundary.XrefTest do
+defmodule Boundary.Mix.XrefTest do
   use ExUnit.Case, async: true
-  alias Boundary.Xref
+  alias Boundary.Mix.Xref
 
   setup_all do
     File.rm_rf("tmp")

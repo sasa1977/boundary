@@ -6,11 +6,11 @@ defmodule Boundary.Checker do
           | {:ignored_dep, dep_error}
           | {:cycle, [Boundary.name()]}
           | {:unclassified_module, [module]}
-          | {:invalid_call, [Boundary.Xref.call()]}
+          | {:invalid_call, [Boundary.Mix.Xref.call()]}
 
   @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
 
-  @spec errors(application: Boundary.application(), calls: [Boundary.Xref.call()]) :: [error]
+  @spec errors(application: Boundary.application(), calls: [Boundary.Mix.Xref.call()]) :: [error]
   def errors(opts \\ []) do
     app = Keyword.get_lazy(opts, :application, &current_app/0)
 
