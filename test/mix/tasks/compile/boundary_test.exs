@@ -1,20 +1,9 @@
 defmodule Mix.Tasks.Compile.BoundaryTest do
-  use ExUnit.Case, async: true
+  use Boundary.ProjectTestCaseTemplate, async: true
 
-  setup_all do
-    mix!(~w/deps.get/)
-    :ok
-  end
-
-  setup do
-    File.rm_rf(tmp_folder())
-    File.mkdir_p(tmp_folder())
-    :ok
-  end
-
-  test "reports all warnings" do
+  test "reports all warnings", context do
     File.write!(
-      Path.join(tmp_folder(), "source.ex"),
+      Path.join([context.project_path, "lib", "source.ex"]),
       """
       defmodule Boundary1 do
       end
@@ -53,33 +42,33 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
       """
     )
 
-    output = mix!(~w/compile/)
+    output = mix!(context.project_path, ~w/compile/)
     warnings = warnings(output)
 
     assert Enum.member?(warnings, %{
-             location: "lib/tmp/source.ex",
+             location: "lib/source.ex",
              warning: "Boundary1 is not included in any boundary"
            })
 
     assert Enum.member?(warnings, %{
-             location: "lib/tmp/source.ex:5",
+             location: "lib/source.ex:5",
              warning: "unknown boundary UnknownBoundary is listed as a dependency"
            })
 
     assert Enum.member?(warnings, %{
-             location: "lib/tmp/source.ex:5",
+             location: "lib/source.ex:5",
              warning: "ignored boundary Boundary4 is listed as a dependency"
            })
 
     assert Enum.member?(warnings, %{
-             location: "lib/tmp/source.ex:7",
+             location: "lib/source.ex:7",
              warning: "forbidden call to Boundary3.fun/0",
              explanation: "(calls from Boundary2 to Boundary3 are not allowed)",
              callee: "(call originated from Boundary2)"
            })
 
     assert Enum.member?(warnings, %{
-             location: "lib/tmp/source.ex:17",
+             location: "lib/source.ex:17",
              warning: "forbidden call to Boundary2.Internal.fun/0",
              explanation: "(module Boundary2.Internal is not exported by its owner boundary Boundary2)",
              callee: "(call originated from Boundary3)"
@@ -91,9 +80,9 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
            })
   end
 
-  test "reports warnings if recompilation doesn't happen" do
+  test "reports warnings if recompilation doesn't happen", context do
     File.write!(
-      Path.join(tmp_folder(), "boundary1.ex"),
+      Path.join([context.project_path, "lib", "boundary1.ex"]),
       """
       defmodule Boundary1 do
         use Boundary, deps: [], exports: []
@@ -103,7 +92,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     )
 
     File.write!(
-      Path.join(tmp_folder(), "boundary2.ex"),
+      Path.join([context.project_path, "lib", "boundary2.ex"]),
       """
       defmodule Boundary2 do
         use Boundary, deps: [], exports: []
@@ -115,22 +104,22 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     # We're deliberatly compiling twice. The first compilation will collect data through the tracer, while the second
     # compilation will actually not compile anything (since there are no code changes). By doing this, we want to verify
     # that tracing data has been preserved, and all the warnings will still be reported.
-    mix!(~w/compile/)
-    output = mix!(~w/compile/)
+    mix!(context.project_path, ~w/compile/)
+    output = mix!(context.project_path, ~w/compile/)
 
     warnings = warnings(output)
 
     assert Enum.member?(warnings, %{
-             location: "lib/tmp/boundary1.ex:3",
+             location: "lib/boundary1.ex:3",
              warning: "forbidden call to Boundary2.fun/0",
              explanation: "(calls from Boundary1 to Boundary2 are not allowed)",
              callee: "(call originated from Boundary1)"
            })
   end
 
-  test "records new warnings on code change" do
+  test "records new warnings on code change", context do
     File.write!(
-      Path.join(tmp_folder(), "boundary1.ex"),
+      Path.join([context.project_path, "lib", "boundary1.ex"]),
       """
       defmodule Boundary1 do
         use Boundary, deps: [], exports: []
@@ -140,7 +129,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     )
 
     File.write!(
-      Path.join(tmp_folder(), "boundary2.ex"),
+      Path.join([context.project_path, "lib", "boundary2.ex"]),
       """
       defmodule Boundary2 do
         use Boundary, deps: [], exports: []
@@ -150,10 +139,10 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
       """
     )
 
-    mix!(~w/compile/)
+    mix!(context.project_path, ~w/compile/)
 
     File.write!(
-      Path.join(tmp_folder(), "boundary1.ex"),
+      Path.join([context.project_path, "lib", "boundary1.ex"]),
       """
       defmodule Boundary1 do
         use Boundary, deps: [], exports: []
@@ -162,25 +151,17 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
       """
     )
 
-    output = mix!(~w/compile/)
+    output = mix!(context.project_path, ~w/compile/)
 
     warnings = warnings(output)
 
     assert Enum.member?(warnings, %{
-             location: "lib/tmp/boundary1.ex:3",
+             location: "lib/boundary1.ex:3",
              warning: "forbidden call to Boundary2.another_fun/0",
              explanation: "(calls from Boundary1 to Boundary2 are not allowed)",
              callee: "(call originated from Boundary1)"
            })
   end
-
-  defp mix!(args) do
-    {output, 0} = mix(args)
-    output
-  end
-
-  defp mix(args),
-    do: System.cmd("mix", args, stderr_to_stdout: true, cd: project_folder())
 
   defp warnings(output) do
     output
@@ -196,7 +177,4 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
       |> Map.put(:warning, String.trim(warning))
     end)
   end
-
-  defp project_folder, do: "test_project"
-  defp tmp_folder, do: Path.join(~w/test_project lib tmp/)
 end

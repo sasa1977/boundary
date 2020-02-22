@@ -87,7 +87,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   @impl Mix.Task.Compiler
   def run(argv) do
-    Xref.start_link(path())
+    Xref.start_link()
     Mix.Task.Compiler.after_compiler(:app, &after_compiler(&1, argv))
 
     tracers = Code.get_compiler_option(:tracers)
@@ -115,21 +115,19 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp after_compiler({status, diagnostics}, argv) when status in [:ok, :noop] do
     tracers = Enum.reject(Code.get_compiler_option(:tracers), &(&1 == __MODULE__))
     Code.put_compiler_option(:tracers, tracers)
-    Xref.flush(path(), app_modules())
+    Xref.flush(app_modules())
     calls = Xref.calls()
     Xref.stop()
 
-    errors = check(Boundary.spec(app_name()), calls)
+    errors = check(Boundary.spec(Boundary.Mix.app_name()), calls)
     print_diagnostic_errors(errors)
     {status(errors, argv), diagnostics ++ errors}
   end
 
   defp app_modules do
-    Application.load(app_name())
-    Application.spec(app_name(), :modules)
+    Application.load(Boundary.Mix.app_name())
+    Application.spec(Boundary.Mix.app_name(), :modules)
   end
-
-  defp app_name, do: Keyword.fetch!(Mix.Project.config(), :app)
 
   defp status([], _), do: :ok
   defp status([_ | _], argv), do: if(warnings_as_errors?(argv), do: :error, else: :ok)
@@ -160,8 +158,6 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp severity(severity), do: [:bright, color(severity), "#{severity}: ", :reset]
   defp color(:error), do: :red
   defp color(:warning), do: :yellow
-
-  defp path, do: Path.join(Mix.Project.compile_path(), "boundary_calls.ets")
 
   defp check(application, calls) do
     Boundary.errors(application, calls)

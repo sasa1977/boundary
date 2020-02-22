@@ -2,8 +2,8 @@ defmodule Boundary.Mix.Xref do
   @moduledoc false
   use GenServer
 
-  @spec start_link(String.t()) :: GenServer.on_start()
-  def start_link(path), do: GenServer.start_link(__MODULE__, path, name: __MODULE__)
+  @spec start_link :: GenServer.on_start()
+  def start_link, do: GenServer.start_link(__MODULE__, nil, name: __MODULE__)
 
   @spec add_call(module, %{callee: mfa, file: String.t(), line: non_neg_integer}) :: :ok
   def add_call(caller, call) do
@@ -14,10 +14,10 @@ defmodule Boundary.Mix.Xref do
     :ok
   end
 
-  @spec flush(String.t(), [module]) :: :ok
-  def flush(path, app_modules) do
+  @spec flush([module]) :: :ok
+  def flush(app_modules) do
     if not is_nil(app_modules), do: purge_deleted_modules(app_modules)
-    :ets.tab2file(:boundary_xref_calls, to_charlist(path))
+    :ets.tab2file(:boundary_xref_calls, to_charlist(path()))
   end
 
   @spec calls :: [Boundary.call()]
@@ -33,13 +33,13 @@ defmodule Boundary.Mix.Xref do
   def stop, do: GenServer.stop(__MODULE__)
 
   @impl GenServer
-  def init(path) do
+  def init(nil) do
     :ets.new(
       :boundary_xref_seen_modules,
       [:set, :public, :named_table, read_concurrency: true, write_concurrency: true]
     )
 
-    load_file(path) ||
+    load_file() ||
       :ets.new(:boundary_xref_calls, [
         :named_table,
         :public,
@@ -63,11 +63,13 @@ defmodule Boundary.Mix.Xref do
     |> Stream.concat()
   end
 
-  defp load_file(path) do
-    {:ok, tab} = :ets.file2tab(to_charlist(path))
+  defp load_file do
+    {:ok, tab} = :ets.file2tab(to_charlist(path()))
     tab
   catch
     _, _ ->
       nil
   end
+
+  defp path, do: Path.join(Mix.Project.compile_path(), "boundary_calls.ets")
 end
