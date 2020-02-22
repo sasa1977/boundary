@@ -215,7 +215,7 @@ defmodule Boundary do
   end
   ```
   """
-  @type application :: %{
+  @type spec :: %{
           boundaries: %{name => definition},
           modules: %{
             classified: %{module => name},
@@ -226,8 +226,25 @@ defmodule Boundary do
   @type name :: module
   @type definition :: %{deps: [name], exports: [module], ignore?: boolean, file: String.t(), line: pos_integer}
 
+  @type call :: %{
+          callee: mfa,
+          callee_module: module,
+          caller_module: module,
+          file: String.t(),
+          line: pos_integer
+        }
+
+  @type error ::
+          {:unknown_dep, dep_error}
+          | {:ignored_dep, dep_error}
+          | {:cycle, [Boundary.name()]}
+          | {:unclassified_module, [module]}
+          | {:invalid_call, [Boundary.call()]}
+
+  @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
+
   require Boundary.Definition
-  Boundary.Definition.generate(deps: [], exports: [Definition, MixCompiler])
+  Boundary.Definition.generate(deps: [], exports: [])
 
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
@@ -237,21 +254,13 @@ defmodule Boundary do
   end
 
   @doc "Returns the boundary-specific view of the given application."
-  @spec application(atom) :: application
-  def application(app_name) do
+  @spec spec(atom) :: spec
+  def spec(app_name) do
     app_name
     |> Application.spec(:modules)
-    |> Stream.map(&%{name: &1, protocol_impl?: protocol_impl?(&1), classify_to: classify_to(&1)})
-    |> Boundary.Definition.boundaries()
+    |> Boundary.Definition.spec()
   end
 
-  defp protocol_impl?(module),
-    do: function_exported?(module, :__impl__, 1)
-
-  defp classify_to(module) do
-    case Keyword.get(module.__info__(:attributes), Boundary.Target) do
-      [classify_to] -> classify_to
-      nil -> nil
-    end
-  end
+  @spec errors(spec(), [Boundary.call()]) :: [error]
+  def errors(spec, calls), do: Boundary.Checker.errors(spec, calls)
 end

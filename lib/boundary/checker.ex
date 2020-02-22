@@ -1,31 +1,15 @@
 defmodule Boundary.Checker do
   @moduledoc false
 
-  @type error ::
-          {:unknown_dep, dep_error}
-          | {:ignored_dep, dep_error}
-          | {:cycle, [Boundary.name()]}
-          | {:unclassified_module, [module]}
-          | {:invalid_call, [Boundary.Xref.call()]}
+  # credo:disable-for-this-file Credo.Check.Readability.Specs
 
-  @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
-
-  @spec errors(application: Boundary.application(), calls: [Boundary.Xref.call()]) :: [error]
-  def errors(opts \\ []) do
-    app = Keyword.get_lazy(opts, :application, &current_app/0)
-
+  def errors(app, calls) do
     Enum.concat([
       invalid_deps(app.boundaries),
       cycles(app.boundaries),
       unclassified_modules(app.modules.unclassified),
-      invalid_calls(app.boundaries, app.modules.classified, Keyword.fetch!(opts, :calls))
+      invalid_calls(app.boundaries, app.modules.classified, calls)
     ])
-  end
-
-  defp current_app do
-    app = Keyword.fetch!(Mix.Project.config(), :app)
-    Application.load(app)
-    Boundary.application(app)
   end
 
   defp invalid_deps(boundaries) do
@@ -102,7 +86,9 @@ defmodule Boundary.Checker do
       from_boundary != to_boundary and not exported?(boundaries, to_boundary, entry.callee_module) ->
         %{
           type: :not_exported,
-          boundary: to_boundary,
+          from_boundary: from_boundary,
+          to_boundary: to_boundary,
+          caller: entry.caller_module,
           callee: entry.callee,
           file: entry.file,
           line: entry.line

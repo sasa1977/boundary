@@ -1,6 +1,11 @@
 defmodule Boundary.Definition do
   @moduledoc false
+
   # credo:disable-for-this-file Credo.Check.Readability.Specs
+
+  defmodule Error do
+    defexception [:message, :file, :line]
+  end
 
   defmacro generate(opts) do
     quote bind_quoted: [opts: opts] do
@@ -30,14 +35,27 @@ defmodule Boundary.Definition do
     end
   end
 
-  def boundaries(modules) do
-    module_names = Enum.into(modules, MapSet.new(), & &1.name)
+  def spec(module_names) do
+    modules = Enum.map(module_names, &%{name: &1, protocol_impl?: protocol_impl?(&1), classify_to: classify_to(&1)})
     boundaries = load_boundaries(module_names)
     %{modules: classify_modules(boundaries, modules), boundaries: boundaries}
   end
 
-  @doc false
-  def classify_modules(boundaries, modules) do
+  defp protocol_impl?(module) do
+    # Not sure why, but sometimes the protocol implementation isn't loaded.
+    Code.ensure_loaded(module)
+
+    function_exported?(module, :__impl__, 1)
+  end
+
+  defp classify_to(module) do
+    case Keyword.get(module.__info__(:attributes), Boundary.Target) do
+      [classify_to] -> classify_to
+      nil -> nil
+    end
+  end
+
+  defp classify_modules(boundaries, modules) do
     boundaries_search_space =
       boundaries
       |> Map.keys()
@@ -68,7 +86,7 @@ defmodule Boundary.Definition do
       classify_to ->
         unless Map.has_key?(boundaries, classify_to.boundary) do
           message = "invalid boundary #{classify_to.boundary}"
-          raise Boundary.DefinitionError, message: message, file: classify_to.file, line: classify_to.line
+          raise Error, message: message, file: classify_to.file, line: classify_to.line
         end
 
         classify_to.boundary

@@ -28,7 +28,6 @@ defmodule Boundary.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:stream_data, "~> 0.4.0", only: :test},
       {:dialyxir, "~> 0.5", only: :dev, runtime: false},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:credo, "~> 1.1", only: [:dev, :test], runtime: false}

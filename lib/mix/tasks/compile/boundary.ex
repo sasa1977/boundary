@@ -1,9 +1,9 @@
 defmodule Mix.Tasks.Compile.Boundary do
   # credo:disable-for-this-file Credo.Check.Readability.Specs
 
-  use Boundary, deps: [Boundary]
+  use Boundary, deps: [Boundary, Boundary.Mix]
   use Mix.Task.Compiler
-  alias Boundary.Xref
+  alias Boundary.Mix.Xref
 
   @moduledoc """
   Verifies cross-module function calls according to defined boundaries.
@@ -115,19 +115,21 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp after_compiler({status, diagnostics}, argv) when status in [:ok, :noop] do
     tracers = Enum.reject(Code.get_compiler_option(:tracers), &(&1 == __MODULE__))
     Code.put_compiler_option(:tracers, tracers)
+    Xref.flush(path(), app_modules())
+    calls = Xref.calls()
+    Xref.stop()
 
-    calls = Xref.calls(path(), app_modules())
-
-    errors = Boundary.MixCompiler.check(calls: calls)
+    errors = check(Boundary.spec(app_name()), calls)
     print_diagnostic_errors(errors)
     {status(errors, argv), diagnostics ++ errors}
   end
 
   defp app_modules do
-    app = Keyword.fetch!(Mix.Project.config(), :app)
-    Application.load(app)
-    Application.spec(app, :modules)
+    Application.load(app_name())
+    Application.spec(app_name(), :modules)
   end
+
+  defp app_name, do: Keyword.fetch!(Mix.Project.config(), :app)
 
   defp status([], _), do: :ok
   defp status([_ | _], argv), do: if(warnings_as_errors?(argv), do: :error, else: :ok)
@@ -160,4 +162,72 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp color(:warning), do: :yellow
 
   defp path, do: Path.join(Mix.Project.compile_path(), "boundary_calls.ets")
+
+  defp check(application, calls) do
+    Boundary.errors(application, calls)
+    |> Stream.map(&to_diagnostic_error/1)
+    |> Enum.sort_by(&{&1.file, &1.position})
+  rescue
+    e in Boundary.Definition.Error ->
+      [diagnostic(e.message, file: e.file, position: e.line)]
+  end
+
+  defp to_diagnostic_error({:unclassified_module, module}),
+    do: diagnostic("#{inspect(module)} is not included in any boundary", file: module_source(module))
+
+  defp to_diagnostic_error({:unknown_dep, dep}) do
+    diagnostic("unknown boundary #{inspect(dep.name)} is listed as a dependency", file: dep.file, position: dep.line)
+  end
+
+  defp to_diagnostic_error({:ignored_dep, dep}) do
+    diagnostic("ignored boundary #{inspect(dep.name)} is listed as a dependency", file: dep.file, position: dep.line)
+  end
+
+  defp to_diagnostic_error({:cycle, cycle}) do
+    cycle = cycle |> Stream.map(&inspect/1) |> Enum.join(" -> ")
+    diagnostic("dependency cycle found:\n#{cycle}\n")
+  end
+
+  defp to_diagnostic_error({:invalid_call, %{type: :invalid_cross_boundary_call} = error}) do
+    {m, f, a} = error.callee
+
+    message =
+      "forbidden call to #{Exception.format_mfa(m, f, a)}\n" <>
+        "  (calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)\n" <>
+        "  (call originated from #{inspect(error.caller)})"
+
+    diagnostic(message, file: error.file, position: error.line)
+  end
+
+  defp to_diagnostic_error({:invalid_call, %{type: :not_exported} = error}) do
+    {m, f, a} = error.callee
+
+    message =
+      "forbidden call to #{Exception.format_mfa(m, f, a)}\n" <>
+        "  (module #{inspect(m)} is not exported by its owner boundary #{inspect(error.to_boundary)})\n" <>
+        "  (call originated from #{inspect(error.caller)})"
+
+    diagnostic(message, file: error.file, position: error.line)
+  end
+
+  defp module_source(module) do
+    module.module_info(:compile)
+    |> Keyword.fetch!(:source)
+    |> to_string()
+    |> Path.relative_to_cwd()
+  catch
+    _, _ -> ""
+  end
+
+  def diagnostic(message, opts \\ []) do
+    %Mix.Task.Compiler.Diagnostic{
+      compiler_name: "boundary",
+      details: nil,
+      file: "unknown",
+      message: message,
+      position: nil,
+      severity: :warning
+    }
+    |> Map.merge(Map.new(opts))
+  end
 end

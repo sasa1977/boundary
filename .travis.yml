@@ -16,7 +16,7 @@ cache:
 script:
   - MIX_ENV=test mix compile --force --warnings-as-errors
   - mix docs
-  - mix test --include integration
+  - mix test
   - mix format
   - MIX_ENV=test mix credo list
   - mix dialyzer
