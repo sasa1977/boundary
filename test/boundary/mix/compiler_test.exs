@@ -1,6 +1,10 @@
 defmodule Boundary.Mix.CompilerTest do
   use ExUnit.Case, async: true
 
+  defprotocol SomeProtocol do
+    def foo(bar)
+  end
+
   describe "check" do
     test "reports no errors on empty app" do
       assert check(modules: [], calls: []) == []
@@ -14,7 +18,7 @@ defmodule Boundary.Mix.CompilerTest do
                  {Baz, boundary: [exports: [Qux]]},
                  Baz.Qux,
                  {Ignored, boundary: [ignore?: true]},
-                 {Classified, classify_to: %{boundary: Foo}},
+                 {Classified, protocol_impl?: true, boundary: [classify_to: Foo]},
                  {ProtocolImpl, protocol_impl?: true}
                ],
                calls: [
@@ -22,8 +26,8 @@ defmodule Boundary.Mix.CompilerTest do
                  {Foo.Bar, Baz},
                  {Foo, Baz.Qux},
                  {Ignored, Foo},
-                 {Classified, Baz},
-                 {ProtocolImpl, Foo}
+                 {Enumerable.Classified, Baz},
+                 {Enumerable.ProtocolImpl, Foo}
                ]
              ) == []
     end
@@ -121,26 +125,32 @@ defmodule Boundary.Mix.CompilerTest do
   defp define_module(module) when is_atom(module), do: define_module({module, []})
 
   defp define_module({module, opts}) do
-    {boundary_opts, other_opts} = Keyword.pop(opts, :boundary)
+    boundary_opts = Keyword.get(opts, :boundary)
 
-    {{:module, ^module, _code, _}, _bindings} =
-      Code.eval_quoted(
+    quoted =
+      if Keyword.get(opts, :protocol_impl?) do
+        quote bind_quoted: [module: module, boundary_opts: boundary_opts] do
+          defimpl SomeProtocol, for: module do
+            if not is_nil(boundary_opts), do: use(Boundary, boundary_opts)
+            def foo(_), do: :ok
+          end
+        end
+      else
         quote bind_quoted: [module: module, boundary_opts: boundary_opts] do
           defmodule module do
             if not is_nil(boundary_opts), do: use(Boundary, boundary_opts)
           end
         end
-      )
+      end
+
+    {{:module, module, _code, _}, _bindings} = Code.eval_quoted(quoted)
 
     on_exit(fn ->
       :code.delete(module)
       :code.purge(module)
     end)
 
-    Map.merge(
-      %{name: module, protocol_impl?: false, classify_to: nil},
-      Map.new(other_opts)
-    )
+    module
   end
 
   defp call({from, to}) do

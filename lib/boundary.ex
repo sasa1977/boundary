@@ -258,20 +258,9 @@ defmodule Boundary do
   def application(app_name) do
     app_name
     |> Application.spec(:modules)
-    |> Stream.map(&%{name: &1, protocol_impl?: protocol_impl?(&1), classify_to: classify_to(&1)})
     |> Boundary.Definition.boundaries()
   end
 
   @spec errors(application(), [Boundary.call()]) :: [error]
   def errors(application, calls), do: Boundary.Checker.errors(application, calls)
-
-  defp protocol_impl?(module),
-    do: function_exported?(module, :__impl__, 1)
-
-  defp classify_to(module) do
-    case Keyword.get(module.__info__(:attributes), Boundary.Target) do
-      [classify_to] -> classify_to
-      nil -> nil
-    end
-  end
 end

@@ -8,7 +8,7 @@ defmodule Boundary.Mix.Compiler do
     |> Stream.map(&to_diagnostic_error/1)
     |> Enum.sort_by(&{&1.file, &1.position})
   rescue
-    e in Boundary.DefinitionError ->
+    e in Boundary.Definition.Error ->
       [diagnostic(e.message, file: e.file, position: e.line)]
   end
 
