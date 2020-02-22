@@ -41,8 +41,12 @@ defmodule Boundary.Definition do
     %{modules: classify_modules(boundaries, modules), boundaries: boundaries}
   end
 
-  defp protocol_impl?(module),
-    do: function_exported?(module, :__impl__, 1)
+  defp protocol_impl?(module) do
+    # Not sure why, but sometimes the protocol implementation isn't loaded.
+    Code.ensure_loaded(module)
+
+    function_exported?(module, :__impl__, 1)
+  end
 
   defp classify_to(module) do
     case Keyword.get(module.__info__(:attributes), Boundary.Target) do
