@@ -234,6 +234,15 @@ defmodule Boundary do
           line: pos_integer
         }
 
+  @type error ::
+          {:unknown_dep, dep_error}
+          | {:ignored_dep, dep_error}
+          | {:cycle, [Boundary.name()]}
+          | {:unclassified_module, [module]}
+          | {:invalid_call, [Boundary.call()]}
+
+  @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
+
   require Boundary.Definition
   Boundary.Definition.generate(deps: [], exports: [Definition, Mix.Compiler])
 
@@ -252,6 +261,9 @@ defmodule Boundary do
     |> Stream.map(&%{name: &1, protocol_impl?: protocol_impl?(&1), classify_to: classify_to(&1)})
     |> Boundary.Definition.boundaries()
   end
+
+  @spec errors(application(), [Boundary.call()]) :: [error]
+  def errors(application, calls), do: Boundary.Checker.errors(application, calls)
 
   defp protocol_impl?(module),
     do: function_exported?(module, :__impl__, 1)

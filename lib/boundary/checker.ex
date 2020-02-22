@@ -1,31 +1,16 @@
 defmodule Boundary.Checker do
   @moduledoc false
 
-  @type error ::
-          {:unknown_dep, dep_error}
-          | {:ignored_dep, dep_error}
-          | {:cycle, [Boundary.name()]}
-          | {:unclassified_module, [module]}
-          | {:invalid_call, [Boundary.call()]}
+  # credo:disable-for-this-file Credo.Check.Readability.Specs
 
-  @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
-
-  @spec errors(application: Boundary.application(), calls: [Boundary.call()]) :: [error]
-  def errors(opts \\ []) do
-    app = Keyword.get_lazy(opts, :application, &current_app/0)
-
+  @doc false
+  def errors(app, calls) do
     Enum.concat([
       invalid_deps(app.boundaries),
       cycles(app.boundaries),
       unclassified_modules(app.modules.unclassified),
-      invalid_calls(app.boundaries, app.modules.classified, Keyword.fetch!(opts, :calls))
+      invalid_calls(app.boundaries, app.modules.classified, calls)
     ])
-  end
-
-  defp current_app do
-    app = Keyword.fetch!(Mix.Project.config(), :app)
-    Application.load(app)
-    Boundary.application(app)
   end
 
   defp invalid_deps(boundaries) do

@@ -119,16 +119,17 @@ defmodule Mix.Tasks.Compile.Boundary do
     calls = Xref.calls()
     Xref.stop()
 
-    errors = Boundary.Mix.Compiler.check(calls: calls)
+    errors = Boundary.Mix.Compiler.check(Boundary.application(app_name()), calls)
     print_diagnostic_errors(errors)
     {status(errors, argv), diagnostics ++ errors}
   end
 
   defp app_modules do
-    app = Keyword.fetch!(Mix.Project.config(), :app)
-    Application.load(app)
-    Application.spec(app, :modules)
+    Application.load(app_name())
+    Application.spec(app_name(), :modules)
   end
+
+  defp app_name, do: Keyword.fetch!(Mix.Project.config(), :app)
 
   defp status([], _), do: :ok
   defp status([_ | _], argv), do: if(warnings_as_errors?(argv), do: :error, else: :ok)

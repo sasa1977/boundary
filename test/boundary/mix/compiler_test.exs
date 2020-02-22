@@ -111,8 +111,8 @@ defmodule Boundary.Mix.CompilerTest do
     application = Boundary.Definition.boundaries(modules)
 
     Boundary.Mix.Compiler.check(
-      application: application,
-      calls: opts |> Keyword.get(:calls, []) |> Enum.map(&call/1)
+      application,
+      opts |> Keyword.get(:calls, []) |> Enum.map(&call/1)
     )
   end
 

@@ -3,9 +3,8 @@ defmodule Boundary.Mix.Compiler do
 
   # credo:disable-for-this-file Credo.Check.Readability.Specs
 
-  def check(opts \\ []) do
-    opts
-    |> Boundary.Checker.errors()
+  def check(application, calls) do
+    Boundary.errors(application, calls)
     |> Stream.map(&to_diagnostic_error/1)
     |> Enum.sort_by(&{&1.file, &1.position})
   rescue
