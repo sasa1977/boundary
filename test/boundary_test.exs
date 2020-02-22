@@ -1,16 +1,16 @@
-defmodule Boundary.Mix.CompilerTest do
+defmodule BoundaryTest do
   use ExUnit.Case, async: true
 
   defprotocol SomeProtocol do
     def foo(bar)
   end
 
-  describe "check" do
-    test "reports no errors on empty app" do
+  describe "errors" do
+    test "returns empty list on empty app" do
       assert check(modules: [], calls: []) == []
     end
 
-    test "allows valid calls" do
+    test "returns empty list if all calls are valid" do
       assert check(
                modules: [
                  {Foo, boundary: [deps: [Baz]]},
@@ -32,30 +32,34 @@ defmodule Boundary.Mix.CompilerTest do
              ) == []
     end
 
-    test "disallows call to undeclared dep" do
+    test "includes call to undeclared dep" do
       assert [error] = check(modules: [{Foo, boundary: []}, {Bar, boundary: []}], calls: [{Foo, Bar}])
 
-      assert error.message <> "\n" ==
-               """
-               forbidden call to Bar.fun/1
-                 (calls from Foo to Bar are not allowed)
-                 (call originated from Foo)
-               """
+      assert {:invalid_call,
+              %{
+                from_boundary: Foo,
+                to_boundary: Bar,
+                caller: Foo,
+                callee: {Bar, :fun, 1},
+                type: :invalid_cross_boundary_call
+              }} = error
     end
 
-    test "disallows call to unexported module" do
+    test "includes call to unexported module" do
       assert [error] =
                check(
                  modules: [{Foo, boundary: [deps: [Bar]]}, {Bar, boundary: []}, Bar.Baz],
                  calls: [{Foo, Bar.Baz}]
                )
 
-      assert error.message <> "\n" ==
-               """
-               forbidden call to Bar.Baz.fun/1
-                 (module Bar.Baz is not exported by its owner boundary Bar)
-                 (call originated from Foo)
-               """
+      assert {:invalid_call,
+              %{
+                from_boundary: Foo,
+                to_boundary: Bar,
+                caller: Foo,
+                callee: {Bar.Baz, :fun, 1},
+                type: :not_exported
+              }} = error
     end
 
     test "treats inner boundary as a top-level one" do
@@ -65,48 +69,37 @@ defmodule Boundary.Mix.CompilerTest do
                  calls: [{Foo.Bar, Baz}]
                )
 
-      assert error.message <> "\n" ==
-               """
-               forbidden call to Baz.fun/1
-                 (calls from Foo.Bar to Baz are not allowed)
-                 (call originated from Foo.Bar)
-               """
+      assert {:invalid_call, %{from_boundary: Foo.Bar, to_boundary: Baz}} = error
     end
 
-    test "reports unclassified modules" do
+    test "includes unclassified modules" do
       assert [error1, error2] = check(modules: [{Foo, boundary: []}, Bar, Foo.Bar, Baz, Foo.Baz])
-      assert error1.message == "Bar is not included in any boundary"
-      assert error2.message == "Baz is not included in any boundary"
+      assert error1 == {:unclassified_module, Bar}
+      assert error2 == {:unclassified_module, Baz}
     end
 
-    test "doesn't report unclassified protocol implementations" do
+    test "doesn't include unclassified protocol implementations" do
       assert check(modules: [{Foo, boundary: []}, {Bar, [protocol_impl?: true]}]) == []
     end
 
-    test "reports unknown boundaries in deps" do
+    test "includes unknown boundaries in deps" do
       assert [error] = check(modules: [{Foo, boundary: [deps: [Bar]]}])
-      assert error.message == "unknown boundary Bar is listed as a dependency"
+      assert {:unknown_dep, %{name: Bar}} = error
     end
 
-    test "reports ignored boundaries is deps" do
+    test "includes ignored boundaries in deps" do
       assert [error] = check(modules: [{Foo, boundary: [deps: [Bar]]}, {Bar, boundary: [ignore?: true]}])
-      assert error.message == "ignored boundary Bar is listed as a dependency"
+      assert {:ignored_dep, %{name: Bar}} = error
     end
 
-    test "reports cycles" do
+    test "includes cycles" do
       modules = [
         {Foo, boundary: [deps: [Bar]]},
         {Bar, boundary: [deps: [Baz]]},
         {Baz, boundary: [deps: [Foo]]}
       ]
 
-      assert [error] = check(modules: modules)
-
-      assert error.message ==
-               """
-               dependency cycle found:
-               Foo -> Bar -> Baz -> Foo
-               """
+      assert check(modules: modules) == [{:cycle, [Foo, Bar, Baz, Foo]}]
     end
   end
 
@@ -114,7 +107,7 @@ defmodule Boundary.Mix.CompilerTest do
     modules = def_modules(Keyword.get(opts, :modules, []))
     spec = Boundary.Definition.spec(modules)
 
-    Boundary.Mix.Compiler.check(
+    Boundary.errors(
       spec,
       opts |> Keyword.get(:calls, []) |> Enum.map(&call/1)
     )

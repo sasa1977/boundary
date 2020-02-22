@@ -86,7 +86,8 @@ defmodule Boundary.Checker do
       from_boundary != to_boundary and not exported?(boundaries, to_boundary, entry.callee_module) ->
         %{
           type: :not_exported,
-          boundary: to_boundary,
+          from_boundary: from_boundary,
+          to_boundary: to_boundary,
           caller: entry.caller_module,
           callee: entry.callee,
           file: entry.file,
