@@ -54,7 +54,7 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
     end
   end
 
-  defp load_compile_time_deps() do
+  defp load_compile_time_deps do
     Mix.Project.config()
     |> Keyword.get(:deps, [])
     |> Stream.filter(fn

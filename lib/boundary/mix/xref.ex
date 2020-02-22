@@ -2,8 +2,8 @@ defmodule Boundary.Mix.Xref do
   @moduledoc false
   use GenServer
 
-  @spec start_link() :: GenServer.on_start()
-  def start_link(), do: GenServer.start_link(__MODULE__, nil, name: __MODULE__)
+  @spec start_link :: GenServer.on_start()
+  def start_link, do: GenServer.start_link(__MODULE__, nil, name: __MODULE__)
 
   @spec add_call(module, %{callee: mfa, file: String.t(), line: non_neg_integer}) :: :ok
   def add_call(caller, call) do

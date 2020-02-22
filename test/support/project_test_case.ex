@@ -1,4 +1,7 @@
 defmodule Boundary.ProjectTestCaseTemplate do
+  @moduledoc false
+
+  # credo:disable-for-this-file Credo.Check.Readability.Specs
   use ExUnit.CaseTemplate
 
   using do
@@ -43,7 +46,7 @@ defmodule Boundary.ProjectTestCaseTemplate do
     File.mkdir_p!(path)
   end
 
-  defp mix_exs_content() do
+  defp mix_exs_content do
     """
     defmodule TestProject.MixProject do
       use Mix.Project
