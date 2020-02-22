@@ -1,7 +1,5 @@
-defmodule Boundary.IntegrationTest do
+defmodule Mix.Tasks.Compile.BoundaryTest do
   use ExUnit.Case, async: true
-
-  @moduletag :integration
 
   setup_all do
     mix!("my_system", ~w/deps.get/)
