@@ -3,7 +3,6 @@ defmodule Boundary.Checker do
 
   # credo:disable-for-this-file Credo.Check.Readability.Specs
 
-  @doc false
   def errors(app, calls) do
     Enum.concat([
       invalid_deps(app.boundaries),

@@ -55,8 +55,7 @@ defmodule Boundary.Definition do
     end
   end
 
-  @doc false
-  def classify_modules(boundaries, modules) do
+  defp classify_modules(boundaries, modules) do
     boundaries_search_space =
       boundaries
       |> Map.keys()
