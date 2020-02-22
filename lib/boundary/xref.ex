@@ -22,24 +22,23 @@ defmodule Boundary.Xref do
     :ok
   end
 
-  @spec calls(String.t(), [module]) :: [call]
-  def calls(path, app_modules) do
+  @spec flush(String.t(), [module]) :: :ok
+  def flush(path, app_modules) do
     if not is_nil(app_modules), do: purge_deleted_modules(app_modules)
     :ets.tab2file(:boundary_xref_calls, to_charlist(path))
-    GenServer.stop(__MODULE__)
-
-    table = load_file(path)
-
-    try do
-      table
-      |> :ets.tab2list()
-      |> Stream.map(fn {caller, meta} -> Map.put(meta, :caller_module, caller) end)
-      |> Stream.map(fn %{callee: {mod, _fun, _arg}} = entry -> Map.put(entry, :callee_module, mod) end)
-      |> Enum.reject(&(&1.callee_module == &1.caller_module))
-    after
-      :ets.delete(table)
-    end
   end
+
+  @spec calls() :: [call]
+  def calls() do
+    :boundary_xref_calls
+    |> :ets.tab2list()
+    |> Stream.map(fn {caller, meta} -> Map.put(meta, :caller_module, caller) end)
+    |> Stream.map(fn %{callee: {mod, _fun, _arg}} = entry -> Map.put(entry, :callee_module, mod) end)
+    |> Enum.reject(&(&1.callee_module == &1.caller_module))
+  end
+
+  @spec stop() :: :ok
+  def stop(), do: GenServer.stop(__MODULE__)
 
   @impl GenServer
   def init(path) do

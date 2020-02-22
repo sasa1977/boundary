@@ -115,8 +115,9 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp after_compiler({status, diagnostics}, argv) when status in [:ok, :noop] do
     tracers = Enum.reject(Code.get_compiler_option(:tracers), &(&1 == __MODULE__))
     Code.put_compiler_option(:tracers, tracers)
-
-    calls = Xref.calls(path(), app_modules())
+    Xref.flush(path(), app_modules())
+    calls = Xref.calls()
+    Xref.stop()
 
     errors = Boundary.MixCompiler.check(calls: calls)
     print_diagnostic_errors(errors)
