@@ -176,11 +176,17 @@ defmodule Mix.Tasks.Compile.Boundary do
     do: diagnostic("#{inspect(module)} is not included in any boundary", file: module_source(module))
 
   defp to_diagnostic_error({:unknown_dep, dep}) do
-    diagnostic("unknown boundary #{inspect(dep.name)} is listed as a dependency", file: dep.file, position: dep.line)
+    diagnostic("unknown boundary #{inspect(dep.name)} is listed as a dependency",
+      file: Path.relative_to_cwd(dep.file),
+      position: dep.line
+    )
   end
 
   defp to_diagnostic_error({:ignored_dep, dep}) do
-    diagnostic("ignored boundary #{inspect(dep.name)} is listed as a dependency", file: dep.file, position: dep.line)
+    diagnostic("ignored boundary #{inspect(dep.name)} is listed as a dependency",
+      file: Path.relative_to_cwd(dep.file),
+      position: dep.line
+    )
   end
 
   defp to_diagnostic_error({:cycle, cycle}) do
@@ -196,7 +202,7 @@ defmodule Mix.Tasks.Compile.Boundary do
         "  (calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)\n" <>
         "  (call originated from #{inspect(error.caller)})"
 
-    diagnostic(message, file: error.file, position: error.line)
+    diagnostic(message, file: Path.relative_to_cwd(error.file), position: error.line)
   end
 
   defp to_diagnostic_error({:invalid_call, %{type: :not_exported} = error}) do
@@ -207,7 +213,7 @@ defmodule Mix.Tasks.Compile.Boundary do
         "  (module #{inspect(m)} is not exported by its owner boundary #{inspect(error.to_boundary)})\n" <>
         "  (call originated from #{inspect(error.caller)})"
 
-    diagnostic(message, file: error.file, position: error.line)
+    diagnostic(message, file: Path.relative_to_cwd(error.file), position: error.line)
   end
 
   defp module_source(module) do

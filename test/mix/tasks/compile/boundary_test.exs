@@ -62,12 +62,12 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
            })
 
     assert Enum.member?(warnings, %{
-             location: "/projects/me/boundaries/test_project/lib/tmp/source.ex:5",
+             location: "lib/tmp/source.ex:5",
              warning: "unknown boundary UnknownBoundary is listed as a dependency"
            })
 
     assert Enum.member?(warnings, %{
-             location: "/projects/me/boundaries/test_project/lib/tmp/source.ex:5",
+             location: "lib/tmp/source.ex:5",
              warning: "ignored boundary Boundary4 is listed as a dependency"
            })
 
