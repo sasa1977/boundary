@@ -2,54 +2,105 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   use ExUnit.Case, async: true
 
   setup_all do
-    mix!("my_system", ~w/deps.get/)
-    mix!("my_system", ~w/compile/)
+    mix!(~w/deps.get/)
     :ok
   end
 
-  test "reports expected warnings" do
-    {output, _code} = mix("my_system", ~w/compile/)
+  setup do
+    File.rm_rf(tmp_folder())
+    :ok
+  end
 
+  test "reports all warnings" do
+    File.mkdir_p(tmp_folder())
+
+    File.write!(
+      Path.join(tmp_folder(), "source.ex"),
+      """
+      defmodule Boundary1 do
+      end
+
+      defmodule Boundary2 do
+        use Boundary, deps: [Boundary4, UnknownBoundary], exports: []
+
+        def fun(), do: Boundary3.fun()
+
+        defmodule Internal do
+          def fun(), do: :ok
+        end
+      end
+
+      defmodule Boundary3 do
+        use Boundary, deps: [Boundary2], exports: []
+
+        def fun(), do: Boundary2.Internal.fun()
+      end
+
+      defmodule Boundary4 do
+        use Boundary, ignore?: true
+      end
+
+      defmodule Boundary5 do
+        use Boundary, deps: [Boundary6], exports: []
+
+        def fun(), do: :ok
+      end
+
+      defmodule Boundary6 do
+        use Boundary, deps: [Boundary5], exports: []
+
+        def fun(), do: :ok
+      end
+      """
+    )
+
+    {output, _code} = mix(~w/compile/)
     warnings = warnings(output)
-    assert length(warnings) == 2
+
+    IO.inspect(warnings)
 
     assert Enum.member?(warnings, %{
-             explanation: "(calls from MySystem to MySystemWeb are not allowed)",
-             callee: "(call originated from MySystem.User)",
-             location: "lib/my_system/user.ex:3",
-             warning: "forbidden call to MySystemWeb.Endpoint.url/0"
+             location: "lib/tmp/source.ex",
+             warning: "Boundary1 is not included in any boundary"
            })
 
     assert Enum.member?(warnings, %{
-             explanation: "(calls from MySystemWeb to MySystem.Application are not allowed)",
-             callee: "(call originated from MySystemWeb.ErrorView)",
-             location: "lib/my_system_web/templates/error/index.html.eex:1",
-             warning: "forbidden call to MySystem.Application.foo/0"
+             location: "/projects/me/boundaries/test_project/lib/tmp/source.ex:5",
+             warning: "unknown boundary UnknownBoundary is listed as a dependency"
+           })
+
+    assert Enum.member?(warnings, %{
+             location: "/projects/me/boundaries/test_project/lib/tmp/source.ex:5",
+             warning: "ignored boundary Boundary4 is listed as a dependency"
+           })
+
+    assert Enum.member?(warnings, %{
+             location: "lib/tmp/source.ex:7",
+             warning: "forbidden call to Boundary3.fun/0",
+             explanation: "(calls from Boundary2 to Boundary3 are not allowed)",
+             callee: "(call originated from Boundary2)"
+           })
+
+    assert Enum.member?(warnings, %{
+             location: "lib/tmp/source.ex:17",
+             warning: "forbidden call to Boundary2.Internal.fun/0",
+             explanation: "(module Boundary2.Internal is not exported by its owner boundary Boundary2)",
+             callee: "(call originated from Boundary3)"
+           })
+
+    assert Enum.member?(warnings, %{
+             warning: "dependency cycle found:",
+             location: "Boundary6 -> Boundary5 -> Boundary6"
            })
   end
 
-  test "ignored boundaries are not reported" do
-    {output, _code} = mix("my_system", ~w/compile/)
-    refute String.contains?(output, "SomeTopLevelModule")
-  end
-
-  test "exit code is zero with default options" do
-    {_output, code} = mix("my_system", ~w/compile/)
-    assert code == 0
-  end
-
-  test "exit code is non-zero with --warnings-as-errors" do
-    {_output, code} = mix("my_system", ~w/compile --warnings-as-errors/)
-    assert code == 1
-  end
-
-  defp mix!(project_name, args) do
-    {output, 0} = mix(project_name, args)
+  defp mix!(args) do
+    {output, 0} = mix(args)
     output
   end
 
-  defp mix(project_name, args),
-    do: System.cmd("mix", args, stderr_to_stdout: true, cd: Path.join(~w/demos #{project_name}/))
+  defp mix(args),
+    do: System.cmd("mix", args, stderr_to_stdout: true, cd: project_folder())
 
   defp warnings(output) do
     output
@@ -65,4 +116,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
       |> Map.put(:warning, String.trim(warning))
     end)
   end
+
+  defp project_folder, do: "test_project"
+  defp tmp_folder, do: Path.join(~w/test_project lib tmp/)
 end
