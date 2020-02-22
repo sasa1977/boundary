@@ -226,6 +226,14 @@ defmodule Boundary do
   @type name :: module
   @type definition :: %{deps: [name], exports: [module], ignore?: boolean, file: String.t(), line: pos_integer}
 
+  @type call :: %{
+          callee: mfa,
+          callee_module: module,
+          caller_module: module,
+          file: String.t(),
+          line: pos_integer
+        }
+
   require Boundary.Definition
   Boundary.Definition.generate(deps: [], exports: [Definition, Mix.Compiler])
 

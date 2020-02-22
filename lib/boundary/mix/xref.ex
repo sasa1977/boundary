@@ -2,14 +2,6 @@ defmodule Boundary.Mix.Xref do
   @moduledoc false
   use GenServer
 
-  @type call :: %{
-          callee: mfa,
-          callee_module: module,
-          caller_module: module,
-          file: String.t(),
-          line: pos_integer
-        }
-
   @spec start_link(String.t()) :: GenServer.on_start()
   def start_link(path), do: GenServer.start_link(__MODULE__, path, name: __MODULE__)
 
@@ -28,8 +20,8 @@ defmodule Boundary.Mix.Xref do
     :ets.tab2file(:boundary_xref_calls, to_charlist(path))
   end
 
-  @spec calls() :: [call]
-  def calls() do
+  @spec calls :: [Boundary.call()]
+  def calls do
     :boundary_xref_calls
     |> :ets.tab2list()
     |> Stream.map(fn {caller, meta} -> Map.put(meta, :caller_module, caller) end)
@@ -37,8 +29,8 @@ defmodule Boundary.Mix.Xref do
     |> Enum.reject(&(&1.callee_module == &1.caller_module))
   end
 
-  @spec stop() :: :ok
-  def stop(), do: GenServer.stop(__MODULE__)
+  @spec stop :: :ok
+  def stop, do: GenServer.stop(__MODULE__)
 
   @impl GenServer
   def init(path) do
