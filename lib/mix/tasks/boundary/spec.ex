@@ -10,7 +10,7 @@ defmodule Mix.Tasks.Boundary.Spec do
   @impl Mix.Task
   def run(_argv) do
     Mix.Task.run("compile")
-    Application.load(Boundary.Mix.app_name())
+    Boundary.Mix.load_app()
 
     boundary_spec = Boundary.spec(Boundary.Mix.app_name())
 

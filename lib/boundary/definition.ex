@@ -38,7 +38,18 @@ defmodule Boundary.Definition do
   def spec(module_names) do
     modules = Enum.map(module_names, &%{name: &1, protocol_impl?: protocol_impl?(&1), classify_to: classify_to(&1)})
     boundaries = load_boundaries(module_names)
-    %{modules: classify_modules(boundaries, modules), boundaries: boundaries}
+
+    module_to_app =
+      for {app, _description, _vsn} <- Application.loaded_applications(),
+          module <- Application.spec(app, :modules),
+          into: %{erlang: :erlang},
+          do: {module, app}
+
+    %{
+      modules: classify_modules(boundaries, modules),
+      boundaries: boundaries,
+      module_to_app: module_to_app
+    }
   end
 
   defp protocol_impl?(module) do
@@ -112,13 +123,14 @@ defmodule Boundary.Definition do
     |> Map.merge(Map.new(definition))
     |> validate!()
     |> expand_exports(boundary)
+    |> Map.update!(:externals, &Map.new/1)
     |> Map.merge(%{file: env.file, line: env.line})
   end
 
-  defp defaults, do: %{deps: [], exports: [], ignore?: false}
+  defp defaults, do: %{deps: [], exports: [], ignore?: false, externals: []}
 
   defp validate!(definition) do
-    valid_keys = ~w/deps exports ignore?/a
+    valid_keys = ~w/deps exports ignore? externals/a
 
     with [_ | _] = invalid_options <- definition |> Map.keys() |> Enum.reject(&(&1 in valid_keys)) do
       error = "Invalid options: #{invalid_options |> Stream.map(&inspect/1) |> Enum.join(", ")}"

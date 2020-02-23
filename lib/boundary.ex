@@ -155,6 +155,31 @@ defmodule Boundary do
   Of course, in-boundary cross-module dependencies are always allowed (any module may use all
   other modules from the same boundary).
 
+  ### External dependencies
+
+  By default, all dependencies on 3rd party modules (modules from other OTP applications) are permitted. However, you
+  can restrain such dependencies using the `:externals` option. For example, let's say you want to prevent using
+  `Ecto` in the Web tier, except for `Ecto.Changeset`. This can be specified as follows:
+
+  ```
+  defmodule MySystemWeb do
+    use Boundary, externals: [ecto: [Ecto.Changeset]]
+  end
+  ```
+
+  The `:externals` option has the shape of `[{app_name, permitted_boundaries}]`, where the `permitted_boundaries` is
+  a list of modules which can be referenced.
+
+  Each module is treated as a boundary, which means that listing a module will also allow dependecies to "submodules".
+  For example, if `Ecto.Query` is in the permitted list, dependencies to `Ecto.Query.API` and `Ecto.Query.WindowAPI` is
+  also permitted. To completely disallow dependencies to some app, you can provide `[]` in the `permitted_boundaries`
+  list.
+
+  If an app is not included in the externals list, all the calls to its modules are permitted. In other words, the
+  `:externals` option works as an opt-in. You only list the apps which you want to restrain.
+
+  You can use the `Mix.Tasks.Boundary.FindExternalDeps` mix task to explore external dependencies of your boundaries.
+
   ## Ignored boundaries
 
   It is possible to exclude some modules from cross-boundary checks by defining an __ignored__ boundary:
@@ -220,11 +245,19 @@ defmodule Boundary do
           modules: %{
             classified: %{module => name},
             unclassified: [%{name: module, protocol_impl?: boolean}]
-          }
+          },
+          module_to_app: %{module => atom}
         }
 
   @type name :: module
-  @type definition :: %{deps: [name], exports: [module], ignore?: boolean, file: String.t(), line: pos_integer}
+  @type definition :: %{
+          deps: [name],
+          exports: [module],
+          externals: %{atom => [name]},
+          ignore?: boolean,
+          file: String.t(),
+          line: pos_integer
+        }
 
   @type call :: %{
           callee: mfa,

@@ -113,20 +113,17 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp after_compiler({:error, _} = status, _argv), do: status
 
   defp after_compiler({status, diagnostics}, argv) when status in [:ok, :noop] do
+    Boundary.Mix.load_app()
+
     tracers = Enum.reject(Code.get_compiler_option(:tracers), &(&1 == __MODULE__))
     Code.put_compiler_option(:tracers, tracers)
-    Xref.flush(app_modules())
+    Xref.flush(Application.spec(Boundary.Mix.app_name(), :modules))
     calls = Xref.calls()
     Xref.stop()
 
     errors = check(Boundary.spec(Boundary.Mix.app_name()), calls)
     print_diagnostic_errors(errors)
     {status(errors, argv), diagnostics ++ errors}
-  end
-
-  defp app_modules do
-    Application.load(Boundary.Mix.app_name())
-    Application.spec(Boundary.Mix.app_name(), :modules)
   end
 
   defp status([], _), do: :ok
@@ -207,6 +204,17 @@ defmodule Mix.Tasks.Compile.Boundary do
     message =
       "forbidden call to #{Exception.format_mfa(m, f, a)}\n" <>
         "  (module #{inspect(m)} is not exported by its owner boundary #{inspect(error.to_boundary)})\n" <>
+        "  (call originated from #{inspect(error.caller)})"
+
+    diagnostic(message, file: Path.relative_to_cwd(error.file), position: error.line)
+  end
+
+  defp to_diagnostic_error({:invalid_call, %{type: :invalid_external_dep_call} = error}) do
+    {m, f, a} = error.callee
+
+    message =
+      "forbidden call to #{Exception.format_mfa(m, f, a)}\n" <>
+        "  (calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)\n" <>
         "  (call originated from #{inspect(error.caller)})"
 
     diagnostic(message, file: Path.relative_to_cwd(error.file), position: error.line)

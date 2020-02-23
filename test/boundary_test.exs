@@ -15,7 +15,7 @@ defmodule BoundaryTest do
     test "returns empty list if all calls are valid" do
       assert check(
                modules: [
-                 {Foo, boundary: [deps: [Baz]]},
+                 {Foo, boundary: [deps: [Baz], externals: [logger: [Logger]]]},
                  Foo.Bar,
                  {Baz, boundary: [exports: [Qux]]},
                  Baz.Qux,
@@ -25,6 +25,8 @@ defmodule BoundaryTest do
                ],
                calls: [
                  {Foo, Baz},
+                 {Foo, Logger, :metadata},
+                 {Foo, Logger.Formatter, :compile},
                  {Foo.Bar, Baz},
                  {Foo, Baz.Qux},
                  {Ignored, Foo},
@@ -35,33 +37,51 @@ defmodule BoundaryTest do
     end
 
     test "includes call to undeclared dep" do
-      assert [error] = check(modules: [{Foo, boundary: []}, {Bar, boundary: []}], calls: [{Foo, Bar}])
+      assert [{:invalid_call, error}] =
+               check(
+                 modules: [{Foo, boundary: []}, {Bar, boundary: []}],
+                 calls: [{Foo, Bar}]
+               )
 
-      assert {:invalid_call,
-              %{
-                from_boundary: Foo,
-                to_boundary: Bar,
-                caller: Foo,
-                callee: {Bar, :fun, 1},
-                type: :invalid_cross_boundary_call
-              }} = error
+      assert %{
+               from_boundary: Foo,
+               to_boundary: Bar,
+               caller: Foo,
+               callee: {Bar, :fun, 1},
+               type: :invalid_cross_boundary_call
+             } = error
     end
 
     test "includes call to unexported module" do
-      assert [error] =
+      assert [{:invalid_call, error}] =
                check(
                  modules: [{Foo, boundary: [deps: [Bar]]}, {Bar, boundary: []}, Bar.Baz],
                  calls: [{Foo, Bar.Baz}]
                )
 
-      assert {:invalid_call,
-              %{
-                from_boundary: Foo,
-                to_boundary: Bar,
-                caller: Foo,
-                callee: {Bar.Baz, :fun, 1},
-                type: :not_exported
-              }} = error
+      assert %{
+               from_boundary: Foo,
+               to_boundary: Bar,
+               caller: Foo,
+               callee: {Bar.Baz, :fun, 1},
+               type: :not_exported
+             } = error
+    end
+
+    test "includes call to forbidden external" do
+      assert [{:invalid_call, error}] =
+               check(
+                 modules: [{Foo, boundary: [externals: [elixir: []]]}],
+                 calls: [{Foo, IO, :puts}]
+               )
+
+      assert %{
+               from_boundary: Foo,
+               to_boundary: IO,
+               caller: Foo,
+               callee: {IO, :puts, 1},
+               type: :invalid_external_dep_call
+             } = error
     end
 
     test "treats inner boundary as a top-level one" do
@@ -148,9 +168,11 @@ defmodule BoundaryTest do
     module
   end
 
-  defp call({from, to}) do
+  defp call({from, to}), do: call({from, to, :fun})
+
+  defp call({from, to, fun}) do
     %{
-      callee: {to, :fun, 1},
+      callee: {to, fun, 1},
       callee_module: to,
       caller_module: from,
       file: "nofile",

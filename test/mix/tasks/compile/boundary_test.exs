@@ -39,6 +39,13 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
         def fun(), do: :ok
       end
+
+      defmodule Boundary7 do
+        use Boundary, externals: [logger: []]
+        require Logger
+
+        def fun(), do: Logger.info("foo")
+      end
       """
     )
 
@@ -77,6 +84,13 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     assert Enum.member?(warnings, %{
              warning: "dependency cycle found:",
              location: "Boundary6 -> Boundary5 -> Boundary6"
+           })
+
+    assert Enum.member?(warnings, %{
+             location: "lib/source.ex:40",
+             warning: "forbidden call to Logger.info/1",
+             explanation: "(calls from Boundary7 to Logger are not allowed)",
+             callee: "(call originated from Boundary7)"
            })
   end
 
