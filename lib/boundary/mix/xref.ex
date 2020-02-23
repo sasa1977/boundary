@@ -7,26 +7,40 @@ defmodule Boundary.Mix.Xref do
 
   @spec add_call(module, %{callee: mfa, file: String.t(), line: non_neg_integer}) :: :ok
   def add_call(caller, call) do
-    if :ets.insert_new(:boundary_xref_seen_modules, {caller}),
-      do: :ets.delete(:boundary_xref_calls, caller)
-
     :ets.insert(:boundary_xref_calls, {caller, call})
     :ok
   end
 
   @spec flush([module]) :: :ok
   def flush(app_modules) do
-    if not is_nil(app_modules), do: purge_deleted_modules(app_modules)
-    :ets.tab2file(:boundary_xref_calls, to_charlist(path()))
+    purge_deleted_modules(app_modules)
+
+    Stream.iterate(:ets.first(:boundary_xref_calls), &:ets.next(:boundary_xref_calls, &1))
+    |> Stream.take_while(&(&1 != :"$end_of_table"))
+    |> Enum.each(fn module ->
+      File.write!(
+        module_file(module),
+        :erlang.term_to_binary(:ets.lookup_element(:boundary_xref_calls, module, 2))
+      )
+    end)
   end
 
-  @spec calls :: [Boundary.call()]
+  @doc "Returns a lazy stream where each element is of type `Boundary.call()`"
+  @spec calls :: Enumerable.t()
   def calls do
-    :boundary_xref_calls
-    |> :ets.tab2list()
-    |> Stream.map(fn {caller, meta} -> Map.put(meta, :caller_module, caller) end)
-    |> Stream.map(fn %{callee: {mod, _fun, _arg}} = entry -> Map.put(entry, :callee_module, mod) end)
-    |> Enum.reject(&(&1.callee_module == &1.caller_module))
+    Path.join(path(), "*.bert")
+    |> Path.wildcard()
+    |> Stream.flat_map(fn filename ->
+      caller_module = filename |> Path.basename(".bert") |> String.to_atom()
+
+      filename
+      |> File.read!()
+      |> :erlang.binary_to_term()
+      |> Stream.reject(&match?(%{callee: {^caller_module, _fun, _arg}}, &1))
+      |> Stream.map(fn %{callee: {callee, _fun, _arg}} = meta ->
+        Map.merge(meta, %{caller_module: caller_module, callee_module: callee})
+      end)
+    end)
   end
 
   @spec stop :: :ok
@@ -34,51 +48,39 @@ defmodule Boundary.Mix.Xref do
 
   @impl GenServer
   def init(nil) do
-    File.mkdir_p!(Path.dirname(path()))
+    File.mkdir_p!(path())
 
-    :ets.new(
-      :boundary_xref_seen_modules,
-      [:set, :public, :named_table, read_concurrency: true, write_concurrency: true]
-    )
-
-    load_file() ||
-      :ets.new(:boundary_xref_calls, [
-        :named_table,
-        :public,
-        :duplicate_bag,
-        write_concurrency: true
-      ])
+    :ets.new(:boundary_xref_calls, [
+      :named_table,
+      :public,
+      :duplicate_bag,
+      write_concurrency: true
+    ])
 
     {:ok, nil}
   end
 
   defp purge_deleted_modules(app_modules) do
-    recorded_modules()
-    |> MapSet.new()
-    |> MapSet.difference(MapSet.new(app_modules))
-    |> Enum.each(&:ets.delete(:boundary_xref_calls, &1))
+    existing_modules = Enum.into(app_modules, MapSet.new(), &module_file/1)
+
+    recorded_modules =
+      Path.join(path(), "*.bert")
+      |> Path.wildcard()
+      |> MapSet.new()
+
+    Enum.each(
+      MapSet.difference(recorded_modules, existing_modules),
+      &File.rm_rf/1
+    )
   end
 
-  defp recorded_modules do
-    :boundary_xref_calls
-    |> :ets.match({:"$1", :_})
-    |> Stream.concat()
-  end
-
-  defp load_file do
-    {:ok, tab} = :ets.file2tab(to_charlist(path()))
-    tab
-  catch
-    _, _ ->
-      nil
-  end
+  defp module_file(module), do: Path.join(path(), "#{module}.bert")
 
   defp path do
     Path.join([
       Mix.Project.build_path(),
       "boundary",
-      to_string(Boundary.Mix.app_name()),
-      "boundary_calls.ets"
+      to_string(Boundary.Mix.app_name())
     ])
   end
 end

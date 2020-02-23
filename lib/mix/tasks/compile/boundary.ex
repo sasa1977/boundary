@@ -118,10 +118,9 @@ defmodule Mix.Tasks.Compile.Boundary do
     tracers = Enum.reject(Code.get_compiler_option(:tracers), &(&1 == __MODULE__))
     Code.put_compiler_option(:tracers, tracers)
     Xref.flush(Application.spec(Boundary.Mix.app_name(), :modules))
-    calls = Xref.calls()
     Xref.stop()
 
-    errors = check(Boundary.spec(Boundary.Mix.app_name()), calls)
+    errors = check(Boundary.spec(Boundary.Mix.app_name()), Xref.calls())
     print_diagnostic_errors(errors)
     {status(errors, argv), diagnostics ++ errors}
   end
