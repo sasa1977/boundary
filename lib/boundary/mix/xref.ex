@@ -34,6 +34,8 @@ defmodule Boundary.Mix.Xref do
 
   @impl GenServer
   def init(nil) do
+    File.mkdir_p!(Path.dirname(path()))
+
     :ets.new(
       :boundary_xref_seen_modules,
       [:set, :public, :named_table, read_concurrency: true, write_concurrency: true]
@@ -71,5 +73,12 @@ defmodule Boundary.Mix.Xref do
       nil
   end
 
-  defp path, do: Path.join(Mix.Project.compile_path(), "boundary_calls.ets")
+  defp path do
+    Path.join([
+      Mix.Project.build_path(),
+      "boundary",
+      to_string(Boundary.Mix.app_name()),
+      "boundary_calls.ets"
+    ])
+  end
 end
