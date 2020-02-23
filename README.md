@@ -6,9 +6,9 @@
 
 Boundary is a library which helps managing and restraining cross-module dependencies in Elixir projects.
 
-## Status
+## Warning
 
-Highly experimental, untested, and unstable.
+This library is experimental, untested, and unstable. Interface might change significantly in the future versions. The code is not well tested or optimized, so you might experience crashes, or significant slowdowns during compilation, especially in larger projects. In addition, be aware that Boundary loads the application and all of its dependencies (recursively) during compilation.
 
 ## Documentation
 
@@ -96,20 +96,6 @@ Because `boundary` is implemented as a mix compiler, it integrates seamlessly wi
 ![VS Code warning 1](images/vscode_warning_1.png)
 
 ![VS Code warning 2](images/vscode_warning_2.png)
-
-## Troubleshooting
-
-### Boundary loads the application
-
-Boundary loads the applications because it needs to fetch module attributes.
-If you're loading your application in your code, for example in test. Treat the case when the application is already loaded as a success case.
-
-```elixir
-case Application.load(:my_app) do
-  :ok -> :ok
-  {:error, {:already_loaded, :my_app}} -> :ok
-end
-```
 
 ## Roadmap
 
