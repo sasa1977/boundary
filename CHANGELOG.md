@@ -1,3 +1,11 @@
+# 0.3.0
+
+- Added support for controlling the usage of external deps via the `:externals` option.
+- Added `boundary.spec` and `boundary.find_external_deps` mix tasks.
+- Manual classification via the `:classify_to` option is now also allowed for mix tasks.
+- Stabilized memory usage, reduced disk usage and analysis time. Boundary is still not thoroughly optimized, but it should behave better in larger projects.
+- Boundary database files are now stored in `_build/#{Mix.env}/boundary`. Previously they were stored in apps `ebin` which means they would be also included in the OTP release.
+
 # 0.2.0
 
 - **[Breaking]** Requires Elixir 1.10 or higher
