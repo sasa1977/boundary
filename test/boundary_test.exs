@@ -12,32 +12,77 @@ defmodule BoundaryTest do
       assert check(modules: [], calls: []) == []
     end
 
-    test "returns empty list if all calls are valid" do
+    test "doesn't include in-boundary calls" do
       assert check(
-               modules: [
-                 {Foo,
-                  boundary: [
-                    deps: [Baz],
-                    externals: [logger: {:only, [Logger]}, mix: {:except, [Mix.Project]}]
-                  ]},
-                 Foo.Bar,
-                 {Baz, boundary: [exports: [Qux]]},
-                 Baz.Qux,
-                 {Ignored, boundary: [ignore?: true]},
-                 {Classified, protocol_impl?: true, boundary: [classify_to: Foo]},
-                 {ProtocolImpl, protocol_impl?: true}
-               ],
-               calls: [
-                 {Foo, Baz},
-                 {Foo, Logger, :metadata},
-                 {Foo, Logger.Formatter, :compile},
-                 {Foo, Mix, :env},
-                 {Foo.Bar, Baz},
-                 {Foo, Baz.Qux},
-                 {Ignored, Foo},
-                 {Enumerable.Classified, Baz},
-                 {Enumerable.ProtocolImpl, Foo}
-               ]
+               modules: [{Foo, boundary: []}, Foo.Bar, Foo.Baz],
+               calls: [{Foo, Foo, Bar}, {Foo.Bar, Foo}, {Foo.Bar, Foo.Baz}]
+             ) == []
+    end
+
+    test "doesn't include call to top-level dependency module" do
+      assert check(
+               modules: [{Foo, boundary: [deps: [Bar]]}, {Bar, boundary: []}],
+               calls: [{Foo, Bar}]
+             ) == []
+    end
+
+    test "doesn't include call from an inner module to dependency module" do
+      assert check(
+               modules: [{Foo, boundary: [deps: [Baz]]}, Foo.Bar, {Baz, boundary: []}],
+               calls: [{Foo.Bar, Baz}]
+             ) == []
+    end
+
+    test "doesn't include call to exported dependency module" do
+      assert check(
+               modules: [{Foo, boundary: [deps: [Bar]]}, {Bar, boundary: [exports: [Baz]]}, Bar.Baz],
+               calls: [{Foo, Bar.Baz}]
+             ) == []
+    end
+
+    test "doesn't include call to non-listed external" do
+      assert check(modules: [{Foo, boundary: []}], calls: [{Foo, Mix}]) == []
+    end
+
+    test "doesn't include external call allowed via `:only`" do
+      assert check(
+               modules: [{Foo, boundary: [externals: [mix: {:only, [Mix]}]]}],
+               calls: [{Foo, Mix}, {Foo, Mix.Project}]
+             ) == []
+    end
+
+    test "doesn't include external call allowed via `:except`" do
+      assert check(
+               modules: [{Foo, boundary: [externals: [mix: {:except, [Mix.Project]}]]}],
+               calls: [{Foo, Mix}, {Foo, Mix.Config}]
+             ) == []
+    end
+
+    test "doesn't include call to an ignored boundary" do
+      assert check(
+               modules: [{Foo, boundary: []}, {Bar, boundary: [ignore?: true]}],
+               calls: [{Foo, Bar}]
+             ) == []
+    end
+
+    test "doesn't include call from an ignored boundary" do
+      assert check(
+               modules: [{Foo, boundary: []}, {Bar, boundary: [ignore?: true]}],
+               calls: [{Bar, Foo}]
+             ) == []
+    end
+
+    test "doesn't include call from an unclassified protocol implementation" do
+      assert check(
+               modules: [{Foo, boundary: []}, {Bar, protocol_impl?: true}],
+               calls: [{BoundaryTest.SomeProtocol.Bar, Foo}]
+             ) == []
+    end
+
+    test "doesn't include call from a classified protocol implementation" do
+      assert check(
+               modules: [{Foo, boundary: []}, {Bar, protocol_impl?: true, boundary: [classify_to: Foo]}],
+               calls: [{BoundaryTest.SomeProtocol.Bar, Foo}]
              ) == []
     end
 
@@ -70,6 +115,26 @@ defmodule BoundaryTest do
                caller: Foo,
                callee: {Bar.Baz, :fun, 1},
                type: :not_exported
+             } = error
+    end
+
+    test "includes invalid call from a classified protocol implementation" do
+      assert [{:invalid_call, error}] =
+               check(
+                 modules: [
+                   {Foo, boundary: []},
+                   {Bar, boundary: []},
+                   {Baz, protocol_impl?: true, boundary: [classify_to: Bar]}
+                 ],
+                 calls: [{BoundaryTest.SomeProtocol.Baz, Foo}]
+               )
+
+      assert %{
+               from_boundary: Bar,
+               to_boundary: Foo,
+               caller: BoundaryTest.SomeProtocol.Baz,
+               callee: {Foo, :fun, 1},
+               type: :invalid_cross_boundary_call
              } = error
     end
 
@@ -111,10 +176,6 @@ defmodule BoundaryTest do
       assert [error1, error2] = check(modules: [{Foo, boundary: []}, Bar, Foo.Bar, Baz, Foo.Baz])
       assert error1 == {:unclassified_module, Bar}
       assert error2 == {:unclassified_module, Baz}
-    end
-
-    test "doesn't include unclassified protocol implementations" do
-      assert check(modules: [{Foo, boundary: []}, {Bar, [protocol_impl?: true]}]) == []
     end
 
     test "includes unknown boundaries in deps" do
