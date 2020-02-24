@@ -92,8 +92,14 @@ defmodule Boundary.Checker do
     externals = Map.fetch!(spec.boundaries, from_boundary).externals
 
     case Map.fetch(externals, app) do
-      :error -> true
-      {:ok, allowed} -> Enum.any?(allowed, &prefix?(Module.split(&1), Module.split(call.callee_module)))
+      :error ->
+        true
+
+      {:ok, {:only, allowed}} ->
+        Enum.any?(allowed, &prefix?(Module.split(&1), Module.split(call.callee_module)))
+
+      {:ok, {:except, forbidden}} ->
+        not Enum.any?(forbidden, &prefix?(Module.split(&1), Module.split(call.callee_module)))
     end
   end
 

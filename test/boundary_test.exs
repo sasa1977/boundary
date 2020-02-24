@@ -15,7 +15,11 @@ defmodule BoundaryTest do
     test "returns empty list if all calls are valid" do
       assert check(
                modules: [
-                 {Foo, boundary: [deps: [Baz], externals: [logger: [Logger]]]},
+                 {Foo,
+                  boundary: [
+                    deps: [Baz],
+                    externals: [logger: {:only, [Logger]}, mix: {:except, [Mix.Project]}]
+                  ]},
                  Foo.Bar,
                  {Baz, boundary: [exports: [Qux]]},
                  Baz.Qux,
@@ -27,6 +31,7 @@ defmodule BoundaryTest do
                  {Foo, Baz},
                  {Foo, Logger, :metadata},
                  {Foo, Logger.Formatter, :compile},
+                 {Foo, Mix, :env},
                  {Foo.Bar, Baz},
                  {Foo, Baz.Qux},
                  {Ignored, Foo},
@@ -69,10 +74,10 @@ defmodule BoundaryTest do
     end
 
     test "includes call to forbidden external" do
-      assert [{:invalid_call, error}] =
+      assert [{:invalid_call, error1}, {:invalid_call, error2}] =
                check(
-                 modules: [{Foo, boundary: [externals: [elixir: []]]}],
-                 calls: [{Foo, IO, :puts}]
+                 modules: [{Foo, boundary: [externals: [elixir: {:only, []}, mix: {:except, [Mix.Project]}]]}],
+                 calls: [{Foo, IO, :puts}, {Foo, Mix.Project, :config}]
                )
 
       assert %{
@@ -81,7 +86,15 @@ defmodule BoundaryTest do
                caller: Foo,
                callee: {IO, :puts, 1},
                type: :invalid_external_dep_call
-             } = error
+             } = error1
+
+      assert %{
+               from_boundary: Foo,
+               to_boundary: Mix.Project,
+               caller: Foo,
+               callee: {Mix.Project, :config, 1},
+               type: :invalid_external_dep_call
+             } = error2
     end
 
     test "treats inner boundary as a top-level one" do

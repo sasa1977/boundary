@@ -163,17 +163,16 @@ defmodule Boundary do
 
   ```
   defmodule MySystemWeb do
-    use Boundary, externals: [ecto: [Ecto.Changeset]]
+    use Boundary, externals: [ecto: {:only, [Ecto.Changeset]}]
   end
   ```
 
-  The `:externals` option has the shape of `[{app_name, permitted_boundaries}]`, where the `permitted_boundaries` is
-  a list of modules which can be referenced.
+  The `:externals` option has the shape of `[{app_name, {:only | :except, boundaries}]`, where `boundaries` is a list of
+  modules which can be referenced.
 
-  Each module is treated as a boundary, which means that listing a module will also allow dependecies to "submodules".
-  For example, if `Ecto.Query` is in the permitted list, dependencies to `Ecto.Query.API` and `Ecto.Query.WindowAPI` is
-  also permitted. To completely disallow dependencies to some app, you can provide `[]` in the `permitted_boundaries`
-  list.
+  Each module is treated as a boundary, which means that listing a module will also include "submodules". For example,
+  if `Ecto.Query` is in the boundaries list, `Ecto.Query.API` and `Ecto.Query.WindowAPI` are also included. To
+  completely disallow some external app to be used by a boundary, you can provide `app_name: {:only, []}`.
 
   If an app is not included in the externals list, all the calls to its modules are permitted. In other words, the
   `:externals` option works as an opt-in. You only list the apps which you want to restrain.
@@ -253,7 +252,7 @@ defmodule Boundary do
   @type definition :: %{
           deps: [name],
           exports: [module],
-          externals: %{atom => [name]},
+          externals: %{atom => {:only | :except, [name]}},
           ignore?: boolean,
           file: String.t(),
           line: pos_integer
