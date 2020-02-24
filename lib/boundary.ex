@@ -294,6 +294,7 @@ defmodule Boundary do
     |> Boundary.Definition.spec()
   end
 
-  @spec errors(spec(), [Boundary.call()]) :: [error]
+  @doc "Returns all boundary errors."
+  @spec errors(spec(), Enumerable.t()) :: [error]
   def errors(spec, calls), do: Boundary.Checker.errors(spec, calls)
 end
