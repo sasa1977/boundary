@@ -1,5 +1,9 @@
 defmodule Mix.Tasks.Boundary.FindExternalDeps do
-  @shortdoc "Prints information about external dependencies of all application boundaries."
+  @shortdoc """
+  Prints information about external dependencies of all application boundaries.
+
+  Note that `:stdlib`, `:kernel', `:elixir`, and `:boundary` will not be included in the output.
+  """
   @moduledoc "Prints information about external dependencies of all application boundaries."
 
   # credo:disable-for-this-file Credo.Check.Readability.Specs
@@ -25,10 +29,16 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
   end
 
   defp message({boundary_name, external_deps}) do
-    """
-    #{[IO.ANSI.bright()]}#{inspect(boundary_name)}#{IO.ANSI.reset()}:
-      #{external_deps |> Enum.sort() |> Stream.map(&inspect/1) |> Enum.join(", ")}
-    """
+    header = "#{[IO.ANSI.bright()]}#{inspect(boundary_name)}#{IO.ANSI.reset()}"
+
+    if Enum.empty?(external_deps) do
+      header <> " - no external deps\n"
+    else
+      """
+      #{header}:
+        #{external_deps |> Enum.sort() |> Stream.map(&inspect/1) |> Enum.join(", ")}
+      """
+    end
   end
 
   defp find_external_deps(boundary_spec) do
@@ -40,7 +50,7 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
         not Map.fetch!(boundary_spec.boundaries, boundary).ignore?,
         app = Map.get(boundary_spec.module_to_app, call.callee_module),
         app not in [:boundary, Boundary.Mix.app_name(), nil],
-        reduce: %{} do
+        reduce: Enum.into(Map.keys(boundary_spec.boundaries), %{}, &{&1, MapSet.new()}) do
       acc ->
         Map.update(acc, boundary, MapSet.new([app]), &MapSet.put(&1, app))
     end

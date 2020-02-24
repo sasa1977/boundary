@@ -177,6 +177,9 @@ defmodule Boundary do
   If an app is not included in the externals list, all the calls to its modules are permitted. In other words, the
   `:externals` option works as an opt-in. You only list the apps which you want to restrain.
 
+  `:stdlib`, `:kernel`, and `:elixir` are considered as core applications which can't be configured. Providing these
+  applications in the `:externals` list won't have any effects.
+
   You can use the `Mix.Tasks.Boundary.FindExternalDeps` mix task to explore external dependencies of your boundaries.
 
   ## Ignored boundaries

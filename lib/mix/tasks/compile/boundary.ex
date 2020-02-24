@@ -98,7 +98,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   @doc false
   def trace({remote, meta, callee_module, name, arity}, env) when remote in ~w/remote_function remote_macro/a do
-    if env.module != nil do
+    unless is_nil(env.module) or system_module?(callee_module) do
       Xref.add_call(
         env.module,
         %{callee: {callee_module, name, arity}, file: Path.relative_to_cwd(env.file), line: meta[:line]}
@@ -109,6 +109,16 @@ defmodule Mix.Tasks.Compile.Boundary do
   end
 
   def trace(_event, _env), do: :ok
+
+  system_apps = ~w/elixir stdlib kernel/a
+
+  system_apps
+  |> Stream.each(&Application.load/1)
+  |> Stream.flat_map(&Application.spec(&1, :modules))
+  |> Stream.concat([:erlang])
+  |> Enum.each(fn module -> defp system_module?(unquote(module)), do: true end)
+
+  defp system_module?(_), do: false
 
   defp after_compiler({:error, _} = status, _argv), do: status
 

@@ -32,10 +32,9 @@ defmodule Mix.Tasks.Boundary.FindExternalDepsTest do
              """
 
              #{[IO.ANSI.bright()]}Boundary1#{IO.ANSI.reset()}:
-               :elixir, :erlang, :logger
+               :logger
 
-             #{[IO.ANSI.bright()]}Boundary2#{IO.ANSI.reset()}:
-               :elixir, :erlang
+             #{[IO.ANSI.bright()]}Boundary2#{IO.ANSI.reset()} - no external deps
 
              """
   end
