@@ -1,7 +1,7 @@
 defmodule Mix.Tasks.Compile.Boundary do
   # credo:disable-for-this-file Credo.Check.Readability.Specs
 
-  use Boundary, deps: [Boundary, Boundary.Mix]
+  use Boundary, classify_to: Boundary.Mix
   use Mix.Task.Compiler
   alias Boundary.Mix.Xref
 

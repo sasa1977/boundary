@@ -4,7 +4,7 @@ defmodule Mix.Tasks.Boundary.Spec do
 
   # credo:disable-for-this-file Credo.Check.Readability.Specs
 
-  use Boundary, deps: [Boundary]
+  use Boundary, classify_to: Boundary.Mix
   use Mix.Task
 
   @impl Mix.Task

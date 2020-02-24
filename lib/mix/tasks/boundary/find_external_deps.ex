@@ -9,7 +9,7 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
 
   # credo:disable-for-this-file Credo.Check.Readability.Specs
 
-  use Boundary, deps: [Boundary]
+  use Boundary, classify_to: Boundary.Mix
   use Mix.Task
   alias Boundary.Mix.Xref
 

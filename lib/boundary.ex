@@ -78,6 +78,32 @@ defmodule Boundary do
   child. At the moment, nesting of boundaries (defining internal boundaries within other
   boundaries) is not supported by this library.
 
+  ### Mix tasks
+
+  By convention, mix tasks have to reside in the `Mix.Tasks` namespace, which makes it harder to
+  put them under the same boundary. To assist with this, boundary supports manual reclassification
+  of such modules.
+
+  The advised approach is to introduce the `MySystem.Mix` boundary which can hold helper functions
+  required by the mix tasks. With such boundary in place, you can manually classify mix tasks as:
+
+  ```
+  defmodule Mix.Tasks.SomeTask do
+    use Boundary, classify_to: MySystem.Mix
+    use Mix.Task
+  end
+
+  defmodule Mix.Tasks.AnotherTask do
+    use Boundary, classify_to: MySystem.Mix
+    use Mix.Task
+  end
+  ```
+
+  This way, both modules will be considered as a part of the `MySystem.Mix` boundary.
+
+  Note that manual classification is allowed only for mix tasks and protocol implementations (see
+  the following section).
+
   ### Protocol implementation
 
   Consider the following protocol implementation:
@@ -95,8 +121,8 @@ defmodule Boundary do
   implementation is by default unclassified (it doesn't belong to any boundary). However, the
   boundary checker will not emit a warning for unclassified protocol implementations.
 
-  In addition, you can manually classify the protocol implementation, as demonstrated in the
-  following example:
+  However, you can manually classify the protocol implementation, as demonstrated in the following
+  example:
 
   ```
   defimpl String.Chars, for: MySchema do
@@ -105,10 +131,8 @@ defmodule Boundary do
   end
   ```
 
-  Here, we're manually assigning the module (`String.Chars.MySchema`) to the `MySystem` boundary.
-
-  Notice that `:classify_to` option is only allowed for protocol implementations. Plain modules
-  (the ones which don't implement a protocol) can't be manually classified.
+  Note that `:classify_to` option is only allowed for protocol implementations and mix tasks.
+  Other modules can't be manually classified.
 
   ## Exports
 

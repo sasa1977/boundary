@@ -23,8 +23,11 @@ defmodule Boundary.Definition do
           Module.put_attribute(__MODULE__, Boundary, Boundary.Definition.normalize(__MODULE__, opts, @env))
 
         {boundary, opts} ->
-          unless Module.defines?(__MODULE__, {:__impl__, 1}, :def),
-            do: raise(":classify_to can only be provided in protocol implementations")
+          protocol? = Module.defines?(__MODULE__, {:__impl__, 1}, :def)
+          mix_task? = String.starts_with?(inspect(__MODULE__), "Mix.Tasks.")
+
+          unless protocol? or mix_task?,
+            do: raise(":classify_to can only be provided in protocol implementations and mix tasks")
 
           if opts != [],
             do: raise("no other option is allowed with :classify_to")
