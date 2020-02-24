@@ -1,10 +1,11 @@
 defmodule Mix.Tasks.Boundary.FindExternalDeps do
-  @shortdoc """
+  @shortdoc "Prints information about external dependencies of all application boundaries."
+
+  @moduledoc """
   Prints information about external dependencies of all application boundaries.
 
   Note that `:stdlib`, `:kernel', `:elixir`, and `:boundary` will not be included in the output.
   """
-  @moduledoc "Prints information about external dependencies of all application boundaries."
 
   # credo:disable-for-this-file Credo.Check.Readability.Specs
 
