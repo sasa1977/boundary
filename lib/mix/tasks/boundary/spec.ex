@@ -28,6 +28,7 @@ defmodule Mix.Tasks.Boundary.Spec do
     #{inspect(boundary_name)}
       deps: #{spec.deps |> Enum.sort() |> Stream.map(&inspect/1) |> Enum.join(", ")}
       exports: #{exports(boundary_name, spec)}
+      externals: #{externals(spec)}
     """
   end
 
@@ -54,4 +55,13 @@ defmodule Mix.Tasks.Boundary.Spec do
 
   defp relative_to([head | tail1], [head | tail2]), do: relative_to(tail1, tail2)
   defp relative_to(list, _), do: list
+
+  defp externals(%{externals: externals}) when map_size(externals) == 0, do: "unrestricted"
+
+  defp externals(%{externals: externals}) do
+    "\n" <>
+      (externals
+       |> Enum.map(fn {app, {type, modules}} -> "    #{app}: #{type} #{modules |> Enum.sort() |> Enum.join(", ")}" end)
+       |> Enum.join("\n"))
+  end
 end

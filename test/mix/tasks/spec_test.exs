@@ -13,7 +13,7 @@ defmodule Mix.Tasks.Boundary.SpecTest do
       end
 
       defmodule Boundary2 do
-        use Boundary, deps: [], exports: []
+        use Boundary, deps: [], exports: [], externals: [logger: {:only, [Logger]}]
       end
 
       defmodule Boundary3 do
@@ -40,14 +40,18 @@ defmodule Mix.Tasks.Boundary.SpecTest do
              Boundary1
                deps: Boundary2, Boundary3
                exports: Bar, Foo
+               externals: unrestricted
 
              Boundary2
                deps:
                exports:
+               externals:
+                 logger: only Elixir.Logger
 
              Boundary3
                deps:
                exports:
+               externals: unrestricted
 
              Ignored (ignored)
 
