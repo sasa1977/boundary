@@ -3,6 +3,8 @@ defmodule Boundary.Mix.Xref do
   use GenServer
   alias __MODULE__.TermsStorage
 
+  @vsn 1
+
   @spec start_link :: GenServer.on_start()
   def start_link, do: GenServer.start_link(__MODULE__, nil, name: __MODULE__)
 
@@ -23,10 +25,10 @@ defmodule Boundary.Mix.Xref do
   @doc "Returns a lazy stream where each element is of type `Boundary.call()`"
   @spec calls :: Enumerable.t()
   def calls do
-    Path.join(path(), "*.boundary")
+    Path.join(path(), "*.calls")
     |> Path.wildcard()
     |> Stream.flat_map(fn filename ->
-      caller = filename |> Path.basename(".boundary") |> String.to_atom()
+      caller = filename |> Path.basename(".calls") |> String.to_atom()
 
       Stream.map(
         TermsStorage.read!(filename),
@@ -74,7 +76,7 @@ defmodule Boundary.Mix.Xref do
     existing_modules = Enum.into(app_modules, MapSet.new(), &module_file/1)
 
     recorded_modules =
-      Path.join(path(), "*.boundary")
+      Path.join(path(), "*.calls")
       |> Path.wildcard()
       |> MapSet.new()
 
@@ -84,12 +86,13 @@ defmodule Boundary.Mix.Xref do
     )
   end
 
-  defp module_file(module), do: Path.join(path(), "#{module}.boundary")
+  defp module_file(module), do: Path.join(path(), "#{module}.calls")
 
   defp path do
     Path.join([
       Mix.Project.build_path(),
       "boundary",
+      to_string(@vsn),
       to_string(Boundary.Mix.app_name())
     ])
   end
