@@ -20,7 +20,7 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
 
     message =
       Boundary.Mix.app_name()
-      |> Boundary.spec()
+      |> Boundary.view()
       |> find_external_deps()
       |> Enum.sort()
       |> Stream.map(&message/1)
@@ -42,15 +42,15 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
     end
   end
 
-  defp find_external_deps(boundary_spec) do
+  defp find_external_deps(boundary_view) do
     Xref.start_link()
 
     for call <- Xref.calls(),
-        boundary = Boundary.get(boundary_spec, call.caller_module),
+        boundary = Boundary.get(boundary_view, call.caller_module),
         not boundary.ignore?,
-        app = Boundary.app(boundary_spec, call.callee_module),
+        app = Boundary.app(boundary_view, call.callee_module),
         app not in [:boundary, Boundary.Mix.app_name(), nil],
-        reduce: Enum.into(Boundary.all_names(boundary_spec), %{}, &{&1, MapSet.new()}) do
+        reduce: Enum.into(Boundary.all_names(boundary_view), %{}, &{&1, MapSet.new()}) do
       acc ->
         Map.update(acc, boundary.name, MapSet.new([app]), &MapSet.put(&1, app))
     end

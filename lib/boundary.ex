@@ -266,15 +266,8 @@ defmodule Boundary do
   end
   ```
   """
-  @opaque spec :: %{
-            boundaries: %{name => definition},
-            modules: %{classified: %{module => name}, unclassified: MapSet.t(module)},
-            module_to_app: %{module => atom}
-          }
 
-  @type name :: module
-
-  @type definition :: %{
+  @type t :: %{
           name: name,
           deps: [name],
           exports: [module],
@@ -283,6 +276,14 @@ defmodule Boundary do
           file: String.t(),
           line: pos_integer
         }
+
+  @opaque view :: %{
+            boundaries: %{name => t},
+            modules: %{classified: %{module => name}, unclassified: MapSet.t(module)},
+            module_to_app: %{module => atom}
+          }
+
+  @type name :: module
 
   @type call :: %{
           callee: mfa,
@@ -315,42 +316,42 @@ defmodule Boundary do
   end
 
   @doc "Builds the boundary-specific view of the given application."
-  @spec spec(atom) :: spec
-  def spec(app_name) do
+  @spec view(atom) :: view
+  def view(app_name) do
     app_name
     |> Application.spec(:modules)
-    |> build_spec()
+    |> build_view()
   end
 
   @doc "Returns definitions of all boundaries."
-  @spec all(spec) :: [definition]
-  def all(spec), do: Map.values(spec.boundaries)
+  @spec all(view) :: [t]
+  def all(view), do: Map.values(view.boundaries)
 
   @doc "Returns the names of all boundaries."
-  @spec all_names(spec) :: [name]
-  def all_names(spec), do: Map.keys(spec.boundaries)
+  @spec all_names(view) :: [name]
+  def all_names(view), do: Map.keys(view.boundaries)
 
   @doc "Returns definition of the boundary to which the given module belongs."
-  @spec get(spec, module) :: definition | nil
-  def get(spec, module) do
-    with boundary_name when not is_nil(boundary_name) <- Map.get(spec.modules.classified, module),
-         do: Map.fetch!(spec.boundaries, boundary_name)
+  @spec get(view, module) :: t | nil
+  def get(view, module) do
+    with boundary_name when not is_nil(boundary_name) <- Map.get(view.modules.classified, module),
+         do: Map.fetch!(view.boundaries, boundary_name)
   end
 
   @doc "Returns the application of the given module."
-  @spec app(spec, module) :: atom | nil
-  def app(spec, module), do: Map.get(spec.module_to_app, module)
+  @spec app(view, module) :: atom | nil
+  def app(view, module), do: Map.get(view.module_to_app, module)
 
   @doc "Returns the collection of unclassified modules."
-  @spec unclassified_modules(spec) :: MapSet.t(module)
-  def unclassified_modules(spec), do: spec.modules.unclassified
+  @spec unclassified_modules(view) :: MapSet.t(module)
+  def unclassified_modules(view), do: view.modules.unclassified
 
   @doc "Returns all boundary errors."
-  @spec errors(spec(), Enumerable.t()) :: [error]
-  def errors(spec, calls), do: Boundary.Checker.errors(spec, calls)
+  @spec errors(view, Enumerable.t()) :: [error]
+  def errors(view, calls), do: Boundary.Checker.errors(view, calls)
 
   @doc false
-  def build_spec(modules) do
+  def build_view(modules) do
     boundaries = load_boundaries(modules)
 
     %{
@@ -369,10 +370,9 @@ defmodule Boundary do
 
   defp load_boundaries(modules) do
     for module <- modules,
-        boundary_spec = Definition.get(module),
-        not is_nil(boundary_spec),
+        boundary = Definition.get(module),
         into: %{},
-        do: {module, Map.put(boundary_spec, :name, module)}
+        do: {module, Map.put(boundary, :name, module)}
   end
 
   defp classify_modules(boundaries, modules) do

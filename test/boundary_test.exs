@@ -201,10 +201,10 @@ defmodule BoundaryTest do
 
   defp check(opts) do
     modules = def_modules(Keyword.get(opts, :modules, []))
-    spec = Boundary.build_spec(modules)
+    view = Boundary.build_view(modules)
 
     Boundary.errors(
-      spec,
+      view,
       opts |> Keyword.get(:calls, []) |> Enum.map(&call/1)
     )
   end

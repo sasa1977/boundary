@@ -134,7 +134,7 @@ defmodule Mix.Tasks.Compile.Boundary do
     Code.put_compiler_option(:tracers, tracers)
     Xref.flush(Application.spec(Boundary.Mix.app_name(), :modules))
 
-    errors = check(Boundary.spec(Boundary.Mix.app_name()), Xref.calls())
+    errors = check(Boundary.view(Boundary.Mix.app_name()), Xref.calls())
     print_diagnostic_errors(errors)
     {status(errors, argv), diagnostics ++ errors}
   end

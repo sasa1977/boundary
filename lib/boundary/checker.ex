@@ -3,19 +3,19 @@ defmodule Boundary.Checker do
 
   # credo:disable-for-this-file Credo.Check.Readability.Specs
 
-  def errors(spec, calls) do
+  def errors(view, calls) do
     Enum.concat([
-      invalid_deps(spec),
-      cycles(spec),
-      unclassified_modules(spec),
-      invalid_calls(spec, calls)
+      invalid_deps(view),
+      cycles(view),
+      unclassified_modules(view),
+      invalid_calls(view, calls)
     ])
   end
 
-  defp invalid_deps(spec) do
-    for boundary <- Boundary.all(spec),
+  defp invalid_deps(view) do
+    for boundary <- Boundary.all(view),
         dep <- boundary.deps,
-        error = validate_dep(Boundary.get(spec, dep), %{name: dep, file: boundary.file, line: boundary.line}),
+        error = validate_dep(Boundary.get(view, dep), %{name: dep, file: boundary.file, line: boundary.line}),
         into: MapSet.new(),
         do: error
   end
@@ -24,13 +24,13 @@ defmodule Boundary.Checker do
   defp validate_dep(%{ignore?: true}, dep), do: {:ignored_dep, dep}
   defp validate_dep(%{ignore?: false}, _dep), do: nil
 
-  defp cycles(spec) do
+  defp cycles(view) do
     graph = :digraph.new([:cyclic])
 
     try do
-      Enum.each(Boundary.all_names(spec), &:digraph.add_vertex(graph, &1))
+      Enum.each(Boundary.all_names(view), &:digraph.add_vertex(graph, &1))
 
-      for boundary <- Boundary.all(spec),
+      for boundary <- Boundary.all(view),
           dep <- boundary.deps,
           do: :digraph.add_edge(graph, boundary.name, dep)
 
@@ -44,15 +44,15 @@ defmodule Boundary.Checker do
     end
   end
 
-  defp unclassified_modules(spec), do: Enum.map(Boundary.unclassified_modules(spec), &{:unclassified_module, &1})
+  defp unclassified_modules(view), do: Enum.map(Boundary.unclassified_modules(view), &{:unclassified_module, &1})
 
-  defp invalid_calls(spec, calls) do
+  defp invalid_calls(view, calls) do
     for call <- calls,
-        from_boundary = Boundary.get(spec, call.caller_module),
+        from_boundary = Boundary.get(view, call.caller_module),
         not from_boundary.ignore?,
-        to_boundary = Boundary.get(spec, call.callee_module) || :unknown,
+        to_boundary = Boundary.get(view, call.callee_module) || :unknown,
         from_boundary != to_boundary,
-        {type, to_boundary_name} <- [call_error(spec, call, from_boundary, to_boundary)] do
+        {type, to_boundary_name} <- [call_error(view, call, from_boundary, to_boundary)] do
       {:invalid_call,
        %{
          type: type,
@@ -66,14 +66,14 @@ defmodule Boundary.Checker do
     end
   end
 
-  defp call_error(spec, call, from_boundary, to_boundary) do
+  defp call_error(view, call, from_boundary, to_boundary) do
     if to_boundary == :unknown,
-      do: external_app_call_error(spec, call, from_boundary),
+      do: external_app_call_error(view, call, from_boundary),
       else: in_app_call_error(call, from_boundary, to_boundary)
   end
 
-  defp external_app_call_error(spec, call, from_boundary) do
-    app = Boundary.app(spec, call.callee_module)
+  defp external_app_call_error(view, call, from_boundary) do
+    app = Boundary.app(view, call.callee_module)
 
     if is_nil(app) or external_dep_allowed?(call, from_boundary, app),
       do: nil,
