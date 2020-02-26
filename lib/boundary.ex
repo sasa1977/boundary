@@ -266,17 +266,16 @@ defmodule Boundary do
   end
   ```
   """
-  @type spec :: %{
-          boundaries: %{name => definition},
-          modules: %{
-            classified: %{module => name},
-            unclassified: [%{name: module, protocol_impl?: boolean}]
-          },
-          module_to_app: %{module => atom}
-        }
+  @opaque spec :: %{
+            boundaries: %{name => definition},
+            modules: %{classified: %{module => name}, unclassified: MapSet.t(module)},
+            module_to_app: %{module => atom}
+          }
 
   @type name :: module
+
   @type definition :: %{
+          name: name,
           deps: [name],
           exports: [module],
           externals: %{atom => {:only | :except, [name]}},
@@ -315,13 +314,36 @@ defmodule Boundary do
     end
   end
 
-  @doc "Returns the boundary-specific view of the given application."
+  @doc "Builds the boundary-specific view of the given application."
   @spec spec(atom) :: spec
   def spec(app_name) do
     app_name
     |> Application.spec(:modules)
     |> build_spec()
   end
+
+  @doc "Returns definitions of all boundaries."
+  @spec all(spec) :: [definition]
+  def all(spec), do: Map.values(spec.boundaries)
+
+  @doc "Returns the names of all boundaries."
+  @spec all_names(spec) :: [name]
+  def all_names(spec), do: Map.keys(spec.boundaries)
+
+  @doc "Returns definition of the boundary to which the given module belongs."
+  @spec get(spec, module) :: definition | nil
+  def get(spec, module) do
+    with boundary_name when not is_nil(boundary_name) <- Map.get(spec.modules.classified, module),
+         do: Map.fetch!(spec.boundaries, boundary_name)
+  end
+
+  @doc "Returns the application of the given module."
+  @spec app(spec, module) :: atom | nil
+  def app(spec, module), do: Map.get(spec.module_to_app, module)
+
+  @doc "Returns the collection of unclassified modules."
+  @spec unclassified_modules(spec) :: MapSet.t(module)
+  def unclassified_modules(spec), do: spec.modules.unclassified
 
   @doc "Returns all boundary errors."
   @spec errors(spec(), Enumerable.t()) :: [error]
@@ -350,7 +372,7 @@ defmodule Boundary do
         boundary_spec = Definition.get(module),
         not is_nil(boundary_spec),
         into: %{},
-        do: {module, boundary_spec}
+        do: {module, Map.put(boundary_spec, :name, module)}
   end
 
   defp classify_modules(boundaries, modules) do
@@ -366,7 +388,9 @@ defmodule Boundary do
       fn module, modules ->
         case target_boundary(module, boundaries_search_space, boundaries) do
           nil ->
-            update_in(modules.unclassified, &MapSet.put(&1, %{name: module, protocol_impl?: protocol_impl?(module)}))
+            if protocol_impl?(module),
+              do: modules,
+              else: update_in(modules.unclassified, &MapSet.put(&1, module))
 
           boundary ->
             put_in(modules.classified[module], boundary)

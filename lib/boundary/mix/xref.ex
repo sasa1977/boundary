@@ -8,7 +8,7 @@ defmodule Boundary.Mix.Xref do
   @spec start_link :: GenServer.on_start()
   def start_link, do: GenServer.start_link(__MODULE__, nil, name: __MODULE__)
 
-  @spec add_call(module, %{callee: mfa, file: String.t(), line: non_neg_integer}) :: :ok
+  @spec add_call(module, %{callee: mfa, file: String.t(), line: non_neg_integer, mode: :compile | :runtime}) :: :ok
   def add_call(caller, call) do
     case call do
       %{callee: {^caller, _fun, _arg}} -> :ok

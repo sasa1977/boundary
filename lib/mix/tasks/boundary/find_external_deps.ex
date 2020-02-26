@@ -46,14 +46,13 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
     Xref.start_link()
 
     for call <- Xref.calls(),
-        boundary = Map.get(boundary_spec.modules.classified, call.caller_module),
-        not is_nil(boundary),
-        not Map.fetch!(boundary_spec.boundaries, boundary).ignore?,
-        app = Map.get(boundary_spec.module_to_app, call.callee_module),
+        boundary = Boundary.get(boundary_spec, call.caller_module),
+        not boundary.ignore?,
+        app = Boundary.app(boundary_spec, call.callee_module),
         app not in [:boundary, Boundary.Mix.app_name(), nil],
-        reduce: Enum.into(Map.keys(boundary_spec.boundaries), %{}, &{&1, MapSet.new()}) do
+        reduce: Enum.into(Boundary.all_names(boundary_spec), %{}, &{&1, MapSet.new()}) do
       acc ->
-        Map.update(acc, boundary, MapSet.new([app]), &MapSet.put(&1, app))
+        Map.update(acc, boundary.name, MapSet.new([app]), &MapSet.put(&1, app))
     end
   end
 end

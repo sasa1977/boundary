@@ -12,35 +12,35 @@ defmodule Mix.Tasks.Boundary.Spec do
     Mix.Task.run("compile")
     Boundary.Mix.load_app()
 
-    boundary_spec = Boundary.spec(Boundary.Mix.app_name())
-
     msg =
-      boundary_spec.boundaries
-      |> Enum.sort()
+      Boundary.Mix.app_name()
+      |> Boundary.spec()
+      |> Boundary.all()
+      |> Enum.sort_by(& &1.name)
       |> Stream.map(&boundary_info/1)
       |> Enum.join("\n")
 
     Mix.shell().info("\n" <> msg)
   end
 
-  defp boundary_info({boundary_name, %{ignore?: false} = spec}) do
+  defp boundary_info(%{ignore?: false} = boundary) do
     """
-    #{inspect(boundary_name)}
-      deps: #{spec.deps |> Enum.sort() |> Stream.map(&inspect/1) |> Enum.join(", ")}
-      exports: #{exports(boundary_name, spec)}
-      externals: #{externals(spec)}
-    """
-  end
-
-  defp boundary_info({boundary_name, %{ignore?: true}}) do
-    """
-    #{inspect(boundary_name)} (ignored)
+    #{inspect(boundary.name)}
+      deps: #{boundary.deps |> Enum.sort() |> Stream.map(&inspect/1) |> Enum.join(", ")}
+      exports: #{exports(boundary)}
+      externals: #{externals(boundary)}
     """
   end
 
-  defp exports(boundary_name, spec) do
-    spec.exports
-    |> Stream.map(&normalize_export(boundary_name, &1))
+  defp boundary_info(%{ignore?: true} = boundary) do
+    """
+    #{inspect(boundary.name)} (ignored)
+    """
+  end
+
+  defp exports(boundary) do
+    boundary.exports
+    |> Stream.map(&normalize_export(boundary.name, &1))
     |> Stream.reject(&is_nil/1)
     |> Enum.sort()
     |> Enum.join(", ")
