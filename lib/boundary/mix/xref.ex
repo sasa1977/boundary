@@ -30,12 +30,13 @@ defmodule Boundary.Mix.Xref do
     |> Stream.flat_map(fn filename ->
       caller = filename |> Path.basename(".calls") |> String.to_atom()
 
-      Stream.map(
-        TermsStorage.read!(filename),
-        fn %{callee: {callee, _fun, _arg}} = meta ->
-          Map.merge(meta, %{caller_module: caller, callee_module: callee})
-        end
-      )
+      TermsStorage.read!(filename)
+      |> Stream.filter(fn %{callee: {callee, _fun, _arity}} ->
+        String.starts_with?(Atom.to_string(callee), "Elixir.")
+      end)
+      |> Stream.map(fn %{callee: {callee, _fun, _arity}} = meta ->
+        Map.merge(meta, %{caller_module: caller, callee_module: callee})
+      end)
     end)
   end
 
