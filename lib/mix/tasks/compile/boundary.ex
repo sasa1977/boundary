@@ -101,7 +101,12 @@ defmodule Mix.Tasks.Compile.Boundary do
     unless env.module in [nil, callee_module] or system_module?(callee_module) do
       Xref.add_call(
         env.module,
-        %{callee: {callee_module, name, arity}, file: Path.relative_to_cwd(env.file), line: meta[:line]}
+        %{
+          callee: {callee_module, name, arity},
+          file: Path.relative_to_cwd(env.file),
+          line: meta[:line],
+          mode: if(is_nil(env.function), do: :compile, else: :runtime)
+        }
       )
     end
 

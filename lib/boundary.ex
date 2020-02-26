@@ -290,7 +290,8 @@ defmodule Boundary do
           callee_module: module,
           caller_module: module,
           file: String.t(),
-          line: pos_integer
+          line: pos_integer,
+          mode: :compile | :runtime
         }
 
   @type error ::
