@@ -3,18 +3,18 @@ defmodule Boundary.Definition do
 
   # credo:disable-for-this-file Credo.Check.Readability.Specs
 
-  defmodule Error do
-    defexception [:message, :file, :line]
-  end
-
   defmacro generate(opts) do
     quote bind_quoted: [opts: opts] do
       @boundary_opts opts
       @env __ENV__
+
+      # Definition will be injected in before compile, because we need to check if this module is
+      # a protocol, which we can only do right before the module is about to be compiled.
       @before_compile Boundary.Definition
     end
   end
 
+  @doc false
   defmacro __before_compile__(_) do
     quote do
       case Keyword.pop(@boundary_opts, :classify_to, nil) do
@@ -38,89 +38,21 @@ defmodule Boundary.Definition do
     end
   end
 
-  def spec(module_names) do
-    modules = Enum.map(module_names, &%{name: &1, protocol_impl?: protocol_impl?(&1), classify_to: classify_to(&1)})
-    boundaries = load_boundaries(module_names)
-
-    module_to_app =
-      for {app, _description, _vsn} <- Application.loaded_applications(),
-          module <- Application.spec(app, :modules),
-          into: %{erlang: :erlang},
-          do: {module, app}
-
-    %{
-      modules: classify_modules(boundaries, modules),
-      boundaries: boundaries,
-      module_to_app: module_to_app
-    }
-  end
-
-  defp protocol_impl?(module) do
-    # Not sure why, but sometimes the protocol implementation isn't loaded.
-    Code.ensure_loaded(module)
-
-    function_exported?(module, :__impl__, 1)
-  end
-
-  defp classify_to(module) do
-    case Keyword.get(module.__info__(:attributes), Boundary.Target) do
-      [classify_to] -> classify_to
-      nil -> nil
-    end
-  end
-
-  defp classify_modules(boundaries, modules) do
-    boundaries_search_space =
-      boundaries
-      |> Map.keys()
-      |> Enum.sort(&>=/2)
-      |> Enum.map(&%{name: &1, parts: Module.split(&1)})
-
-    Enum.reduce(
-      modules,
-      %{classified: %{}, unclassified: MapSet.new()},
-      fn module, modules ->
-        case target_boundary(module, boundaries_search_space, boundaries) do
-          nil -> update_in(modules.unclassified, &MapSet.put(&1, Map.take(module, ~w/name protocol_impl?/a)))
-          boundary -> put_in(modules.classified[module.name], boundary)
-        end
-      end
-    )
-  end
-
-  defp target_boundary(module, boundaries_search_space, boundaries) do
-    case module.classify_to do
-      nil ->
-        parts = Module.split(module.name)
-
-        with boundary when not is_nil(boundary) <-
-               Enum.find(boundaries_search_space, &List.starts_with?(parts, &1.parts)),
-             do: boundary.name
-
-      classify_to ->
-        unless Map.has_key?(boundaries, classify_to.boundary) do
-          message = "invalid boundary #{classify_to.boundary}"
-          raise Error, message: message, file: classify_to.file, line: classify_to.line
-        end
-
-        classify_to.boundary
-    end
-  end
-
-  defp load_boundaries(modules) do
-    modules
-    |> Stream.map(&{&1, get(&1)})
-    |> Enum.reject(&match?({_module, nil}, &1))
-    |> Map.new()
-  end
-
-  defp get(boundary) do
+  def get(boundary) do
     case Keyword.get(boundary.__info__(:attributes), Boundary) do
       [definition] -> definition
       nil -> nil
     end
   end
 
+  def classified_to(module) do
+    case Keyword.get(module.__info__(:attributes), Boundary.Target) do
+      [classify_to] -> classify_to
+      nil -> nil
+    end
+  end
+
+  @doc false
   def normalize(boundary, definition, env) do
     defaults()
     |> Map.merge(Map.new(definition))

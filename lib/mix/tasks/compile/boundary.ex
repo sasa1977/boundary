@@ -174,7 +174,7 @@ defmodule Mix.Tasks.Compile.Boundary do
     |> Stream.map(&to_diagnostic_error/1)
     |> Enum.sort_by(&{&1.file, &1.position})
   rescue
-    e in Boundary.Definition.Error ->
+    e in Boundary.Error ->
       [diagnostic(e.message, file: e.file, position: e.line)]
   end
 

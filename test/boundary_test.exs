@@ -201,7 +201,7 @@ defmodule BoundaryTest do
 
   defp check(opts) do
     modules = def_modules(Keyword.get(opts, :modules, []))
-    spec = Boundary.Definition.spec(modules)
+    spec = Boundary.build_spec(modules)
 
     Boundary.errors(
       spec,

@@ -306,6 +306,8 @@ defmodule Boundary do
   require Boundary.Definition
   Boundary.Definition.generate(deps: [], exports: [])
 
+  alias Boundary.Definition
+
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
       require Boundary.Definition
@@ -318,10 +320,88 @@ defmodule Boundary do
   def spec(app_name) do
     app_name
     |> Application.spec(:modules)
-    |> Boundary.Definition.spec()
+    |> build_spec()
   end
 
   @doc "Returns all boundary errors."
   @spec errors(spec(), Enumerable.t()) :: [error]
   def errors(spec, calls), do: Boundary.Checker.errors(spec, calls)
+
+  @doc false
+  def build_spec(modules) do
+    boundaries = load_boundaries(modules)
+
+    %{
+      modules: classify_modules(boundaries, modules),
+      boundaries: boundaries,
+      module_to_app: module_to_app()
+    }
+  end
+
+  defp module_to_app do
+    for {app, _description, _vsn} <- Application.loaded_applications(),
+        module <- Application.spec(app, :modules),
+        into: %{erlang: :erlang},
+        do: {module, app}
+  end
+
+  defp load_boundaries(modules) do
+    for module <- modules,
+        boundary_spec = Definition.get(module),
+        not is_nil(boundary_spec),
+        into: %{},
+        do: {module, boundary_spec}
+  end
+
+  defp classify_modules(boundaries, modules) do
+    boundaries_search_space =
+      boundaries
+      |> Map.keys()
+      |> Enum.sort(&>=/2)
+      |> Enum.map(&%{name: &1, parts: Module.split(&1)})
+
+    Enum.reduce(
+      modules,
+      %{classified: %{}, unclassified: MapSet.new()},
+      fn module, modules ->
+        case target_boundary(module, boundaries_search_space, boundaries) do
+          nil ->
+            update_in(modules.unclassified, &MapSet.put(&1, %{name: module, protocol_impl?: protocol_impl?(module)}))
+
+          boundary ->
+            put_in(modules.classified[module], boundary)
+        end
+      end
+    )
+  end
+
+  defp target_boundary(module, boundaries_search_space, boundaries) do
+    case Definition.classified_to(module) do
+      nil ->
+        parts = Module.split(module)
+
+        with boundary when not is_nil(boundary) <-
+               Enum.find(boundaries_search_space, &List.starts_with?(parts, &1.parts)),
+             do: boundary.name
+
+      classified_to ->
+        unless Map.has_key?(boundaries, classified_to.boundary) do
+          message = "invalid boundary #{classified_to.boundary}"
+          raise Boundary.Error, message: message, file: classified_to.file, line: classified_to.line
+        end
+
+        classified_to.boundary
+    end
+  end
+
+  defp protocol_impl?(module) do
+    # Not sure why, but sometimes the protocol implementation isn't loaded.
+    Code.ensure_loaded(module)
+
+    function_exported?(module, :__impl__, 1)
+  end
+
+  defmodule Error do
+    defexception [:message, :file, :line]
+  end
 end
