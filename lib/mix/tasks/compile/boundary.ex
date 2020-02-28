@@ -97,14 +97,15 @@ defmodule Mix.Tasks.Compile.Boundary do
   end
 
   @doc false
-  def trace({remote, meta, callee_module, name, arity}, env) when remote in ~w/remote_function remote_macro/a do
+  def trace({remote, meta, callee_module, name, arity}, env)
+      when remote in ~w/remote_function imported_function remote_macro imported_macro/a do
     unless env.module in [nil, callee_module] or system_module?(callee_module) do
       Xref.add_call(
         env.module,
         %{
           callee: {callee_module, name, arity},
           file: Path.relative_to_cwd(env.file),
-          line: meta[:line],
+          line: Keyword.get(meta, :line, env.line),
           mode: if(is_nil(env.function), do: :compile, else: :runtime)
         }
       )
