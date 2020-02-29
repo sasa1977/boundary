@@ -41,7 +41,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
       end
 
       defmodule Boundary7 do
-        use Boundary, externals: [logger: {:only, []}]
+        use Boundary, deps: [], extra_externals: [:logger]
         require Logger
 
         def fun(), do: Logger.info("foo")

@@ -181,30 +181,47 @@ defmodule Boundary do
 
   ### External dependencies
 
-  By default, all dependencies on 3rd party modules (modules from other OTP applications) are permitted. However, you
-  can restrain such dependencies using the `:externals` option. For example, let's say you want to prevent using
-  `Ecto` in the Web tier, except for `Ecto.Changeset`. This can be specified as follows:
+  By default, all dependencies on modules from other OTP applications are permitted. However, you can restrain such
+  dependencies by including boundaries from the external application. For example, let's say you want to limit the ecto
+  usage in the web tier to only `Ecto.Changeset`. This can be specified as follows:
 
   ```
   defmodule MySystemWeb do
-    use Boundary, externals: [ecto: {:only, [Ecto.Changeset]}]
+    use Boundary, deps: [Ecto.Changeset]
   end
   ```
 
-  The `:externals` option has the shape of `[{app_name, {:only | :except, boundaries}]`, where `boundaries` is a list of
-  modules which can be referenced.
+  When you reference a boundary from an external application in the deps list, only the calls to the listed boundaries
+  will be allowed.
 
-  Each module is treated as a boundary, which means that listing a module will also include "submodules". For example,
-  if `Ecto.Query` is in the boundaries list, `Ecto.Query.API` and `Ecto.Query.WindowAPI` are also included. To
-  completely disallow some external app to be used by a boundary, you can provide `app_name: {:only, []}`.
+  If an external application doesn't define boundaries, you can reference application modules. In such case, you're
+  creating an _implicit boundary_. This is exactly what we're doing in the previous example. Ecto doesn't define its own
+  boundaries, but we're still listing `Ecto.Changeset` in the deps list. This will create an implicit boundary of the
+  same name which will include all of the submodules like `Ecto.Changeset.Foo`, or ``Ecto.Changeset.Bar.Baz`. An implicit
+  boundary exports all of its submodules.
 
-  If an app is not included in the externals list, all the calls to its modules are permitted. In other words, the
-  `:externals` option works as an opt-in. You only list the apps which you want to restrain.
+  The implicit boundaries are collected based on all deps of all boundaries in your application. For example, if one
+  boundary lists `Ecto.Query` as a dependency, while another lists `Ecto.Query.API`, then the latter won't be a part of
+  the former boundary.
 
-  `:stdlib`, `:kernel`, and `:elixir` are considered as core applications which can't be configured. Providing these
-  applications in the `:externals` list won't have any effects.
+  If you want to completely prohibit the usage of some library, you can list the app in the `:extra_externals` list:
 
-  You can use the `Mix.Tasks.Boundary.FindExternalDeps` mix task to explore external dependencies of your boundaries.
+  ```
+    defmodule MySystem do
+      use Boundary, extra_externals: [:plug], deps: []
+    end
+  ```
+
+  The `:extra_externals` list contains additional applications considered by boundary. Any calls to the given
+  applications must be explicitly allowed via the `:deps` option. In the example above, we're including `:plug` in the
+  list of external applications, but we're not allowing any dependency from this library. As a result, the context
+  layer is not allowed to use plug functions.
+
+  Finally, it's worth noting that boundary doesn't analyze Erlang modules. Therefore, you can't use boundary to restrain
+  calls to pure Erlang applications, such as `:crypto` or `:cowboy`.
+
+  You can use the `Mix.Tasks.Boundary.FindExternalDeps` mix task to discover all external applications used by your
+  boundaries.
 
   ## Ignored boundaries
 
@@ -267,6 +284,9 @@ defmodule Boundary do
   ```
   """
 
+  require Boundary.Definition
+  Boundary.Definition.generate(deps: [], exports: [])
+
   @type t :: %{
           name: name,
           deps: [name],
@@ -274,12 +294,15 @@ defmodule Boundary do
           externals: %{atom => {:only | :except, [name]}},
           ignore?: boolean,
           file: String.t(),
-          line: pos_integer
+          line: pos_integer,
+          implicit?: boolean,
+          app: atom
         }
 
   @opaque view :: %{
             boundaries: %{name => t},
-            modules: %{classified: %{module => name}, unclassified: MapSet.t(module)},
+            classified_modules: %{module => Boundary.name()},
+            unclassified_modules: MapSet.t(module),
             module_to_app: %{module => atom}
           }
 
@@ -295,18 +318,13 @@ defmodule Boundary do
         }
 
   @type error ::
-          {:unknown_dep, dep_error}
+          {:empty_boundary, dep_error}
           | {:ignored_dep, dep_error}
           | {:cycle, [Boundary.name()]}
           | {:unclassified_module, [module]}
           | {:invalid_call, [Boundary.call()]}
 
   @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
-
-  require Boundary.Definition
-  Boundary.Definition.generate(deps: [], exports: [])
-
-  alias Boundary.Definition
 
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
@@ -317,105 +335,185 @@ defmodule Boundary do
 
   @doc "Builds the boundary-specific view of the given application."
   @spec view(atom) :: view
-  def view(app_name) do
-    app_name
-    |> Application.spec(:modules)
-    |> build_view()
-  end
+  def view(app), do: build_view(app, app_modules(app))
 
-  @doc "Returns definitions of all boundaries."
+  @doc """
+  Returns definitions of all boundaries.
+
+  The result will include boundaries from listed externals, as well as implicit boundaries.
+  """
   @spec all(view) :: [t]
   def all(view), do: Map.values(view.boundaries)
 
-  @doc "Returns the names of all boundaries."
+  @doc """
+  Returns the names of all boundaries.
+
+  The result will include boundaries from listed externals, as well as implicit boundaries.
+  """
   @spec all_names(view) :: [name]
   def all_names(view), do: Map.keys(view.boundaries)
 
-  @doc "Returns definition of the boundary to which the given module belongs."
-  @spec get(view, module) :: t | nil
-  def get(view, module) do
-    with boundary_name when not is_nil(boundary_name) <- Map.get(view.modules.classified, module),
-         do: Map.fetch!(view.boundaries, boundary_name)
-  end
+  @doc "Returns the definition of the given boundary."
+  @spec fetch!(view, name) :: t
+  def fetch!(view, name), do: Map.fetch!(view.boundaries, name)
 
-  @doc "Returns the application of the given module."
-  @spec app(view, module) :: atom | nil
-  def app(view, module), do: Map.get(view.module_to_app, module)
+  @doc "Returns definition of the boundary to which the given module belongs."
+  @spec for_module(view, module) :: t | nil
+  def for_module(view, module) do
+    with boundary when not is_nil(boundary) <- Map.get(view.classified_modules, module),
+         do: Map.fetch!(view.boundaries, boundary)
+  end
 
   @doc "Returns the collection of unclassified modules."
   @spec unclassified_modules(view) :: MapSet.t(module)
-  def unclassified_modules(view), do: view.modules.unclassified
+  def unclassified_modules(view), do: view.unclassified_modules
 
   @doc "Returns all boundary errors."
   @spec errors(view, Enumerable.t()) :: [error]
   def errors(view, calls), do: Boundary.Checker.errors(view, calls)
 
+  @doc "Returns the application of the given module."
+  @spec app(view, module) :: atom | nil
+  def app(view, module), do: Map.get(view.module_to_app, module)
+
   @doc false
-  def build_view(modules) do
-    boundaries = load_boundaries(modules)
+  # credo:disable-for-next-line Credo.Check.Readability.Specs
+  def build_view(app_name, app_modules \\ []) do
+    module_to_app =
+      for {app, _description, _vsn} <- Application.loaded_applications(),
+          module <- app_modules(app),
+          into: %{},
+          do: {module, app}
+
+    # load boundaries from this app
+    app_boundaries = load_boundaries(app_name, module_to_app, app_modules)
+
+    # gather external apps
+    external_apps = for boundary <- app_boundaries, app <- boundary.externals, into: MapSet.new(), do: app
+
+    {classified, unclassified_from_externals} =
+      Enum.reduce(
+        external_apps,
+        {classify_modules(app_boundaries, app_modules), []},
+        fn external_app, {classified, unclassified_from_externals} ->
+          modules = app_modules(external_app)
+
+          case load_boundaries(app_name, module_to_app, modules) do
+            [] ->
+              # app has no boundaries -> we'll need to classify its modules to implicit boundaries
+              {classified, modules ++ unclassified_from_externals}
+
+            external_boundaries ->
+              # app has boundaries -> classify its modules
+              {classify_modules(external_boundaries, modules, classified), unclassified_from_externals}
+          end
+        end
+      )
+
+    # gather unclassified modules of this app
+    unclassified_modules =
+      for module <- app_modules,
+          not Map.has_key?(classified.modules, module),
+          not protocol_impl?(module),
+          into: MapSet.new(),
+          do: module
+
+    # index all dep boundaries
+    all_deps = for app_boundary <- app_boundaries, dep <- app_boundary.deps, into: %{}, do: {dep, app_boundary}
+
+    # implicit boundaries are all dep boundaries which are not explicitly defined
+    implicit_boundaries =
+      for {dep, boundary} <- all_deps,
+          not Map.has_key?(classified.boundaries, dep),
+          boundary_app = Map.get(module_to_app, dep),
+          boundary_app != app_name do
+        boundary_app
+        |> Boundary.Definition.normalize(dep, [], boundary)
+        |> Map.merge(%{name: dep, implicit?: true, modules: []})
+      end
+
+    # classify remaining modules into implicit boundaries
+    classified = classify_modules(implicit_boundaries, unclassified_from_externals, classified)
 
     %{
-      modules: classify_modules(boundaries, modules),
-      boundaries: boundaries,
-      module_to_app: module_to_app()
+      boundaries: classified.boundaries,
+      classified_modules: classified.modules,
+      unclassified_modules: unclassified_modules,
+      module_to_app: module_to_app
     }
   end
 
-  defp module_to_app do
-    for {app, _description, _vsn} <- Application.loaded_applications(),
-        module <- Application.spec(app, :modules),
-        into: %{},
-        do: {module, app}
+  defp load_boundaries(app_name, module_to_app, modules) do
+    for module <- modules, boundary = Boundary.Definition.get(module) do
+      externals =
+        boundary.deps
+        |> Stream.map(&Map.get(module_to_app, &1))
+        |> Stream.reject(&is_nil/1)
+        |> Stream.reject(&(&1 == app_name))
+        |> Stream.concat(boundary.extra_externals)
+        |> Enum.uniq()
+
+      Map.merge(boundary, %{name: module, implicit?: false, modules: [], externals: externals})
+    end
   end
 
-  defp load_boundaries(modules) do
+  defp classify_modules(boundaries, modules, acc \\ %{boundaries: %{}, modules: %{}}) do
+    trie = build_trie(boundaries)
+
+    acc = %{acc | boundaries: Enum.reduce(boundaries, acc.boundaries, &Map.put_new(&2, &1.name, &1))}
+
     for module <- modules,
-        boundary = Definition.get(module),
-        into: %{},
-        do: {module, Map.put(boundary, :name, module)}
+        boundary = find_boundary(trie, module),
+        reduce: acc do
+      acc -> Map.update!(acc, :modules, &Map.put(&1, module, boundary.name))
+    end
   end
 
-  defp classify_modules(boundaries, modules) do
-    boundaries_search_space =
-      boundaries
-      |> Map.keys()
-      |> Enum.sort(&>=/2)
-      |> Enum.map(&%{name: &1, parts: Module.split(&1)})
+  defp build_trie(boundaries), do: Enum.reduce(boundaries, new_trie(), &add_boundary(&2, &1))
 
-    Enum.reduce(
-      modules,
-      %{classified: %{}, unclassified: MapSet.new()},
-      fn module, modules ->
-        case target_boundary(module, boundaries_search_space, boundaries) do
-          nil ->
-            if protocol_impl?(module),
-              do: modules,
-              else: update_in(modules.unclassified, &MapSet.put(&1, module))
+  defp new_trie, do: %{boundary: nil, children: %{}}
 
-          boundary ->
-            put_in(modules.classified[module], boundary)
-        end
-      end
-    )
-  end
-
-  defp target_boundary(module, boundaries_search_space, boundaries) do
-    case Definition.classified_to(module) do
+  defp find_boundary(trie, module) when is_atom(module) do
+    case Boundary.Definition.classified_to(module) do
       nil ->
-        parts = Module.split(module)
-
-        with boundary when not is_nil(boundary) <-
-               Enum.find(boundaries_search_space, &List.starts_with?(parts, &1.parts)),
-             do: boundary.name
+        find_boundary(trie, Module.split(module))
 
       classified_to ->
-        unless Map.has_key?(boundaries, classified_to.boundary) do
-          message = "invalid boundary #{classified_to.boundary}"
+        boundary = find_boundary(trie, classified_to.boundary)
+
+        unless boundary do
+          message = "invalid boundary #{inspect(classified_to.boundary)}"
           raise Boundary.Error, message: message, file: classified_to.file, line: classified_to.line
         end
 
-        classified_to.boundary
+        boundary
     end
+  end
+
+  defp find_boundary(_trie, []), do: nil
+
+  defp find_boundary(trie, [part | rest]) do
+    case Map.fetch(trie.children, part) do
+      {:ok, child_trie} -> find_boundary(child_trie, rest) || child_trie.boundary
+      :error -> nil
+    end
+  end
+
+  defp add_boundary(trie, boundary),
+    do: add_boundary(trie, Module.split(boundary.name), boundary)
+
+  defp add_boundary(trie, [], boundary), do: %{trie | boundary: boundary}
+
+  defp add_boundary(trie, [part | rest], boundary) do
+    Map.update!(
+      trie,
+      :children,
+      fn children ->
+        children
+        |> Map.put_new_lazy(part, &new_trie/0)
+        |> Map.update!(part, &add_boundary(&1, rest, boundary))
+      end
+    )
   end
 
   defp protocol_impl?(module) do
@@ -424,6 +522,10 @@ defmodule Boundary do
 
     function_exported?(module, :__impl__, 1)
   end
+
+  defp app_modules(app),
+    # we're currently supporting only Elixir modules
+    do: Enum.filter(Application.spec(app, :modules), &String.starts_with?(Atom.to_string(&1), "Elixir."))
 
   defmodule Error do
     defexception [:message, :file, :line]

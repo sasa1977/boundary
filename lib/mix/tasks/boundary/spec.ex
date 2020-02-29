@@ -16,6 +16,7 @@ defmodule Mix.Tasks.Boundary.Spec do
       Boundary.Mix.app_name()
       |> Boundary.view()
       |> Boundary.all()
+      |> Stream.filter(&(&1.app == Boundary.Mix.app_name()))
       |> Enum.sort_by(& &1.name)
       |> Stream.map(&boundary_info/1)
       |> Enum.join("\n")
@@ -28,7 +29,7 @@ defmodule Mix.Tasks.Boundary.Spec do
     #{inspect(boundary.name)}
       deps: #{boundary.deps |> Enum.sort() |> Stream.map(&inspect/1) |> Enum.join(", ")}
       exports: #{exports(boundary)}
-      externals: #{externals(boundary)}
+      externals: #{boundary.externals |> Enum.map(&inspect/1) |> Enum.join(", ")}
     """
   end
 
@@ -55,13 +56,4 @@ defmodule Mix.Tasks.Boundary.Spec do
 
   defp relative_to([head | tail1], [head | tail2]), do: relative_to(tail1, tail2)
   defp relative_to(list, _), do: list
-
-  defp externals(%{externals: externals}) when map_size(externals) == 0, do: "unrestricted"
-
-  defp externals(%{externals: externals}) do
-    "\n" <>
-      (externals
-       |> Enum.map(fn {app, {type, modules}} -> "    #{app}: #{type} #{modules |> Enum.sort() |> Enum.join(", ")}" end)
-       |> Enum.join("\n"))
-  end
 end

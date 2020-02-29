@@ -1,8 +1,7 @@
 defmodule MySystemWeb do
   use Boundary,
     exports: [Endpoint],
-    deps: [MySystem],
-    externals: [ecto: {:only, [Ecto.Changeset]}]
+    deps: [MySystem, Ecto.Changeset]
 
   def controller do
     quote do

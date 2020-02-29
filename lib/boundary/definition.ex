@@ -4,9 +4,10 @@ defmodule Boundary.Definition do
   # credo:disable-for-this-file Credo.Check.Readability.Specs
 
   defmacro generate(opts) do
-    quote bind_quoted: [opts: opts] do
+    quote bind_quoted: [opts: opts, app: Keyword.fetch!(Mix.Project.config(), :app)] do
       @boundary_opts opts
       @env __ENV__
+      @app app
 
       # Definition will be injected in before compile, because we need to check if this module is
       # a protocol, which we can only do right before the module is about to be compiled.
@@ -20,7 +21,12 @@ defmodule Boundary.Definition do
       case Keyword.pop(@boundary_opts, :classify_to, nil) do
         {nil, opts} ->
           Module.register_attribute(__MODULE__, Boundary, persist: true, accumulate: false)
-          Module.put_attribute(__MODULE__, Boundary, Boundary.Definition.normalize(__MODULE__, opts, @env))
+
+          Module.put_attribute(
+            __MODULE__,
+            Boundary,
+            Boundary.Definition.normalize(@app, __MODULE__, opts, @env)
+          )
 
         {boundary, opts} ->
           protocol? = Module.defines?(__MODULE__, {:__impl__, 1}, :def)
@@ -53,19 +59,18 @@ defmodule Boundary.Definition do
   end
 
   @doc false
-  def normalize(boundary, definition, env) do
+  def normalize(app, boundary, definition, env) do
     defaults()
     |> Map.merge(Map.new(definition))
     |> validate!()
     |> expand_exports(boundary)
-    |> Map.update!(:externals, &Map.new/1)
-    |> Map.merge(%{file: env.file, line: env.line})
+    |> Map.merge(%{file: env.file, line: env.line, app: app})
   end
 
-  defp defaults, do: %{deps: [], exports: [], ignore?: false, externals: []}
+  defp defaults, do: %{deps: [], exports: [], ignore?: false, externals: [], extra_externals: []}
 
   defp validate!(definition) do
-    valid_keys = ~w/deps exports ignore? externals/a
+    valid_keys = ~w/deps exports ignore? externals extra_externals/a
 
     with [_ | _] = invalid_options <- definition |> Map.keys() |> Enum.reject(&(&1 in valid_keys)) do
       error = "Invalid options: #{invalid_options |> Stream.map(&inspect/1) |> Enum.join(", ")}"

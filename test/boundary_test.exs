@@ -44,17 +44,10 @@ defmodule BoundaryTest do
       assert check(modules: [{Foo, boundary: []}], calls: [{Foo, Mix}]) == []
     end
 
-    test "doesn't include external call allowed via `:only`" do
+    test "doesn't include call to allowed external" do
       assert check(
-               modules: [{Foo, boundary: [externals: [mix: {:only, [Mix]}]]}],
+               modules: [{Foo, boundary: [deps: [Mix]]}],
                calls: [{Foo, Mix}, {Foo, Mix.Project}]
-             ) == []
-    end
-
-    test "doesn't include external call allowed via `:except`" do
-      assert check(
-               modules: [{Foo, boundary: [externals: [mix: {:except, [Mix.Project]}]]}],
-               calls: [{Foo, Mix}, {Foo, Mix.Config}]
              ) == []
     end
 
@@ -139,19 +132,11 @@ defmodule BoundaryTest do
     end
 
     test "includes call to forbidden external" do
-      assert [{:invalid_call, error1}, {:invalid_call, error2}] =
+      assert [{:invalid_call, error}] =
                check(
-                 modules: [{Foo, boundary: [externals: [elixir: {:only, []}, mix: {:except, [Mix.Project]}]]}],
-                 calls: [{Foo, IO, :puts}, {Foo, Mix.Project, :config}]
+                 modules: [{Foo, boundary: [deps: [Mix.Config]]}],
+                 calls: [{Foo, Mix.Project, :config}]
                )
-
-      assert %{
-               from_boundary: Foo,
-               to_boundary: IO,
-               caller: Foo,
-               callee: {IO, :puts, 1},
-               type: :invalid_external_dep_call
-             } = error1
 
       assert %{
                from_boundary: Foo,
@@ -159,7 +144,7 @@ defmodule BoundaryTest do
                caller: Foo,
                callee: {Mix.Project, :config, 1},
                type: :invalid_external_dep_call
-             } = error2
+             } = error
     end
 
     test "treats inner boundary as a top-level one" do
@@ -178,7 +163,7 @@ defmodule BoundaryTest do
       assert error2 == {:unclassified_module, Baz}
     end
 
-    test "includes unknown boundaries in deps" do
+    test "includes empty boundaries in deps" do
       assert [error] = check(modules: [{Foo, boundary: [deps: [Bar]]}])
       assert {:unknown_dep, %{name: Bar}} = error
     end
@@ -201,7 +186,7 @@ defmodule BoundaryTest do
 
   defp check(opts) do
     modules = def_modules(Keyword.get(opts, :modules, []))
-    view = Boundary.build_view(modules)
+    view = Boundary.build_view(:boundary, modules)
 
     Boundary.errors(
       view,
