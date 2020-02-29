@@ -364,7 +364,7 @@ defmodule Boundary do
   defp module_to_app do
     for {app, _description, _vsn} <- Application.loaded_applications(),
         module <- Application.spec(app, :modules),
-        into: %{erlang: :erlang},
+        into: %{},
         do: {module, app}
   end
 
