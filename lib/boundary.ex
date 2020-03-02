@@ -287,6 +287,8 @@ defmodule Boundary do
   require Boundary.Definition
   Boundary.Definition.generate(deps: [], exports: [])
 
+  alias Boundary.Classifier
+
   @type t :: %{
           name: name,
           deps: [name],
@@ -302,7 +304,7 @@ defmodule Boundary do
 
   @opaque view :: %{
             boundaries: %{name => t},
-            classified_modules: %{module => Boundary.name()},
+            classified_modules: %{module => name()},
             unclassified_modules: MapSet.t(module),
             module_to_app: %{module => atom}
           }
@@ -386,65 +388,61 @@ defmodule Boundary do
           into: %{},
           do: {module, app}
 
-    # load boundaries from this app
-    app_boundaries = load_boundaries(app_name, module_to_app, app_modules)
-
-    # gather external apps
-    external_apps = for boundary <- app_boundaries, app <- boundary.externals, into: MapSet.new(), do: app
-
-    {classified, unclassified_from_externals} =
-      Enum.reduce(
-        external_apps,
-        {classify_modules(app_boundaries, app_modules), []},
-        fn external_app, {classified, unclassified_from_externals} ->
-          modules = app_modules(external_app)
-
-          case load_boundaries(app_name, module_to_app, modules) do
-            [] ->
-              # app has no boundaries -> we'll need to classify its modules to implicit boundaries
-              {classified, modules ++ unclassified_from_externals}
-
-            external_boundaries ->
-              # app has boundaries -> classify its modules
-              {classify_modules(external_boundaries, modules, classified), unclassified_from_externals}
-          end
-        end
-      )
-
-    # gather unclassified modules of this app
-    unclassified_modules =
-      for module <- app_modules,
-          not Map.has_key?(classified.modules, module),
-          not protocol_impl?(module),
-          into: MapSet.new(),
-          do: module
-
-    # index all dep boundaries
-    all_deps = for app_boundary <- app_boundaries, dep <- app_boundary.deps, into: %{}, do: {dep, app_boundary}
-
-    # implicit boundaries are all dep boundaries which are not explicitly defined
-    implicit_boundaries =
-      for {dep, boundary} <- all_deps,
-          not Map.has_key?(classified.boundaries, dep),
-          boundary_app = Map.get(module_to_app, dep),
-          boundary_app != app_name do
-        boundary_app
-        |> Boundary.Definition.normalize(dep, [], boundary)
-        |> Map.merge(%{name: dep, implicit?: true, modules: []})
-      end
-
-    # classify remaining modules into implicit boundaries
-    classified = classify_modules(implicit_boundaries, unclassified_from_externals, classified)
+    %{boundaries: boundaries, modules: classified_modules} =
+      app_name
+      |> load_apps_and_boundaries(app_modules, module_to_app)
+      |> Enum.reduce(Classifier.new(), &Classifier.classify(&2, &1.modules, &1.boundaries))
 
     %{
-      boundaries: classified.boundaries,
-      classified_modules: classified.modules,
-      unclassified_modules: unclassified_modules,
+      boundaries: boundaries,
+      classified_modules: classified_modules,
+      unclassified_modules: unclassified_modules(app_modules, classified_modules),
       module_to_app: module_to_app
     }
   end
 
-  defp load_boundaries(app_name, module_to_app, modules) do
+  defp load_apps_and_boundaries(app_name, app_modules, module_to_app) do
+    # fetch boundaries of this app
+    app_boundaries = load_app_boundaries(app_name, app_modules, module_to_app)
+
+    # fetch and index all deps
+    all_deps = for user_boundary <- app_boundaries, dep <- user_boundary.deps, into: %{}, do: {dep, user_boundary}
+
+    # create app -> [boundary] mapping which will be used to determine implicit boundaries
+    implicit_boundaries =
+      for {dep, user_boundary} <- all_deps,
+          boundary_app = Map.get(module_to_app, dep),
+          reduce: %{} do
+        acc -> Map.update(acc, boundary_app, [{dep, user_boundary}], &[{dep, user_boundary} | &1])
+      end
+
+    external_boundaries =
+      Enum.map(
+        for(boundary <- app_boundaries, app <- boundary.externals, into: MapSet.new(), do: app),
+        fn app ->
+          modules = app_modules(app)
+
+          boundaries =
+            with [] <- load_app_boundaries(app, modules, module_to_app) do
+              # app defines no boundaries -> we'll use implicit boundaries from all deps pointing to modules of this app
+              implicit_boundaries
+              |> Map.get(app, [])
+              |> Enum.map(fn
+                {dep, user_boundary} ->
+                  app
+                  |> Boundary.Definition.normalize(dep, [], user_boundary)
+                  |> Map.merge(%{name: dep, implicit?: true})
+              end)
+            end
+
+          %{modules: modules, boundaries: boundaries}
+        end
+      )
+
+    [%{modules: app_modules, boundaries: app_boundaries} | external_boundaries]
+  end
+
+  defp load_app_boundaries(app_name, modules, module_to_app) do
     for module <- modules, boundary = Boundary.Definition.get(module) do
       externals =
         boundary.deps
@@ -458,69 +456,18 @@ defmodule Boundary do
     end
   end
 
-  defp classify_modules(boundaries, modules, acc \\ %{boundaries: %{}, modules: %{}}) do
-    trie = build_trie(boundaries)
-
-    acc = %{acc | boundaries: Enum.reduce(boundaries, acc.boundaries, &Map.put_new(&2, &1.name, &1))}
-
-    for module <- modules,
-        boundary = find_boundary(trie, module),
-        reduce: acc do
-      acc -> Map.update!(acc, :modules, &Map.put(&1, module, boundary.name))
-    end
-  end
-
-  defp build_trie(boundaries), do: Enum.reduce(boundaries, new_trie(), &add_boundary(&2, &1))
-
-  defp new_trie, do: %{boundary: nil, children: %{}}
-
-  defp find_boundary(trie, module) when is_atom(module) do
-    case Boundary.Definition.classified_to(module) do
-      nil ->
-        find_boundary(trie, Module.split(module))
-
-      classified_to ->
-        boundary = find_boundary(trie, classified_to.boundary)
-
-        unless boundary do
-          message = "invalid boundary #{inspect(classified_to.boundary)}"
-          raise Boundary.Error, message: message, file: classified_to.file, line: classified_to.line
-        end
-
-        boundary
-    end
-  end
-
-  defp find_boundary(_trie, []), do: nil
-
-  defp find_boundary(trie, [part | rest]) do
-    case Map.fetch(trie.children, part) do
-      {:ok, child_trie} -> find_boundary(child_trie, rest) || child_trie.boundary
-      :error -> nil
-    end
-  end
-
-  defp add_boundary(trie, boundary),
-    do: add_boundary(trie, Module.split(boundary.name), boundary)
-
-  defp add_boundary(trie, [], boundary), do: %{trie | boundary: boundary}
-
-  defp add_boundary(trie, [part | rest], boundary) do
-    Map.update!(
-      trie,
-      :children,
-      fn children ->
-        children
-        |> Map.put_new_lazy(part, &new_trie/0)
-        |> Map.update!(part, &add_boundary(&1, rest, boundary))
-      end
-    )
+  defp unclassified_modules(app_modules, classified_modules) do
+    # gather unclassified modules of this app
+    for module <- app_modules,
+        not Map.has_key?(classified_modules, module),
+        not protocol_impl?(module),
+        into: MapSet.new(),
+        do: module
   end
 
   defp protocol_impl?(module) do
     # Not sure why, but sometimes the protocol implementation isn't loaded.
     Code.ensure_loaded(module)
-
     function_exported?(module, :__impl__, 1)
   end
 
