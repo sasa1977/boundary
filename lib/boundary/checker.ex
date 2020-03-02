@@ -15,7 +15,7 @@ defmodule Boundary.Checker do
   defp invalid_deps(view) do
     for boundary <- Boundary.all(view),
         dep <- boundary.deps,
-        error = validate_dep(Boundary.for_module(view, dep), %{name: dep, file: boundary.file, line: boundary.line}),
+        error = validate_dep(Boundary.get(view, dep), %{name: dep, file: boundary.file, line: boundary.line}),
         into: MapSet.new(),
         do: error
   end

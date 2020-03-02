@@ -3,7 +3,7 @@ defmodule Mix.Tasks.Boundary.FindExternalDepsTest do
 
   test "produces the expected output", context do
     File.write!(
-      Path.join([context.project_path, "lib", "source.ex"]),
+      Path.join([context.project.path, "lib", "source.ex"]),
       """
       defmodule Boundary1 do
         use Boundary
@@ -20,10 +20,10 @@ defmodule Mix.Tasks.Boundary.FindExternalDepsTest do
       """
     )
 
-    mix!(context.project_path, ~w/compile/)
+    mix!(context.project.path, ~w/compile/)
 
     output =
-      mix!(context.project_path, ~w/boundary.find_external_deps/)
+      mix!(context.project.path, ~w/boundary.find_external_deps/)
       |> String.split("\n")
       |> Enum.map(&String.trim_trailing/1)
       |> Enum.join("\n")

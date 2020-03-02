@@ -3,7 +3,7 @@ defmodule Mix.Tasks.Boundary.SpecTest do
 
   test "produces the expected output", context do
     File.write!(
-      Path.join([context.project_path, "lib", "source.ex"]),
+      Path.join([context.project.path, "lib", "source.ex"]),
       """
       defmodule Boundary1 do
         use Boundary, deps: [Boundary2, Boundary3], exports: [Foo, Bar]
@@ -26,10 +26,10 @@ defmodule Mix.Tasks.Boundary.SpecTest do
       """
     )
 
-    mix!(context.project_path, ~w/compile/)
+    mix!(context.project.path, ~w/compile/)
 
     output =
-      mix!(context.project_path, ~w/boundary.spec/)
+      mix!(context.project.path, ~w/boundary.spec/)
       |> String.split("\n")
       |> Enum.map(&String.trim_trailing/1)
       |> Enum.join("\n")

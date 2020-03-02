@@ -3,7 +3,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
   test "reports all warnings", context do
     File.write!(
-      Path.join([context.project_path, "lib", "source.ex"]),
+      Path.join([context.project.path, "lib", "source.ex"]),
       """
       defmodule Boundary1 do
       end
@@ -49,7 +49,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
       """
     )
 
-    output = mix!(context.project_path, ~w/compile/)
+    output = mix!(context.project.path, ~w/compile/)
     warnings = warnings(output)
 
     assert Enum.member?(warnings, %{
@@ -96,7 +96,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
   test "reports warnings if recompilation doesn't happen", context do
     File.write!(
-      Path.join([context.project_path, "lib", "boundary1.ex"]),
+      Path.join([context.project.path, "lib", "boundary1.ex"]),
       """
       defmodule Boundary1 do
         use Boundary, deps: [], exports: []
@@ -106,7 +106,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     )
 
     File.write!(
-      Path.join([context.project_path, "lib", "boundary2.ex"]),
+      Path.join([context.project.path, "lib", "boundary2.ex"]),
       """
       defmodule Boundary2 do
         use Boundary, deps: [], exports: []
@@ -118,8 +118,8 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     # We're deliberatly compiling twice. The first compilation will collect data through the tracer, while the second
     # compilation will actually not compile anything (since there are no code changes). By doing this, we want to verify
     # that tracing data has been preserved, and all the warnings will still be reported.
-    mix!(context.project_path, ~w/compile/)
-    output = mix!(context.project_path, ~w/compile/)
+    mix!(context.project.path, ~w/compile/)
+    output = mix!(context.project.path, ~w/compile/)
 
     warnings = warnings(output)
 
@@ -133,7 +133,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
   test "records new warnings on code change", context do
     File.write!(
-      Path.join([context.project_path, "lib", "boundary1.ex"]),
+      Path.join([context.project.path, "lib", "boundary1.ex"]),
       """
       defmodule Boundary1 do
         use Boundary, deps: [], exports: []
@@ -143,7 +143,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     )
 
     File.write!(
-      Path.join([context.project_path, "lib", "boundary2.ex"]),
+      Path.join([context.project.path, "lib", "boundary2.ex"]),
       """
       defmodule Boundary2 do
         use Boundary, deps: [], exports: []
@@ -153,10 +153,10 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
       """
     )
 
-    mix!(context.project_path, ~w/compile/)
+    mix!(context.project.path, ~w/compile/)
 
     File.write!(
-      Path.join([context.project_path, "lib", "boundary1.ex"]),
+      Path.join([context.project.path, "lib", "boundary1.ex"]),
       """
       defmodule Boundary1 do
         use Boundary, deps: [], exports: []
@@ -165,7 +165,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
       """
     )
 
-    output = mix!(context.project_path, ~w/compile/)
+    output = mix!(context.project.path, ~w/compile/)
 
     warnings = warnings(output)
 
@@ -174,6 +174,152 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
              warning: "forbidden call to Boundary2.another_fun/0",
              explanation: "(calls from Boundary1 to Boundary2 are not allowed)",
              callee: "(call originated from Boundary1)"
+           })
+  end
+
+  test "external which defines boundaries", context do
+    lib = new_project()
+
+    File.write!(
+      Path.join([lib.path, "lib", "code.ex"]),
+      """
+      defmodule Boundary1 do
+        use Boundary, deps: [], exports: []
+
+        def fun(), do: :ok
+
+        defmodule Submodule do
+          def fun(), do: :ok
+        end
+      end
+
+      defmodule Boundary2 do
+        use Boundary, deps: [], exports: []
+
+        def fun(), do: :ok
+      end
+      """
+    )
+
+    File.write!(
+      Path.join(context.project.path, "mix.exs"),
+      mix_exs(context.project.name, deps: [{:"#{lib.name}", path: "#{Path.absname(lib.path)}"}])
+    )
+
+    File.write!(
+      Path.join([context.project.path, "lib", "code.ex"]),
+      """
+      defmodule Client1 do
+        use Boundary, deps: [Boundary1.Submodule]
+      end
+
+      defmodule Client2 do
+        use Boundary, deps: [Boundary1]
+
+        def fun1(), do: Boundary1.Submodule.fun()
+        def fun2(), do: Boundary2.fun()
+      end
+      """
+    )
+
+    output = mix!(context.project.path, ~w/compile/)
+    warnings = warnings(output)
+
+    assert Enum.member?(warnings, %{
+             location: "lib/code.ex:2",
+             warning: "unknown boundary Boundary1.Submodule is listed as a dependency"
+           })
+
+    assert Enum.member?(warnings, %{
+             location: "lib/code.ex:8",
+             warning: "forbidden call to Boundary1.Submodule.fun/0",
+             explanation: "(module Boundary1.Submodule is not exported by its owner boundary Boundary1)",
+             callee: "(call originated from Client2)"
+           })
+
+    assert Enum.member?(warnings, %{
+             location: "lib/code.ex:9",
+             warning: "forbidden call to Boundary2.fun/0",
+             explanation: "(calls from Client2 to Boundary2 are not allowed)",
+             callee: "(call originated from Client2)"
+           })
+  end
+
+  test "external with implicit boundaries", context do
+    lib = new_project(mix_opts: [deps: [], compilers: []])
+
+    File.write!(
+      Path.join([lib.path, "lib", "code.ex"]),
+      """
+      defmodule Boundary1 do
+        def fun(), do: :ok
+
+        defmodule Boundary2 do
+          def fun(), do: :ok
+
+          defmodule Boundary3 do
+            def fun(), do: :ok
+          end
+        end
+      end
+
+      defmodule Boundary4 do
+        def fun(), do: :ok
+      end
+      """
+    )
+
+    File.write!(
+      Path.join(context.project.path, "mix.exs"),
+      mix_exs(context.project.name,
+        deps: [
+          {:boundary, path: "../.."},
+          {:"#{lib.name}", path: "#{Path.absname(lib.path)}"}
+        ],
+        compilers: [:boundary]
+      )
+    )
+
+    File.write!(
+      Path.join([context.project.path, "lib", "code.ex"]),
+      """
+      defmodule Client1 do
+        use Boundary, deps: [Boundary1]
+
+        def fun1(), do: Boundary1.Boundary2.Boundary3.fun()
+        def fun2(), do: Boundary4.fun()
+      end
+
+      defmodule Client2 do
+        use Boundary, deps: [Boundary1.Boundary2.Boundary3]
+
+        def fun(), do: Boundary1.fun()
+      end
+      """
+    )
+
+    output = mix!(context.project.path, ~w/compile/)
+    warnings = warnings(output)
+
+    assert Enum.member?(warnings, %{
+             location: "lib/code.ex:4",
+             warning: "forbidden call to Boundary1.Boundary2.Boundary3.fun/0",
+             callee: "(call originated from Client1)",
+             explanation: "(calls from Client1 to Boundary1.Boundary2.Boundary3 are not allowed)"
+           })
+
+    assert Enum.member?(warnings, %{
+             location: "lib/code.ex:5",
+             warning: "forbidden call to Boundary4.fun/0",
+             callee: "(call originated from Client1)",
+             explanation: "(calls from Client1 to Boundary4 are not allowed)"
+           })
+
+    assert Enum.member?(warnings, %{
+             location: "lib/code.ex:11",
+             warning: "forbidden call to Boundary1.fun/0",
+             callee: "(call originated from Client2)",
+             explanation: "(calls from Client2 to Boundary1 are not allowed)"
            })
   end
 
