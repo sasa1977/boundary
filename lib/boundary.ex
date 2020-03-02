@@ -360,6 +360,14 @@ defmodule Boundary do
   @spec fetch!(view, name) :: t
   def fetch!(view, name), do: Map.fetch!(view.boundaries, name)
 
+  @doc "Returns the definition of the given boundary."
+  @spec fetch(view, name) :: {:ok, t} | :error
+  def fetch(view, name), do: Map.fetch(view.boundaries, name)
+
+  @doc "Returns the definition of the given boundary."
+  @spec get(view, name) :: t | nil
+  def get(view, name), do: Map.get(view.boundaries, name)
+
   @doc "Returns definition of the boundary to which the given module belongs."
   @spec for_module(view, module) :: t | nil
   def for_module(view, module) do
