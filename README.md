@@ -99,8 +99,9 @@ Because `boundary` is implemented as a mix compiler, it integrates seamlessly wi
 
 ## Roadmap
 
+- [x] validate calls to external deps (e.g. preventing `Ecto` usage from `MySystemWeb`, or `Plug` usage from `MySystem`)
+- [ ] support compile time vs runtime deps
 - [ ] support nested boundaries (defining internal boundaries within a boundary)
-- [ ] validate calls to external deps (e.g. preventing `Ecto` usage from `MySystemWeb`, or `Plug` usage from `MySystem`)
 - [ ] support Erlang modules
 
 ## License
