@@ -60,29 +60,47 @@ defmodule Boundary.Definition do
 
   @doc false
   def normalize(app, boundary, definition, env) do
-    defaults()
-    |> Map.merge(Map.new(definition))
-    |> validate!()
+    definition
+    |> normalize!()
     |> expand_exports(boundary)
     |> Map.merge(%{file: env.file, line: env.line, app: app})
   end
 
-  defp defaults, do: %{deps: [], exports: [], ignore?: false, externals: [], extra_externals: []}
+  defp normalize!(definition) do
+    definition = Map.new(definition)
 
-  defp validate!(definition) do
-    valid_keys = ~w/deps exports ignore? externals extra_externals/a
+    valid_keys = ~w/deps exports ignore? extra_externals externals_mode/a
 
     with [_ | _] = invalid_options <- definition |> Map.keys() |> Enum.reject(&(&1 in valid_keys)) do
       error = "Invalid options: #{invalid_options |> Stream.map(&inspect/1) |> Enum.join(", ")}"
       raise ArgumentError, error
     end
 
-    if definition.ignore? do
+    definition = Map.merge(defaults(), definition)
+
+    if definition.ignore? == true do
       if definition.deps != [], do: raise(ArgumentError, message: "deps are not allowed in ignored boundaries")
       if definition.exports != [], do: raise(ArgumentError, message: "exports are not allowed in ignored boundaries")
     end
 
+    if definition.externals_mode not in ~w/strict relaxed/a,
+      do: raise(ArgumentError, message: "externals_mode must be :strict or :relaxed ")
+
+    if definition.externals_mode == :strict and definition.extra_externals != [],
+      do: raise(ArgumentError, message: "extra externals can't be provided in strict mode")
+
     definition
+  end
+
+  defp defaults do
+    %{
+      deps: [],
+      exports: [],
+      ignore?: false,
+      externals: [],
+      extra_externals: [],
+      externals_mode: Mix.Project.config() |> Keyword.get(:boundary, []) |> Keyword.get(:externals_mode, :relaxed)
+    }
   end
 
   defp expand_exports(definition, boundary) do

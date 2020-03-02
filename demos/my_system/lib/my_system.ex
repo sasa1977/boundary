@@ -1,3 +1,3 @@
 defmodule MySystem do
-  use Boundary, deps: [], exports: [User]
+  use Boundary, deps: [Ecto], exports: [User], externals_mode: :strict
 end

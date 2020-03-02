@@ -191,37 +191,67 @@ defmodule Boundary do
   end
   ```
 
-  When you reference a boundary from an external application in the deps list, only the calls to the listed boundaries
-  will be allowed.
-
-  If an external application doesn't define boundaries, you can reference application modules. In such case, you're
-  creating an _implicit boundary_. This is exactly what we're doing in the previous example. Ecto doesn't define its own
-  boundaries, but we're still listing `Ecto.Changeset` in the deps list. This will create an implicit boundary of the
-  same name which will include all of the submodules like `Ecto.Changeset.Foo`, or ``Ecto.Changeset.Bar.Baz`. An implicit
-  boundary exports all of its submodules.
+  Boundary is able to use boundary definitions from an external application, if such exists. If an external application
+  doesn't define any boundary, you can still reference application modules. In such case, you're creating an _implicit
+  boundary_. This is exactly what we're doing in the previous example. Ecto doesn't define its own boundaries, but we
+  can still include `Ecto.Changeset` in the deps list. This will create an implicit boundary of the same name which will
+  include all of the submodules like `Ecto.Changeset.Foo`, or `Ecto.Changeset.Bar.Baz`. An implicit boundary exports all
+  of its submodules. Note that you can't define implicit boundaries in applications which define their own boundaries.
 
   The implicit boundaries are collected based on all deps of all boundaries in your application. For example, if one
-  boundary lists `Ecto.Query` as a dependency, while another lists `Ecto.Query.API`, then the latter won't be a part of
-  the former boundary.
+  boundary specifies `Ecto.Query` as a dependency, while another references `Ecto.Query.API`, then two boundaries are
+  defined, and the latter will not be a part of the former.
 
-  If you want to completely prohibit the usage of some library, you can list the app in the `:extra_externals` list:
+  In some cases you may want to completely prohibit the usage of some library. However, bare in mind that by default
+  calls to an external application are restricted only if the client boundary references at least one dep boundary from
+  that application. To force boundary to always restrict calls to some application, you can include the application in
+  the `:extra_externals` list:
 
   ```
-    defmodule MySystem do
-      use Boundary, extra_externals: [:plug], deps: []
-    end
+  defmodule MySystem do
+    use Boundary, extra_externals: [:plug], deps: []
+  end
   ```
 
-  The `:extra_externals` list contains additional applications considered by boundary. Any calls to the given
+  The `:extra_externals` list contains additional applications which are always considered. Any calls to given
   applications must be explicitly allowed via the `:deps` option. In the example above, we're including `:plug` in the
-  list of external applications, but we're not allowing any dependency from this library. As a result, the context
-  layer is not allowed to use plug functions.
+  list of external applications, but we're not including any boundary from this library in depssi, the context layer
+  is not allowed to use plug functions.
 
-  Finally, it's worth noting that boundary doesn't analyze Erlang modules. Therefore, you can't use boundary to restrain
-  calls to pure Erlang applications, such as `:crypto` or `:cowboy`.
+  In addition, a strict external mode is supported via the `:externals_mode` option:
 
-  You can use the `Mix.Tasks.Boundary.FindExternalDeps` mix task to discover all external applications used by your
-  boundaries.
+  ```
+  defmodule MySystem do
+    use Boundary, externals_mode: :strict
+  end
+  ```
+
+  In this mode, boundary will report all calls to all external applications which are not explicitly allowed via the
+  `:dep` option. You can also configure the strict mode globally in your mix.exs:
+
+  ```elixir
+  defmodule MySystem.MixProject do
+    use Mix.Project
+
+    def project do
+      [
+        # ...
+        boundary: [externals_mode: :strict]
+      ]
+    end
+
+    # ...
+  end
+  ```
+
+  At this point, all boundaries will be checked with the strict mode. If you want to override this for some boundaries,
+  you can do it with `use Boundary, externals_mode: :relaxed`.
+
+  Note that restraining calls to the `:elixir`, `:boundary`, and pure Erlang applications, such as
+  `:crypto` or `:cowboy`, is currently not possible.
+
+  If you want to discover which external applications are used by your boundaries, you can use the helper mix task
+  `Mix.Tasks.Boundary.FindExternalDeps`.
 
   ## Ignored boundaries
 
@@ -295,6 +325,7 @@ defmodule Boundary do
           exports: [module],
           externals: [atom],
           extra_externals: [atom],
+          externals_mode: :strict | :regular,
           ignore?: boolean,
           file: String.t(),
           line: pos_integer,

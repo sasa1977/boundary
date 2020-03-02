@@ -82,8 +82,11 @@ defmodule Boundary.Checker do
     end
   end
 
-  defp check_external_dep?(view, call, from_boundary),
-    do: Enum.member?(from_boundary.externals, Boundary.app(view, call.callee_module))
+  defp check_external_dep?(view, call, from_boundary) do
+    Boundary.app(view, call.callee_module) != :boundary and
+      (from_boundary.externals_mode == :strict or
+         Enum.member?(from_boundary.externals, Boundary.app(view, call.callee_module)))
+  end
 
   defp allowed?(from_boundary, to_boundary), do: Enum.any?(from_boundary.deps, &(&1 == to_boundary.name))
 

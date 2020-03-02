@@ -64,7 +64,7 @@ defmodule Boundary.ProjectTestCaseTemplate do
           start_permanent: Mix.env() == :prod,
           deps: deps(),
           compilers: #{inspect(Keyword.get(opts, :compilers, [:boundary]))} ++ Mix.compilers()
-        ]
+        ] ++ #{inspect(Keyword.get(opts, :project_opts, []))}
       end
 
       def application do

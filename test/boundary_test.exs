@@ -163,6 +163,22 @@ defmodule BoundaryTest do
              } = error
     end
 
+    test "includes call to forbidden external in strict mode" do
+      assert [{:invalid_call, error}] =
+               check(
+                 modules: [{Foo, boundary: [externals_mode: :strict]}],
+                 calls: [{Foo, IO, :inspect}]
+               )
+
+      assert %{
+               from_boundary: Foo,
+               to_boundary: IO,
+               caller: Foo,
+               callee: {IO, :inspect, 1},
+               type: :invalid_external_dep_call
+             } = error
+    end
+
     test "treats inner boundary as a top-level one" do
       assert [error] =
                check(

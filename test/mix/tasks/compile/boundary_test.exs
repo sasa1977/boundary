@@ -323,6 +323,50 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
            })
   end
 
+  test "global externals", context do
+    lib = new_project()
+
+    File.write!(
+      Path.join([lib.path, "lib", "code.ex"]),
+      """
+      defmodule Boundary1 do
+        use Boundary, deps: [], exports: []
+
+        def fun(), do: :ok
+      end
+      """
+    )
+
+    File.write!(
+      Path.join(context.project.path, "mix.exs"),
+      mix_exs(context.project.name,
+        project_opts: [boundary: [externals_mode: :strict]],
+        deps: [{:"#{lib.name}", path: "#{Path.absname(lib.path)}"}]
+      )
+    )
+
+    File.write!(
+      Path.join([context.project.path, "lib", "code.ex"]),
+      """
+      defmodule Client1 do
+        use Boundary, deps: []
+
+        def fun(), do: Boundary1.fun()
+      end
+      """
+    )
+
+    output = mix!(context.project.path, ~w/compile/)
+    warnings = warnings(output)
+
+    assert Enum.member?(warnings, %{
+             location: "lib/code.ex:4",
+             warning: "forbidden call to Boundary1.fun/0",
+             callee: "(call originated from Client1)",
+             explanation: "(calls from Client1 to Boundary1 are not allowed)"
+           })
+  end
+
   defp warnings(output) do
     output
     |> String.split(~r/\n|\r/)
