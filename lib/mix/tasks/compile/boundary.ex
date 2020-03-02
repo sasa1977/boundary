@@ -99,7 +99,8 @@ defmodule Mix.Tasks.Compile.Boundary do
   @doc false
   def trace({remote, meta, callee_module, name, arity}, env)
       when remote in ~w/remote_function imported_function remote_macro imported_macro/a do
-    unless env.module in [nil, callee_module] or system_module?(callee_module) do
+    unless env.module in [nil, callee_module] or system_module?(callee_module) or
+             not String.starts_with?(Atom.to_string(callee_module), "Elixir.") do
       Xref.add_call(
         env.module,
         %{
