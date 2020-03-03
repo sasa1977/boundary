@@ -27,7 +27,7 @@ defmodule Mix.Tasks.Boundary.Spec do
   defp boundary_info(%{ignore?: false} = boundary) do
     """
     #{inspect(boundary.name)}
-      deps: #{boundary.deps |> Enum.sort() |> Stream.map(&inspect/1) |> Enum.join(", ")}
+      deps: #{deps(boundary)}
       exports: #{exports(boundary)}
       externals: #{boundary.externals |> Enum.map(&inspect/1) |> Enum.join(", ")}
     """
@@ -37,6 +37,16 @@ defmodule Mix.Tasks.Boundary.Spec do
     """
     #{inspect(boundary.name)} (ignored)
     """
+  end
+
+  defp deps(boundary) do
+    boundary.deps
+    |> Enum.sort()
+    |> Stream.map(fn
+      {dep, :runtime} -> inspect(dep)
+      {dep, :compile} -> "#{inspect(dep)} (compile only)"
+    end)
+    |> Enum.join(", ")
   end
 
   defp exports(boundary) do

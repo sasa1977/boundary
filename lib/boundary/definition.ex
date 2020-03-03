@@ -63,6 +63,7 @@ defmodule Boundary.Definition do
     definition
     |> normalize!()
     |> expand_exports(boundary)
+    |> normalize_deps()
     |> Map.merge(%{file: env.file, line: env.line, app: app})
   end
 
@@ -111,6 +112,21 @@ defmodule Boundary.Definition do
           expanded_aliases = Enum.map(exports, &Module.concat(boundary, &1))
           [boundary | expanded_aliases]
         end
+      )
+    end
+  end
+
+  defp normalize_deps(definition) do
+    with %{ignore?: false} <- definition do
+      update_in(
+        definition.deps,
+        &Enum.map(
+          &1,
+          fn
+            {_dep, _type} = dep -> dep
+            dep when is_atom(dep) -> {dep, :runtime}
+          end
+        )
       )
     end
   end

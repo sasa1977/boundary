@@ -321,7 +321,7 @@ defmodule Boundary do
 
   @type t :: %{
           name: name,
-          deps: [name],
+          deps: [{name, mode}],
           exports: [module],
           externals: [atom],
           extra_externals: [atom],
@@ -341,6 +341,7 @@ defmodule Boundary do
           }
 
   @type name :: module
+  @type mode :: :compile | :runtime
 
   @type call :: %{
           callee: mfa,
@@ -348,7 +349,7 @@ defmodule Boundary do
           caller_module: module,
           file: String.t(),
           line: pos_integer,
-          mode: :compile | :runtime
+          mode: mode
         }
 
   @type error ::
@@ -454,7 +455,11 @@ defmodule Boundary do
     app_boundaries = load_app_boundaries(app_name, app_modules, module_to_app)
 
     # fetch and index all deps
-    all_deps = for user_boundary <- app_boundaries, dep <- user_boundary.deps, into: %{}, do: {dep, user_boundary}
+    all_deps =
+      for user_boundary <- app_boundaries,
+          {dep, _type} <- user_boundary.deps,
+          into: %{},
+          do: {dep, user_boundary}
 
     # create app -> [boundary] mapping which will be used to determine implicit boundaries
     implicit_boundaries =
@@ -494,7 +499,7 @@ defmodule Boundary do
     for module <- modules, boundary = Boundary.Definition.get(module) do
       externals =
         boundary.deps
-        |> Stream.map(&Map.get(module_to_app, &1))
+        |> Stream.map(fn {dep, _} -> Map.get(module_to_app, dep) end)
         |> Stream.reject(&is_nil/1)
         |> Stream.reject(&(&1 == app_name))
         |> Stream.concat(boundary.extra_externals)

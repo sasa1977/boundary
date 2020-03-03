@@ -14,7 +14,7 @@ defmodule Boundary.Checker do
 
   defp invalid_deps(view) do
     for boundary <- Boundary.all(view),
-        dep <- boundary.deps,
+        {dep, _type} <- boundary.deps,
         error = validate_dep(Boundary.get(view, dep), %{name: dep, file: boundary.file, line: boundary.line}),
         into: MapSet.new(),
         do: error
@@ -31,7 +31,7 @@ defmodule Boundary.Checker do
       Enum.each(Boundary.all_names(view), &:digraph.add_vertex(graph, &1))
 
       for boundary <- Boundary.all(view),
-          dep <- boundary.deps,
+          {dep, _type} <- boundary.deps,
           do: :digraph.add_edge(graph, boundary.name, dep)
 
       :digraph.vertices(graph)
@@ -76,7 +76,7 @@ defmodule Boundary.Checker do
     cond do
       to_boundary.ignore? -> nil
       cross_app_call?(view, call) and not check_external_dep?(view, call, from_boundary) -> nil
-      not allowed?(from_boundary, to_boundary) -> {:invalid_cross_boundary_call, to_boundary.name}
+      not allowed?(from_boundary, to_boundary, call.mode) -> {:invalid_cross_boundary_call, to_boundary.name}
       not exported?(to_boundary, call.callee_module) -> {:not_exported, to_boundary.name}
       true -> nil
     end
@@ -88,7 +88,16 @@ defmodule Boundary.Checker do
          Enum.member?(from_boundary.externals, Boundary.app(view, call.callee_module)))
   end
 
-  defp allowed?(from_boundary, to_boundary), do: Enum.any?(from_boundary.deps, &(&1 == to_boundary.name))
+  defp allowed?(from_boundary, %{name: name}, mode) do
+    Enum.any?(
+      from_boundary.deps,
+      fn
+        {^name, :runtime} -> true
+        {^name, :compile} -> mode == :compile
+        _ -> false
+      end
+    )
+  end
 
   defp cross_app_call?(view, call),
     do: Boundary.app(view, call.caller_module) != Boundary.app(view, call.callee_module)

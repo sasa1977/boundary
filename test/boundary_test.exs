@@ -284,7 +284,8 @@ defmodule BoundaryTest do
       callee_module: to,
       caller_module: from,
       file: "nofile",
-      line: 1
+      line: 1,
+      mode: :runtime
     }
   end
 end
