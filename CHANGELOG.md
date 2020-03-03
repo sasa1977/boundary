@@ -1,3 +1,7 @@
+# 0.3.1
+
+- Fixed app loading bug which led to some dependencies being missed.
+
 # 0.3.0
 
 - Added support for controlling the usage of external deps. If external dep defines boundaries, the client app can refer to those boundaries. Otherwise, the client app can define implicit boundaries. See [docs](https://hexdocs.pm/boundary/Boundary.html#module-external-dependencies) for details.
