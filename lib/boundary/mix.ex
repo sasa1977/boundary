@@ -19,9 +19,9 @@ defmodule Boundary.Mix do
       visited = MapSet.put(visited, app_name)
 
       visited =
-        if Application.load(app_name) in [:ok, {:error, {:already_loaded, :boundary}}] do
-          Application.spec(app_name(), :applications)
-          |> Stream.concat(Application.spec(app_name(), :included_applications))
+        if Application.load(app_name) in [:ok, {:error, {:already_loaded, app_name}}] do
+          Application.spec(app_name, :applications)
+          |> Stream.concat(Application.spec(app_name, :included_applications))
           |> Enum.reduce(visited, &load_app_recursive/2)
         else
           visited
