@@ -210,7 +210,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
       Path.join([context.project.path, "lib", "code.ex"]),
       """
       defmodule Client1 do
-        use Boundary, deps: [Boundary1.Submodule]
+        use Boundary, deps: [Boundary1.{Submodule, Submodule2}]
       end
 
       defmodule Client2 do
@@ -228,6 +228,11 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     assert Enum.member?(warnings, %{
              location: "lib/code.ex:2",
              warning: "unknown boundary Boundary1.Submodule is listed as a dependency"
+           })
+
+    assert Enum.member?(warnings, %{
+             location: "lib/code.ex:2",
+             warning: "unknown boundary Boundary1.Submodule2 is listed as a dependency"
            })
 
     assert Enum.member?(warnings, %{

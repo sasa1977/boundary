@@ -40,6 +40,16 @@ defmodule BoundaryTest do
              ) == []
     end
 
+    test "doesn't include calls to deps provided in the {} form" do
+      assert check(
+               modules:
+                 quote(
+                   do: [{Foo, boundary: [deps: [Bar.{Baz, Qux}]]}, {Bar.Baz, boundary: []}, {Bar.Qux, boundary: []}]
+                 ),
+               calls: [{Foo, Bar.Baz}, {Foo, Bar.Qux}]
+             ) == []
+    end
+
     test "doesn't include call to non-listed external" do
       assert check(modules: [{Foo, boundary: []}], calls: [{Foo, Mix}]) == []
     end
@@ -233,18 +243,25 @@ defmodule BoundaryTest do
   defp define_module({module, opts}) do
     boundary_opts = Keyword.get(opts, :boundary)
 
+    boundary_call =
+      if not is_nil(boundary_opts) do
+        quote do
+          use Boundary, unquote(boundary_opts)
+        end
+      end
+
     quoted =
       if Keyword.get(opts, :protocol_impl?) do
-        quote bind_quoted: [module: module, boundary_opts: boundary_opts] do
-          defimpl SomeProtocol, for: module do
-            if not is_nil(boundary_opts), do: use(Boundary, boundary_opts)
-            def foo(_), do: :ok
+        quote do
+          defimpl SomeProtocol, for: unquote(module) do
+            unquote(boundary_call)
+            def(foo(_), do: :ok)
           end
         end
       else
-        quote bind_quoted: [module: module, boundary_opts: boundary_opts] do
-          defmodule module do
-            if not is_nil(boundary_opts), do: use(Boundary, boundary_opts)
+        quote do
+          defmodule unquote(module) do
+            unquote(boundary_call)
           end
         end
       end

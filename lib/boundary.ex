@@ -361,9 +361,18 @@ defmodule Boundary do
   @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
 
   defmacro __using__(opts) do
-    quote bind_quoted: [opts: opts] do
+    opts =
+      Enum.map(
+        opts,
+        fn
+          {key, references} when key in ~w/deps exports/a -> {key, normalize_references(references)}
+          other -> other
+        end
+      )
+
+    quote do
       require Boundary.Definition
-      Boundary.Definition.generate(opts)
+      Boundary.Definition.generate(unquote(opts))
     end
   end
 
@@ -513,6 +522,19 @@ defmodule Boundary do
   defp app_modules(app),
     # we're currently supporting only Elixir modules
     do: Enum.filter(Application.spec(app, :modules), &String.starts_with?(Atom.to_string(&1), "Elixir."))
+
+  defp normalize_references(references) do
+    Enum.flat_map(
+      references,
+      fn
+        reference ->
+          case Macro.decompose_call(reference) do
+            {parent, :{}, children} -> Enum.map(children, &quote(do: Module.concat(unquote([parent, &1]))))
+            _ -> [reference]
+          end
+      end
+    )
+  end
 
   defmodule Error do
     defexception [:message, :file, :line]
