@@ -107,7 +107,11 @@ defmodule Mix.Tasks.Compile.Boundary do
           callee: {callee_module, name, arity},
           file: Path.relative_to_cwd(env.file),
           line: Keyword.get(meta, :line, env.line),
-          mode: if(is_nil(env.function), do: :compile, else: :runtime)
+          mode:
+            if(is_nil(env.function) or remote in ~w/remote_macro imported_macro/a,
+              do: :compile,
+              else: :runtime
+            )
         }
       )
     end
