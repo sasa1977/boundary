@@ -1,3 +1,7 @@
+# 0.3.2
+
+- Eliminates duplicate warnings
+
 # 0.3.1
 
 - Fixed app loading bug which led to some dependencies being missed.
