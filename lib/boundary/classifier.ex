@@ -27,7 +27,9 @@ defmodule Boundary.Classifier do
   defp find_boundary(trie, module) when is_atom(module) do
     case Boundary.Definition.classified_to(module) do
       nil ->
-        find_boundary(trie, Module.split(module))
+        if Boundary.protocol_impl?(module),
+          do: nil,
+          else: find_boundary(trie, Module.split(module))
 
       classified_to ->
         boundary = find_boundary(trie, classified_to.boundary)

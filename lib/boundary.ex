@@ -518,7 +518,8 @@ defmodule Boundary do
         do: module
   end
 
-  defp protocol_impl?(module) do
+  @doc false
+  def protocol_impl?(module) do
     # Not sure why, but sometimes the protocol implementation isn't loaded.
     Code.ensure_loaded(module)
     function_exported?(module, :__impl__, 1)
