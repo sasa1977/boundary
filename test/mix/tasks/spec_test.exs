@@ -1,5 +1,5 @@
 defmodule Mix.Tasks.Boundary.SpecTest do
-  use Boundary.ProjectTestCaseTemplate, async: true
+  use Boundary.ProjectTestCase, async: true
 
   test "produces the expected output", context do
     File.write!(
@@ -26,10 +26,10 @@ defmodule Mix.Tasks.Boundary.SpecTest do
       """
     )
 
-    mix!(context.project.path, ~w/compile/)
+    TestProject.compile!(context.project)
 
     output =
-      mix!(context.project.path, ~w/boundary.spec/)
+      TestProject.mix!(context.project, ~w/boundary.spec/)
       |> String.split("\n")
       |> Enum.map(&String.trim_trailing/1)
       |> Enum.join("\n")

@@ -379,7 +379,7 @@ defmodule Boundary do
 
   @doc "Builds the boundary-specific view of the given application."
   @spec view(atom) :: view
-  def view(app), do: build_view(app, app_modules(app))
+  def view(app), do: build_view(app)
 
   @doc """
   Returns definitions of all boundaries.
@@ -428,9 +428,17 @@ defmodule Boundary do
   @spec app(view, module) :: atom | nil
   def app(view, module), do: Map.get(view.module_to_app, module)
 
-  @doc false
-  # credo:disable-for-next-line Credo.Check.Readability.Specs
-  def build_view(app_name, app_modules \\ []) do
+  @doc "Returns true if the module is an implementation of some protocol."
+  @spec protocol_impl?(module) :: boolean
+  def protocol_impl?(module) do
+    # Not sure why, but sometimes the protocol implementation isn't loaded.
+    Code.ensure_loaded(module)
+    function_exported?(module, :__impl__, 1)
+  end
+
+  defp build_view(main_app) do
+    main_app_modules = app_modules(main_app)
+
     module_to_app =
       for {app, _description, _vsn} <- Application.loaded_applications(),
           module <- app_modules(app),
@@ -438,21 +446,21 @@ defmodule Boundary do
           do: {module, app}
 
     %{boundaries: boundaries, modules: classified_modules} =
-      app_name
-      |> load_apps_and_boundaries(app_modules, module_to_app)
+      main_app
+      |> load_apps_and_boundaries(main_app_modules, module_to_app)
       |> Enum.reduce(Classifier.new(), &Classifier.classify(&2, &1.modules, &1.boundaries))
 
     %{
       boundaries: boundaries,
       classified_modules: classified_modules,
-      unclassified_modules: unclassified_modules(app_modules, classified_modules),
+      unclassified_modules: unclassified_modules(main_app_modules, classified_modules),
       module_to_app: module_to_app
     }
   end
 
-  defp load_apps_and_boundaries(app_name, app_modules, module_to_app) do
+  defp load_apps_and_boundaries(main_app, main_app_modules, module_to_app) do
     # fetch boundaries of this app
-    app_boundaries = load_app_boundaries(app_name, app_modules, module_to_app)
+    app_boundaries = load_app_boundaries(main_app, main_app_modules, module_to_app)
 
     # fetch and index all deps
     all_deps =
@@ -492,7 +500,7 @@ defmodule Boundary do
         end
       )
 
-    [%{modules: app_modules, boundaries: app_boundaries} | external_boundaries]
+    [%{modules: main_app_modules, boundaries: app_boundaries} | external_boundaries]
   end
 
   defp load_app_boundaries(app_name, modules, module_to_app) do
@@ -509,20 +517,13 @@ defmodule Boundary do
     end
   end
 
-  defp unclassified_modules(app_modules, classified_modules) do
+  defp unclassified_modules(main_app_modules, classified_modules) do
     # gather unclassified modules of this app
-    for module <- app_modules,
+    for module <- main_app_modules,
         not Map.has_key?(classified_modules, module),
         not protocol_impl?(module),
         into: MapSet.new(),
         do: module
-  end
-
-  @doc false
-  def protocol_impl?(module) do
-    # Not sure why, but sometimes the protocol implementation isn't loaded.
-    Code.ensure_loaded(module)
-    function_exported?(module, :__impl__, 1)
   end
 
   defp app_modules(app),

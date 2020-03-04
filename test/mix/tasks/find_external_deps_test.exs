@@ -1,5 +1,5 @@
 defmodule Mix.Tasks.Boundary.FindExternalDepsTest do
-  use Boundary.ProjectTestCaseTemplate, async: true
+  use Boundary.ProjectTestCase, async: true
 
   test "produces the expected output", context do
     File.write!(
@@ -20,10 +20,10 @@ defmodule Mix.Tasks.Boundary.FindExternalDepsTest do
       """
     )
 
-    mix!(context.project.path, ~w/compile/)
+    TestProject.compile!(context.project)
 
     output =
-      mix!(context.project.path, ~w/boundary.find_external_deps/)
+      TestProject.mix!(context.project, ~w/boundary.find_external_deps/)
       |> String.split("\n")
       |> Enum.map(&String.trim_trailing/1)
       |> Enum.join("\n")
