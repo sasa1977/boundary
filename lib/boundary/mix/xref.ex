@@ -31,7 +31,7 @@ defmodule Boundary.Mix.Xref do
     |> Enum.each(&:ets.delete(@calls_table, &1))
 
     :ets.delete_all_objects(@seen_table)
-    :ets.tab2file(@calls_table, to_charlist(manifest()))
+    :ets.tab2file(@calls_table, to_charlist(Boundary.Mix.manifest_path("boundary")))
   end
 
   @doc "Returns a lazy stream where each element is of type `Boundary.call()`"
@@ -48,26 +48,20 @@ defmodule Boundary.Mix.Xref do
   @impl GenServer
   def init(nil) do
     :ets.new(@seen_table, [:set, :public, :named_table, read_concurrency: true, write_concurrency: true])
-
-    manifest = manifest()
-
-    if Mix.Utils.stale?([Mix.Project.config_mtime()], [manifest]),
-      do: build_manifest(),
-      else: read_manifest(manifest)
-
+    read_manifest() || build_manifest()
     {:ok, %{}}
   end
 
   defp build_manifest, do: :ets.new(@calls_table, [:named_table, :public, :duplicate_bag, write_concurrency: true])
 
-  defp read_manifest(manifest) do
-    {:ok, table} = :ets.file2tab(String.to_charlist(manifest))
-    table
+  defp read_manifest do
+    unless Boundary.Mix.stale_manifest?("boundary") do
+      {:ok, table} = :ets.file2tab(String.to_charlist(Boundary.Mix.manifest_path("boundary")))
+      table
+    end
   rescue
-    _ -> build_manifest()
+    _ -> nil
   end
-
-  defp manifest, do: Path.join(Mix.Project.manifest_path(Mix.Project.config()), "compile.boundary")
 
   defp stored_modules do
     Stream.unfold(

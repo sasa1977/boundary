@@ -375,7 +375,11 @@ defmodule Boundary do
 
   @doc "Builds the boundary-specific view of the given application."
   @spec view(atom) :: view
-  def view(app), do: View.build(app)
+  def view(app), do: view(app, nil)
+
+  @doc false
+  @spec view(atom, module | nil) :: view
+  def view(app, cacher), do: View.build(app, cacher)
 
   @doc """
   Returns definitions of all boundaries.

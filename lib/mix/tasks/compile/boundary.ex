@@ -139,10 +139,18 @@ defmodule Mix.Tasks.Compile.Boundary do
     Code.put_compiler_option(:tracers, tracers)
     Xref.flush(Application.spec(Boundary.Mix.app_name(), :modules) || [])
 
-    errors = check(Boundary.view(Boundary.Mix.app_name()), Xref.calls())
+    view = Boundary.view(Boundary.Mix.app_name(), __MODULE__)
+
+    errors = check(view, Xref.calls())
     print_diagnostic_errors(errors)
     {status(errors, argv), diagnostics ++ errors}
   end
+
+  @doc false
+  def read_cached, do: Boundary.Mix.read_manifest("boundary_externals")
+
+  @doc false
+  def store_cache(data), do: Boundary.Mix.write_manifest("boundary_externals", data)
 
   defp status([], _), do: :ok
   defp status([_ | _], argv), do: if(warnings_as_errors?(argv), do: :error, else: :ok)
