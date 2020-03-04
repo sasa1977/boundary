@@ -200,6 +200,20 @@ defmodule Mix.Tasks.Compile.Boundary do
     )
   end
 
+  defp to_diagnostic_error({:unknown_export, export}) do
+    diagnostic("unknown module #{inspect(export.name)} is listed as an export",
+      file: Path.relative_to_cwd(export.file),
+      position: export.line
+    )
+  end
+
+  defp to_diagnostic_error({:export_not_in_boundary, export}) do
+    diagnostic("module #{inspect(export.name)} can't be exported because it's not a part of this boundary",
+      file: Path.relative_to_cwd(export.file),
+      position: export.line
+    )
+  end
+
   defp to_diagnostic_error({:cycle, cycle}) do
     cycle = cycle |> Stream.map(&inspect/1) |> Enum.join(" -> ")
     diagnostic("dependency cycle found:\n#{cycle}\n")

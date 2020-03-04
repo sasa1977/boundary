@@ -6,6 +6,7 @@ defmodule Boundary.Checker do
   def errors(view, calls) do
     Enum.concat([
       invalid_deps(view),
+      invalid_exports(view),
       cycles(view),
       unclassified_modules(view),
       invalid_calls(view, calls)
@@ -23,6 +24,27 @@ defmodule Boundary.Checker do
   defp validate_dep(nil, dep), do: {:unknown_dep, dep}
   defp validate_dep(%{ignore?: true}, dep), do: {:ignored_dep, dep}
   defp validate_dep(_boundary, _dep), do: nil
+
+  defp invalid_exports(view) do
+    for boundary <- Boundary.all(view),
+        export <- boundary.exports,
+        error = validate_export(view, boundary, %{name: export, file: boundary.file, line: boundary.line}),
+        into: MapSet.new(),
+        do: error
+  end
+
+  defp validate_export(view, boundary, export) do
+    cond do
+      is_nil(Boundary.app(view, export.name)) ->
+        {:unknown_export, export}
+
+      (Boundary.for_module(view, export.name) || %{name: nil}).name != boundary.name ->
+        {:export_not_in_boundary, export}
+
+      true ->
+        nil
+    end
+  end
 
   defp cycles(view) do
     graph = :digraph.new([:cyclic])
