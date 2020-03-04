@@ -455,9 +455,62 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               end
               """ do
     assert [warning] = warnings
-    assert warning.message == "forbidden call to LibWithBoundaries.Boundary2.fun/0"
-    assert warning.explanation == "(calls from #{unquote(module1)} to LibWithBoundaries.Boundary2 are not allowed)"
+    assert warning.message == "forbidden runtime call to LibWithBoundaries.Boundary2.fun/0"
+
+    assert warning.explanation ==
+             "(runtime calls from #{unquote(module1)} to LibWithBoundaries.Boundary2 are not allowed)"
+
     assert warning.line == 8
+  end
+
+  module1 = unique_module_name()
+
+  module_test "reports invalid option",
+              """
+              defmodule #{module1} do
+                use Boundary, foo: :bar
+              end
+              """ do
+    assert [%{message: "unknown option :foo"}] = warnings
+  end
+
+  module1 = unique_module_name()
+
+  module_test "can't use dep or export in an ignored boundary",
+              """
+              defmodule #{module1} do
+                use Boundary, ignore?: true, exports: [Foo], deps: [#{module1}.Bar]
+
+                defmodule Foo do end
+                defmodule Bar do use Boundary end
+              end
+              """ do
+    assert [
+             %{message: "deps can't be provided in an ignored boundary"},
+             %{message: "exports can't be provided in an ignored boundary"}
+           ] = warnings
+  end
+
+  module1 = unique_module_name()
+
+  module_test "invalid externals_mode",
+              """
+              defmodule #{module1} do
+                use Boundary, externals_mode: :invalid
+              end
+              """ do
+    assert [%{message: "invalid externals_mode"}] = warnings
+  end
+
+  module1 = unique_module_name()
+
+  module_test "can't provide extra externals in strict mode",
+              """
+              defmodule #{module1} do
+                use Boundary, externals_mode: :strict, extra_externals: [:mix]
+              end
+              """ do
+    assert [%{message: "extra_externals can't be provided in strict mode"}] = warnings
   end
 
   defp lib_with_boundaries do

@@ -219,12 +219,18 @@ defmodule Mix.Tasks.Compile.Boundary do
     diagnostic("dependency cycle found:\n#{cycle}\n")
   end
 
-  defp to_diagnostic_error({:invalid_call, %{type: :invalid_cross_boundary_call} = error}) do
+  defp to_diagnostic_error({:invalid_call, %{type: type} = error}) when type in ~w/runtime call/a do
     {m, f, a} = error.callee
 
+    call_display =
+      case type do
+        :runtime -> "runtime call"
+        :call -> "call"
+      end
+
     message =
-      "forbidden call to #{Exception.format_mfa(m, f, a)}\n" <>
-        "  (calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)\n" <>
+      "forbidden #{call_display} to #{Exception.format_mfa(m, f, a)}\n" <>
+        "  (#{call_display}s from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)\n" <>
         "  (call originated from #{inspect(error.caller)})"
 
     diagnostic(message, file: Path.relative_to_cwd(error.file), position: error.line)
@@ -250,6 +256,41 @@ defmodule Mix.Tasks.Compile.Boundary do
         "  (call originated from #{inspect(error.caller)})"
 
     diagnostic(message, file: Path.relative_to_cwd(error.file), position: error.line)
+  end
+
+  defp to_diagnostic_error({:unknown_option, data}) do
+    diagnostic("unknown option #{inspect(data.name)}",
+      file: Path.relative_to_cwd(data.file),
+      position: data.line
+    )
+  end
+
+  defp to_diagnostic_error({:dep_in_ignored_boundary, data}) do
+    diagnostic("deps can't be provided in an ignored boundary",
+      file: Path.relative_to_cwd(data.file),
+      position: data.line
+    )
+  end
+
+  defp to_diagnostic_error({:export_in_ignored_boundary, data}) do
+    diagnostic("exports can't be provided in an ignored boundary",
+      file: Path.relative_to_cwd(data.file),
+      position: data.line
+    )
+  end
+
+  defp to_diagnostic_error({:invalid_externals_mode, data}) do
+    diagnostic("invalid externals_mode",
+      file: Path.relative_to_cwd(data.file),
+      position: data.line
+    )
+  end
+
+  defp to_diagnostic_error({:extra_externals_in_strict_mode, data}) do
+    diagnostic("extra_externals can't be provided in strict mode",
+      file: Path.relative_to_cwd(data.file),
+      position: data.line
+    )
   end
 
   defp module_source(module) do

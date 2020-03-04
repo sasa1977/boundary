@@ -330,7 +330,8 @@ defmodule Boundary do
           file: String.t(),
           line: pos_integer,
           implicit?: boolean,
-          app: atom
+          app: atom,
+          errors: [term]
         }
 
   @type view :: map

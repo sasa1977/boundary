@@ -5,6 +5,7 @@ defmodule Boundary.Checker do
 
   def errors(view, calls) do
     Enum.concat([
+      invalid_config(view),
       invalid_deps(view),
       invalid_exports(view),
       cycles(view),
@@ -20,6 +21,8 @@ defmodule Boundary.Checker do
         into: MapSet.new(),
         do: error
   end
+
+  defp invalid_config(view), do: view |> Boundary.all() |> Enum.flat_map(& &1.errors)
 
   defp validate_dep(nil, dep), do: {:unknown_dep, dep}
   defp validate_dep(%{ignore?: true}, dep), do: {:ignored_dep, dep}
@@ -98,7 +101,7 @@ defmodule Boundary.Checker do
     cond do
       to_boundary.ignore? -> nil
       cross_app_call?(view, call) and not check_external_dep?(view, call, from_boundary) -> nil
-      not allowed?(from_boundary, to_boundary, call.mode) -> {:invalid_cross_boundary_call, to_boundary.name}
+      not allowed?(from_boundary, to_boundary, call.mode) -> invalid_cross_call_error(call, from_boundary, to_boundary)
       not exported?(to_boundary, call.callee_module) -> {:not_exported, to_boundary.name}
       true -> nil
     end
@@ -119,6 +122,15 @@ defmodule Boundary.Checker do
         _ -> false
       end
     )
+  end
+
+  defp invalid_cross_call_error(call, from_boundary, to_boundary) do
+    tag =
+      if call.mode == :runtime and Enum.member?(from_boundary.deps, {to_boundary.name, :compile}),
+        do: :runtime,
+        else: :call
+
+    {tag, to_boundary.name}
   end
 
   defp cross_app_call?(view, call),

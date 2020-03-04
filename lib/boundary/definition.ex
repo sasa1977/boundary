@@ -61,36 +61,51 @@ defmodule Boundary.Definition do
   @doc false
   def normalize(app, boundary, definition, env) do
     definition
-    |> normalize!()
+    |> normalize!(app, env)
     |> expand_exports(boundary)
     |> normalize_deps()
-    |> Map.merge(%{file: env.file, line: env.line, app: app})
   end
 
-  defp normalize!(definition) do
-    definition = Map.new(definition)
+  defp normalize!(user_opts, app, env) do
+    defaults()
+    |> Map.merge(%{file: env.file, line: env.line, app: app})
+    |> merge_user_opts(user_opts)
+    |> validate(&if &1.ignore? and &1.deps != [], do: :dep_in_ignored_boundary)
+    |> validate(&if &1.ignore? and &1.exports != [], do: :export_in_ignored_boundary)
+    |> validate(&if &1.externals_mode not in ~w/strict relaxed/a, do: :invalid_externals_mode)
+    |> validate(&if &1.externals_mode == :strict and &1.extra_externals != [], do: :extra_externals_in_strict_mode)
+  end
 
+  defp merge_user_opts(definition, user_opts) do
+    user_opts = Map.new(user_opts)
     valid_keys = ~w/deps exports ignore? extra_externals externals_mode/a
 
-    with [_ | _] = invalid_options <- definition |> Map.keys() |> Enum.reject(&(&1 in valid_keys)) do
-      error = "Invalid options: #{invalid_options |> Stream.map(&inspect/1) |> Enum.join(", ")}"
-      raise ArgumentError, error
-    end
-
-    definition = Map.merge(defaults(), definition)
-
-    if definition.ignore? == true do
-      if definition.deps != [], do: raise(ArgumentError, message: "deps are not allowed in ignored boundaries")
-      if definition.exports != [], do: raise(ArgumentError, message: "exports are not allowed in ignored boundaries")
-    end
-
-    if definition.externals_mode not in ~w/strict relaxed/a,
-      do: raise(ArgumentError, message: "externals_mode must be :strict or :relaxed ")
-
-    if definition.externals_mode == :strict and definition.extra_externals != [],
-      do: raise(ArgumentError, message: "extra externals can't be provided in strict mode")
-
     definition
+    |> Map.merge(Map.take(user_opts, valid_keys))
+    |> add_errors(user_opts |> Map.drop(valid_keys) |> Map.keys() |> Enum.map(&{:unknown_option, name: &1}))
+  end
+
+  defp expand_exports(definition, boundary) do
+    update_in(
+      definition.exports,
+      fn exports ->
+        expanded_aliases = Enum.map(exports, &Module.concat(boundary, &1))
+        [boundary | expanded_aliases]
+      end
+    )
+  end
+
+  defp normalize_deps(definition) do
+    update_in(
+      definition.deps,
+      &Enum.map(
+        &1,
+        fn
+          {_dep, _type} = dep -> dep
+          dep when is_atom(dep) -> {dep, :runtime}
+        end
+      )
+    )
   end
 
   defp defaults do
@@ -100,34 +115,25 @@ defmodule Boundary.Definition do
       ignore?: false,
       externals: [],
       extra_externals: [],
-      externals_mode: Mix.Project.config() |> Keyword.get(:boundary, []) |> Keyword.get(:externals_mode, :relaxed)
+      externals_mode: Mix.Project.config() |> Keyword.get(:boundary, []) |> Keyword.get(:externals_mode, :relaxed),
+      errors: []
     }
   end
 
-  defp expand_exports(definition, boundary) do
-    with %{ignore?: false} <- definition do
-      update_in(
-        definition.exports,
-        fn exports ->
-          expanded_aliases = Enum.map(exports, &Module.concat(boundary, &1))
-          [boundary | expanded_aliases]
-        end
-      )
-    end
+  defp add_errors(definition, errors) do
+    errors = Enum.map(errors, &full_error(&1, definition))
+    update_in(definition.errors, &Enum.concat(&1, errors))
   end
 
-  defp normalize_deps(definition) do
-    with %{ignore?: false} <- definition do
-      update_in(
-        definition.deps,
-        &Enum.map(
-          &1,
-          fn
-            {_dep, _type} = dep -> dep
-            dep when is_atom(dep) -> {dep, :runtime}
-          end
-        )
-      )
+  defp full_error(tag, definition) when is_atom(tag), do: full_error({tag, []}, definition)
+
+  defp full_error({tag, data}, definition),
+    do: {tag, data |> Map.new() |> Map.merge(Map.take(definition, ~w/file line/a))}
+
+  defp validate(definition, check) do
+    case check.(definition) do
+      nil -> definition
+      error -> add_errors(definition, [error])
     end
   end
 end

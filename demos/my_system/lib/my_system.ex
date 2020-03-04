@@ -1,8 +1,7 @@
 defmodule MySystem do
   use Boundary,
     exports: [User],
-    deps: [Ecto, {Mix, :compile}],
-    externals_mode: :strict
+    deps: [Ecto, {Mix, :compile}]
 
   Mix.env()
 
