@@ -1,3 +1,9 @@
+# 0.4.0
+
+- Support for permitting dep to be used only at compile time via `deps: [{SomeDep, :compile}]`.
+- Support for alias-like grouping (e.g. `deps: [Ecto.{Changeset, Query}]`)
+- The boundary compiler now caches boundaries from external dependencies, which significantly reduces check duration in the cases where the client app doesn't need to be fully recompiled.
+
 # 0.3.2
 
 - Eliminates duplicate warnings
