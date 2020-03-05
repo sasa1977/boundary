@@ -4,7 +4,13 @@
 [![hexdocs.pm](https://img.shields.io/badge/docs-latest-green.svg?style=flat-square)](https://hexdocs.pm/boundary/)
 [![Build Status](https://travis-ci.org/sasa1977/boundary.svg?branch=master)](https://travis-ci.org/sasa1977/boundary)
 
-Boundary is a library which helps managing and restraining cross-module dependencies in Elixir projects.
+Boundary is a library which helps managing and restraining cross-module dependencies in Elixir projects. A few examples of the things you can do with boundary include:
+
+- Prevent invocations from the context layer to the web layer
+- Prevent invocations from the web layer to internal context modules
+- Prevent usage of Phoenix and Plug in the context layer
+- Limit usage of Ecto in the web layer to only Ecto.Changeset
+- Allow `:mix` modules to be used only at compile time
 
 ## Warning
 
@@ -19,6 +25,25 @@ For a detailed reference see docs for [Boundary module](https://hexdocs.pm/bound
 To use this library, you first need to define the boundaries of your project. A __boundary__ is a named group of one or more modules. Each boundary exports some (but not all!) of its modules, and can depend on other boundaries. During compilation, the boundary compiler will find and report all cross-module function calls which are not permitted according to the boundary configuration.
 
 ### Example
+
+Add boundary as a dependency in mix.exs:
+
+```elixir
+defmodule MySystem.MixProject do
+  use Mix.Project
+
+  # ...
+
+  defp deps do
+    [
+      {:boundary, "~> 0.4.0", runtime: false},
+      # ...
+    ]
+  end
+
+  # ...
+end
+```
 
 The following code defines boundaries for a typical Phoenix based project generated with `mix phx.new`.
 
@@ -100,7 +125,7 @@ Because `boundary` is implemented as a mix compiler, it integrates seamlessly wi
 ## Roadmap
 
 - [x] validate calls to external deps (e.g. preventing `Ecto` usage from `MySystemWeb`, or `Plug` usage from `MySystem`)
-- [ ] support compile time vs runtime deps
+- [x] support compile time vs runtime deps
 - [ ] support nested boundaries (defining internal boundaries within a boundary)
 - [ ] support Erlang modules
 
