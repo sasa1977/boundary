@@ -6,8 +6,13 @@ defmodule Boundary do
   boundaries.
 
   Boundary definitions can be used in combination with `Mix.Tasks.Compile.Boundary` to restrain
-  cross-module dependencies. For example, you can use boundaries to prevent invocations
-  from the context layer (e.g. `MySystem`) to the UI layer (e.g. `MySystemWeb`).
+  cross-module dependencies. A few examples of what you can do with boundary include:
+
+  - Prevent invocations from the context layer to the web layer
+  - Prevent invocations from the web layer to internal context modules
+  - Prevent usage of Phoenix and Plug in the context layer
+  - Limit usage of Ecto in the web layer to only Ecto.Changeset
+  - Allow `:mix` modules to be used only at compile time
 
   ## Quick example
 
@@ -179,6 +184,12 @@ defmodule Boundary do
   Of course, in-boundary cross-module dependencies are always allowed (any module may use all
   other modules from the same boundary).
 
+  When listing deps and exports, a "grouping" syntax can also be used:
+
+  ```
+  use Boundary, deps: [Foo.{Bar, Baz}]
+  ```
+
   ### External dependencies
 
   By default, all dependencies on modules from other OTP applications are permitted. However, you can restrain such
@@ -229,7 +240,7 @@ defmodule Boundary do
   In this mode, boundary will report all calls to all external applications which are not explicitly allowed via the
   `:dep` option. You can also configure the strict mode globally in your mix.exs:
 
-  ```elixir
+  ```
   defmodule MySystem.MixProject do
     use Mix.Project
 
@@ -252,6 +263,28 @@ defmodule Boundary do
 
   If you want to discover which external applications are used by your boundaries, you can use the helper mix task
   `Mix.Tasks.Boundary.FindExternalDeps`.
+
+  ### Compile-time dependencies
+
+  By default, a dependency allows calls at both, compile time and runtime. In some cases you may want to permit calls to
+  some dependency only at compile-time. A typical example are modules from the `:mix` application. These modules are
+  not safe to be used at runtime. Limiting their usage to compile-time only can be done as follows:
+
+  ```
+  use Boundary, deps: [{Mix, :compile}]
+  ```
+
+  With such configuration, the following calls are allowed:
+
+  - Function invocations at compile time (i.e. outside of any function, or in `unquote(...)`).
+  - Macro invocations anywhere in the code.
+
+  Note that you might have some modules which will require runtime dependency on mix, such as custom mix tasks. It's
+  advised to group such modules under a common boundary, such as `MySystem.Mix`, and allow `mix` as a runtime
+  dependency only in that boundary.
+
+  Finally, it's worth noting that it's not possible to permit some dependency only at runtime. If a dependency is
+  allowed at runtime, then it can also be used at compile time.
 
   ## Ignored boundaries
 
