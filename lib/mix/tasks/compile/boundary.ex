@@ -48,7 +48,7 @@ defmodule Mix.Tasks.Compile.Boundary do
     # ...
 
     defp extra_compilers(:prod), do: []
-    defp extra_compilers(_env), do: [:boundaries]
+    defp extra_compilers(_env), do: [:boundary]
   end
   ```
 
