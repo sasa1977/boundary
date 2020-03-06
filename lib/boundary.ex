@@ -278,6 +278,7 @@ defmodule Boundary do
 
   - Function invocations at compile time (i.e. outside of any function, or in `unquote(...)`).
   - Macro invocations anywhere in the code.
+  - Any invocations made from a public macro.
 
   Note that you might have some modules which will require runtime dependency on mix, such as custom mix tasks. It's
   advised to group such modules under a common boundary, such as `MySystem.Mix`, and allow `mix` as a runtime
@@ -375,6 +376,7 @@ defmodule Boundary do
   @type call :: %{
           callee: mfa,
           callee_module: module,
+          caller: mfa,
           caller_module: module,
           file: String.t(),
           line: pos_integer,

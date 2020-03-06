@@ -5,6 +5,14 @@ defmodule Boundary.Mix.Xref do
   @calls_table __MODULE__.Calls
   @seen_table __MODULE__.Seen
 
+  @type call :: %{
+          callee: mfa,
+          caller_function: {atom, non_neg_integer} | nil,
+          file: String.t(),
+          line: non_neg_integer,
+          mode: :compile | :runtime
+        }
+
   @spec start_link :: GenServer.on_start()
   def start_link do
     result = GenServer.start_link(__MODULE__, nil, name: __MODULE__)
@@ -15,7 +23,7 @@ defmodule Boundary.Mix.Xref do
     result
   end
 
-  @spec add_call(module, %{callee: mfa, file: String.t(), line: non_neg_integer, mode: :compile | :runtime}) :: :ok
+  @spec add_call(module, call) :: :ok
   def add_call(caller, call) do
     if :ets.insert_new(@seen_table, {caller}), do: :ets.delete(@calls_table, caller)
     unless match?({^caller, _fun, _arg}, call.callee), do: :ets.insert(@calls_table, {caller, call})
@@ -39,8 +47,14 @@ defmodule Boundary.Mix.Xref do
   def calls do
     Enum.map(
       :ets.tab2list(@calls_table),
-      fn {caller, %{callee: {callee, _fun, _arity}} = meta} ->
-        Map.merge(meta, %{caller_module: caller, callee_module: callee})
+      fn {caller_module, %{callee: {callee, _fun, _arity}} = meta} ->
+        caller =
+          case meta.caller_function do
+            {name, arity} -> {caller_module, name, arity}
+            _ -> nil
+          end
+
+        Map.merge(meta, %{caller: caller, caller_module: caller_module, callee_module: callee})
       end
     )
   end

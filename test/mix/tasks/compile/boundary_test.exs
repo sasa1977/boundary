@@ -452,6 +452,11 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
                   LibWithBoundaries.Boundary2.macro()
                   LibWithBoundaries.Boundary2.fun()
                 end
+
+                defmacro macro do
+                  # this is also allowed because we're invoking the function during compilation
+                  LibWithBoundaries.Boundary2.fun()
+                end
               end
               """ do
     assert [warning] = warnings

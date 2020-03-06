@@ -101,7 +101,7 @@ defmodule Boundary.Checker do
     cond do
       to_boundary.ignore? -> nil
       cross_app_call?(view, call) and not check_external_dep?(view, call, from_boundary) -> nil
-      not allowed?(from_boundary, to_boundary, call.mode) -> invalid_cross_call_error(call, from_boundary, to_boundary)
+      not allowed?(from_boundary, to_boundary, call) -> invalid_cross_call_error(call, from_boundary, to_boundary)
       not exported?(to_boundary, call.callee_module) -> {:not_exported, to_boundary.name}
       true -> nil
     end
@@ -113,16 +113,20 @@ defmodule Boundary.Checker do
          Enum.member?(from_boundary.externals, Boundary.app(view, call.callee_module)))
   end
 
-  defp allowed?(from_boundary, %{name: name}, mode) do
+  defp allowed?(from_boundary, %{name: name}, call) do
     Enum.any?(
       from_boundary.deps,
       fn
         {^name, :runtime} -> true
-        {^name, :compile} -> mode == :compile
+        {^name, :compile} -> compile_time_call?(call)
         _ -> false
       end
     )
   end
+
+  defp compile_time_call?(%{mode: :compile}), do: true
+  defp compile_time_call?(%{caller: {module, name, arity}}), do: macro_exported?(module, name, arity)
+  defp compile_time_call?(_), do: false
 
   defp invalid_cross_call_error(call, from_boundary, to_boundary) do
     tag =

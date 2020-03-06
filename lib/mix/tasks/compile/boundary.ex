@@ -105,6 +105,7 @@ defmodule Mix.Tasks.Compile.Boundary do
         env.module,
         %{
           callee: {callee_module, name, arity},
+          caller_function: env.function,
           file: Path.relative_to_cwd(env.file),
           line: Keyword.get(meta, :line, env.line),
           mode:
