@@ -1,3 +1,7 @@
+# 0.4.2
+
+- Remote calls from macro are treated as compile-time calls.
+
 # 0.4.1
 
 - Fixes false positive report of an unknown external boundary.
