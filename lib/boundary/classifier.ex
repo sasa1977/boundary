@@ -1,10 +1,10 @@
 defmodule Boundary.Classifier do
   @moduledoc false
 
-  @type t :: %{boundaries: %{Boundary.name() => Boundary.t()}, modules: %{module() => Boundary.name()}}
+  @type t :: %{key: term, boundaries: %{Boundary.name() => Boundary.t()}, modules: %{module() => Boundary.name()}}
 
-  @spec new :: t
-  def new, do: %{boundaries: %{}, modules: %{}}
+  @spec new(term) :: t
+  def new(key), do: %{boundaries: %{}, modules: %{}, key: key}
 
   @spec classify(t, [module], [Boundary.t()]) :: t
   def classify(classifier, modules, boundaries) do

@@ -31,7 +31,14 @@ defmodule Boundary.View do
     main_app_modules = app_modules(main_app)
     main_app_boundaries = load_app_boundaries(main_app, main_app_modules, module_to_app)
 
-    classifier = (cacher && cacher.read_cached()) || classify_externals(main_app_boundaries, module_to_app, cacher)
+    classifier =
+      with false <- is_nil(cacher),
+           classifier when not is_nil(classifier) <- cacher.read_cached(),
+           true <- MapSet.equal?(classifier.key, all_externals(main_app_boundaries)) do
+        classifier
+      else
+        _ -> classify_externals(main_app_boundaries, module_to_app, cacher)
+      end
 
     Classifier.classify(classifier, main_app_modules, main_app_boundaries)
   end
@@ -40,12 +47,19 @@ defmodule Boundary.View do
     classifier =
       Enum.reduce(
         load_external_boundaries(main_app_boundaries, module_to_app),
-        Classifier.new(),
+        Classifier.new(all_externals(main_app_boundaries)),
         &Classifier.classify(&2, &1.modules, &1.boundaries)
       )
 
     cacher && cacher.store_cache(classifier)
     classifier
+  end
+
+  defp all_externals(main_app_boundaries) do
+    for boundary <- main_app_boundaries,
+        external <- boundary.externals,
+        into: MapSet.new(),
+        do: external
   end
 
   defp load_app_boundaries(app_name, modules, module_to_app) do
