@@ -1,3 +1,7 @@
+# 0.4.1
+
+- Fixes false positive report of an unknown external boundary.
+
 # 0.4.0
 
 - Support for permitting dep to be used only at compile time via `deps: [{SomeDep, :compile}]`.
