@@ -468,11 +468,7 @@ defmodule Boundary do
 
   @doc "Returns true if the module is an implementation of some protocol."
   @spec protocol_impl?(module) :: boolean
-  def protocol_impl?(module) do
-    # Not sure why, but sometimes the protocol implementation isn't loaded.
-    Code.ensure_loaded(module)
-    function_exported?(module, :__impl__, 1)
-  end
+  def protocol_impl?(module), do: function_exported?(module, :__impl__, 1)
 
   defmodule Error do
     defexception [:message, :file, :line]

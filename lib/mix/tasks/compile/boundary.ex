@@ -134,17 +134,25 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp after_compiler({:error, _} = status, _argv), do: status
 
   defp after_compiler({status, diagnostics}, argv) when status in [:ok, :noop] do
-    Boundary.Mix.load_app()
+    new_loaded_apps = Boundary.Mix.load_app()
 
-    tracers = Enum.reject(Code.get_compiler_option(:tracers), &(&1 == __MODULE__))
-    Code.put_compiler_option(:tracers, tracers)
-    Xref.flush(Application.spec(Boundary.Mix.app_name(), :modules) || [])
+    try do
+      tracers = Enum.reject(Code.get_compiler_option(:tracers), &(&1 == __MODULE__))
+      Code.put_compiler_option(:tracers, tracers)
+      Xref.flush(Application.spec(Boundary.Mix.app_name(), :modules) || [])
 
-    view = Boundary.view(Boundary.Mix.app_name(), __MODULE__)
+      view = Boundary.view(Boundary.Mix.app_name(), __MODULE__)
 
-    errors = check(view, Xref.calls())
-    print_diagnostic_errors(errors)
-    {status(errors, argv), diagnostics ++ errors}
+      errors = check(view, Xref.calls())
+      print_diagnostic_errors(errors)
+      {status(errors, argv), diagnostics ++ errors}
+    after
+      # We're going to unload the apps we loaded to preserve the state of the beam instance intact. This resolves
+      # issues with ElixirLS which recompiles the project in the same beam instance. As a result, if we load the app
+      # once, it won't be reloaded on subsequent recompilations, and we'll get an incorrect modules list, which
+      # ultimately causes the crash in the compiler.
+      Enum.each(new_loaded_apps, &Application.unload/1)
+    end
   end
 
   @doc false

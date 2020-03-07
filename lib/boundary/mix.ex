@@ -6,10 +6,13 @@ defmodule Boundary.Mix do
   @spec app_name :: atom
   def app_name, do: Keyword.fetch!(Mix.Project.config(), :app)
 
-  @spec load_app :: :ok
+  @spec load_app :: MapSet.t(atom)
   def load_app do
+    loaded_apps_before = Enum.into(Application.loaded_applications(), MapSet.new(), fn {app, _, _} -> app end)
     load_app_recursive(app_name())
     load_compile_time_deps()
+    loaded_apps_after = Enum.into(Application.loaded_applications(), MapSet.new(), fn {app, _, _} -> app end)
+    MapSet.difference(loaded_apps_after, loaded_apps_before)
   end
 
   @spec manifest_path(String.t()) :: String.t()
