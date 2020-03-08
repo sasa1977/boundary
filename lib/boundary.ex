@@ -408,13 +408,8 @@ defmodule Boundary do
     end
   end
 
-  @doc "Builds the boundary-specific view of the given application."
   @spec view(atom) :: view
-  def view(app), do: view(app, nil)
-
-  @doc false
-  @spec view(atom, module | nil) :: view
-  def view(app, cacher), do: View.build(app, cacher)
+  def view(app), do: View.build(app)
 
   @doc """
   Returns definitions of all boundaries.
@@ -425,7 +420,7 @@ defmodule Boundary do
   functions of this module to acquire the information you need.
   """
   @spec all(view) :: [t]
-  def all(view), do: Map.values(view.boundaries)
+  def all(view), do: Map.values(view.classifier.boundaries)
 
   @doc """
   Returns the names of all boundaries.
@@ -433,25 +428,25 @@ defmodule Boundary do
   The result will include boundaries from listed externals, as well as implicit boundaries.
   """
   @spec all_names(view) :: [name]
-  def all_names(view), do: Map.keys(view.boundaries)
+  def all_names(view), do: Map.keys(view.classifier.boundaries)
 
   @doc "Returns the definition of the given boundary."
   @spec fetch!(view, name) :: t
-  def fetch!(view, name), do: Map.fetch!(view.boundaries, name)
+  def fetch!(view, name), do: Map.fetch!(view.classifier.boundaries, name)
 
   @doc "Returns the definition of the given boundary."
   @spec fetch(view, name) :: {:ok, t} | :error
-  def fetch(view, name), do: Map.fetch(view.boundaries, name)
+  def fetch(view, name), do: Map.fetch(view.classifier.boundaries, name)
 
   @doc "Returns the definition of the given boundary."
   @spec get(view, name) :: t | nil
-  def get(view, name), do: Map.get(view.boundaries, name)
+  def get(view, name), do: Map.get(view.classifier.boundaries, name)
 
   @doc "Returns definition of the boundary to which the given module belongs."
   @spec for_module(view, module) :: t | nil
   def for_module(view, module) do
-    with boundary when not is_nil(boundary) <- Map.get(view.classified_modules, module),
-         do: Map.fetch!(view.boundaries, boundary)
+    with boundary when not is_nil(boundary) <- Map.get(view.classifier.modules, module),
+         do: fetch!(view, boundary)
   end
 
   @doc "Returns the collection of unclassified modules."

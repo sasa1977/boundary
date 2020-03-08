@@ -134,14 +134,24 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp after_compiler({:error, _} = status, _argv), do: status
 
   defp after_compiler({status, diagnostics}, argv) when status in [:ok, :noop] do
-    new_loaded_apps = Boundary.Mix.load_app()
+    loaded_apps_before = Enum.into(Application.loaded_applications(), MapSet.new(), fn {app, _, _} -> app end)
 
     try do
+      # We're reloading the app to make sure we have the latest version. This fixes some potential invalid state in
+      # ElixirLS.
+      Application.unload(Boundary.Mix.app_name())
+      Application.load(Boundary.Mix.app_name())
       tracers = Enum.reject(Code.get_compiler_option(:tracers), &(&1 == __MODULE__))
       Code.put_compiler_option(:tracers, tracers)
       Xref.flush(Application.spec(Boundary.Mix.app_name(), :modules) || [])
 
-      view = Boundary.view(Boundary.Mix.app_name(), __MODULE__)
+      view =
+        case Boundary.Mix.read_manifest("boundary_view") do
+          nil -> rebuild_view()
+          view -> Boundary.View.refresh(view) || rebuild_view()
+        end
+
+      Boundary.Mix.write_manifest("boundary_view", Boundary.View.drop_main_app(view))
 
       errors = check(view, Xref.calls())
       print_diagnostic_errors(errors)
@@ -151,15 +161,17 @@ defmodule Mix.Tasks.Compile.Boundary do
       # issues with ElixirLS which recompiles the project in the same beam instance. As a result, if we load the app
       # once, it won't be reloaded on subsequent recompilations, and we'll get an incorrect modules list, which
       # ultimately causes the crash in the compiler.
-      Enum.each(new_loaded_apps, &Application.unload/1)
+      Application.loaded_applications()
+      |> Enum.into(MapSet.new(), fn {app, _, _} -> app end)
+      |> MapSet.difference(loaded_apps_before)
+      |> Enum.each(&Application.unload/1)
     end
   end
 
-  @doc false
-  def read_cached, do: Boundary.Mix.read_manifest("boundary_externals")
-
-  @doc false
-  def store_cache(data), do: Boundary.Mix.write_manifest("boundary_externals", data)
+  defp rebuild_view do
+    Boundary.Mix.load_app()
+    Boundary.View.build(Boundary.Mix.app_name())
+  end
 
   defp status([], _), do: :ok
   defp status([_ | _], argv), do: if(warnings_as_errors?(argv), do: :error, else: :ok)

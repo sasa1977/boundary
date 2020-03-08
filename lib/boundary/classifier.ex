@@ -1,10 +1,29 @@
 defmodule Boundary.Classifier do
   @moduledoc false
 
-  @type t :: %{key: term, boundaries: %{Boundary.name() => Boundary.t()}, modules: %{module() => Boundary.name()}}
+  @type t :: %{boundaries: %{Boundary.name() => Boundary.t()}, modules: %{module() => Boundary.name()}}
 
-  @spec new(term) :: t
-  def new(key), do: %{boundaries: %{}, modules: %{}, key: key}
+  @spec new :: t
+  def new, do: %{boundaries: %{}, modules: %{}}
+
+  @spec delete(t, atom) :: t
+  def delete(classifier, app) do
+    boundaries_to_delete =
+      classifier.boundaries
+      |> Map.values()
+      |> Stream.filter(&(&1.app == app))
+      |> Enum.map(& &1.name)
+
+    boundaries = Map.drop(classifier.boundaries, boundaries_to_delete)
+
+    modules =
+      for {_, boundary} = entry <- classifier.modules,
+          Map.has_key?(boundaries, boundary),
+          do: entry,
+          into: %{}
+
+    %{classifier | boundaries: boundaries, modules: modules}
+  end
 
   @spec classify(t, [module], [Boundary.t()]) :: t
   def classify(classifier, modules, boundaries) do
