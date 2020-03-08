@@ -1,3 +1,7 @@
+# 0.4.4
+
+- Fixed app config bug related to unloading
+
 # 0.4.3
 
 - Fixed a few bugs which were noticed in ElixirLS
