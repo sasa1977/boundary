@@ -134,38 +134,25 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp after_compiler({:error, _} = status, _argv), do: status
 
   defp after_compiler({status, diagnostics}, argv) when status in [:ok, :noop] do
-    loaded_apps_before = Enum.into(Application.loaded_applications(), MapSet.new(), fn {app, _, _} -> app end)
+    # We're reloading the app to make sure we have the latest version. This fixes potential stale state in ElixirLS.
+    Application.unload(Boundary.Mix.app_name())
+    Application.load(Boundary.Mix.app_name())
 
-    try do
-      # We're reloading the app to make sure we have the latest version. This fixes some potential invalid state in
-      # ElixirLS.
-      Application.unload(Boundary.Mix.app_name())
-      Application.load(Boundary.Mix.app_name())
-      tracers = Enum.reject(Code.get_compiler_option(:tracers), &(&1 == __MODULE__))
-      Code.put_compiler_option(:tracers, tracers)
-      Xref.flush(Application.spec(Boundary.Mix.app_name(), :modules) || [])
+    tracers = Enum.reject(Code.get_compiler_option(:tracers), &(&1 == __MODULE__))
+    Code.put_compiler_option(:tracers, tracers)
+    Xref.flush(Application.spec(Boundary.Mix.app_name(), :modules) || [])
 
-      view =
-        case Boundary.Mix.read_manifest("boundary_view") do
-          nil -> rebuild_view()
-          view -> Boundary.View.refresh(view) || rebuild_view()
-        end
+    view =
+      case Boundary.Mix.read_manifest("boundary_view") do
+        nil -> rebuild_view()
+        view -> Boundary.View.refresh(view) || rebuild_view()
+      end
 
-      Boundary.Mix.write_manifest("boundary_view", Boundary.View.drop_main_app(view))
+    Boundary.Mix.write_manifest("boundary_view", Boundary.View.drop_main_app(view))
 
-      errors = check(view, Xref.calls())
-      print_diagnostic_errors(errors)
-      {status(errors, argv), diagnostics ++ errors}
-    after
-      # We're going to unload the apps we loaded to preserve the state of the beam instance intact. This resolves
-      # issues with ElixirLS which recompiles the project in the same beam instance. As a result, if we load the app
-      # once, it won't be reloaded on subsequent recompilations, and we'll get an incorrect modules list, which
-      # ultimately causes the crash in the compiler.
-      Application.loaded_applications()
-      |> Enum.into(MapSet.new(), fn {app, _, _} -> app end)
-      |> MapSet.difference(loaded_apps_before)
-      |> Enum.each(&Application.unload/1)
-    end
+    errors = check(view, Xref.calls())
+    print_diagnostic_errors(errors)
+    {status(errors, argv), diagnostics ++ errors}
   end
 
   defp rebuild_view do

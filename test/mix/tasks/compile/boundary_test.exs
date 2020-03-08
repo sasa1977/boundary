@@ -628,18 +628,6 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
         )
       end)
     end
-
-    test "doesn't load new apps" do
-      module1 = unique_module_name()
-      loaded_apps_before = Enum.into(Application.loaded_applications(), MapSet.new(), fn {app, _, _} -> app end)
-
-      TestProject.in_project(fn project ->
-        File.write!(Path.join([project.path, "lib", "mod1.ex"]), "defmodule #{module1} do end")
-        TestProject.compile()
-        loaded_apps_after = Enum.into(Application.loaded_applications(), MapSet.new(), fn {app, _, _} -> app end)
-        assert MapSet.equal?(loaded_apps_before, loaded_apps_after)
-      end)
-    end
   end
 
   defp in_lib_with_boundaries(fun) do
