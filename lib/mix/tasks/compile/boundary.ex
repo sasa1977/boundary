@@ -182,7 +182,7 @@ defmodule Mix.Tasks.Compile.Boundary do
   end
 
   defp print_diagnostic_errors(errors) do
-    if errors != [], do: IO.puts("")
+    if errors != [], do: Mix.shell().info("")
     Enum.each(errors, &print_diagnostic_error/1)
   end
 

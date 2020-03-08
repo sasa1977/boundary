@@ -1,51 +1,84 @@
+# credo:disable-for-this-file Credo.Check.Readability.Specs
 defmodule Boundary.TestProject do
   @moduledoc false
 
-  # credo:disable-for-this-file Credo.Check.Readability.Specs
-  def mix!(project, args) do
-    {:ok, output} = mix(project, args)
-    output
-  end
+  def in_project(opts \\ [], fun) do
+    loaded_apps_before = Enum.into(Application.loaded_applications(), MapSet.new(), fn {app, _, _} -> app end)
+    %{name: name, file: file} = Mix.Project.pop()
+    tmp_path = Path.absname("tmp/#{:erlang.unique_integer(~w/positive monotonic/a)}")
 
-  def mix(project, args) do
-    case System.cmd("mix", args, stderr_to_stdout: true, cd: project.path) do
-      {output, 0} -> {:ok, output}
-      {output, _} -> {:error, output}
+    app_name = "test_project_#{:erlang.unique_integer(~w/positive monotonic/a)}"
+    app = String.to_atom(app_name)
+    project = %{app: app, path: Path.join(tmp_path, app_name)}
+
+    try do
+      File.rm_rf(project.path)
+
+      Mix.Task.clear()
+      :ok = Mix.Tasks.New.run([project.path])
+      reinitialize(project, opts)
+
+      Mix.Project.in_project(app, project.path, [], fn _module -> fun.(project) end)
+    after
+      Mix.Project.push(name, file)
+
+      Application.loaded_applications()
+      |> Enum.into(MapSet.new(), fn {app, _, _} -> app end)
+      |> MapSet.difference(loaded_apps_before)
+      |> Enum.each(&Application.unload/1)
+
+      File.rm_rf(tmp_path)
     end
   end
 
-  def compile(project), do: mix(project, ["do", "deps.get,", "compile"])
-
-  def compile!(project) do
-    {:ok, output} = compile(project)
-    output
+  def compile do
+    result = run_task("compile", ["--return-errors"])
+    {warnings, result} = Map.pop!(result, :result)
+    Map.put(result, :warnings, warnings)
   end
 
-  def create(opts \\ []) do
-    File.mkdir_p("tmp")
+  def run_task(task, args \\ []) do
+    ref = make_ref()
 
-    project_name = "test_project_#{:erlang.unique_integer(~w/positive monotonic/a)}"
-    project_path = Path.join("tmp", project_name)
+    ExUnit.CaptureIO.capture_io(:stderr, fn ->
+      Mix.Task.clear()
+      send(self(), {ref, Mix.Task.run(task, args)})
+    end)
 
-    File.rm_rf(project_path)
+    receive do
+      {^ref, result} ->
+        result =
+          case result do
+            :ok -> []
+            {:ok, result} -> result
+          end
 
-    {_, 0} = System.cmd("mix", ~w/new #{project_name}/, cd: "tmp")
-    project = %{name: project_name, path: project_path}
-    reinitialize(project, opts)
+        output =
+          Stream.repeatedly(fn ->
+            receive do
+              {:mix_shell, :info, msg} -> msg
+            after
+              0 -> nil
+            end
+          end)
+          |> Enum.take_while(&(not is_nil(&1)))
+          |> to_string
 
-    ExUnit.Callbacks.on_exit(fn -> File.rm_rf(project_path) end)
-    project
+        %{result: result, output: output}
+    after
+      0 -> raise("result not received")
+    end
   end
 
-  def reinitialize(project, opts \\ []) do
-    File.write!(Path.join(project.path, "mix.exs"), mix_exs(project.name, Keyword.get(opts, :mix_opts, [])))
+  defp reinitialize(project, opts) do
+    File.write!(Path.join(project.path, "mix.exs"), mix_exs(project.app, Keyword.get(opts, :mix_opts, [])))
     File.rm_rf(Path.join(project.path, "lib"))
     File.mkdir_p!(Path.join(project.path, "lib"))
   end
 
   defp mix_exs(project_name, opts) do
     """
-    defmodule #{Macro.camelize(project_name)}.MixProject do
+    defmodule #{Macro.camelize(to_string(project_name))}.MixProject do
       use Mix.Project
 
       def project do
@@ -66,7 +99,7 @@ defmodule Boundary.TestProject do
       end
 
       defp deps do
-        #{inspect(Keyword.get(opts, :deps, [{:boundary, path: "../.."}]))}
+        #{inspect(Keyword.get(opts, :deps, [{:boundary, path: unquote(Path.absname("."))}]))}
       end
     end
     """

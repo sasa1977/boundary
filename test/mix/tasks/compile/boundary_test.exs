@@ -1,23 +1,33 @@
 defmodule Mix.Tasks.Compile.BoundaryTest do
-  use Boundary.CompilerCase, async: true
-  import Boundary.ProjectTestCase
+  use ExUnit.Case, async: false
+  use Boundary.CompilerTester
 
   setup_all do
-    lib_with_boundaries = lib_with_boundaries()
-    lib_without_boundaries = lib_without_boundaries()
+    Mix.shell(Mix.Shell.Process)
+    Logger.disable(self())
 
-    project =
-      TestProject.create(
-        mix_opts: [
-          deps: [
-            {:"#{lib_with_boundaries.name}", path: "#{Path.absname(lib_with_boundaries.path)}"},
-            {:"#{lib_without_boundaries.name}", path: "#{Path.absname(lib_without_boundaries.path)}"}
-          ]
-        ]
-      )
+    compile_result =
+      in_lib_with_boundaries(fn lib_with_boundaries ->
+        in_lib_without_boundaries(fn lib_without_boundaries ->
+          TestProject.in_project(
+            [
+              mix_opts: [
+                deps: [
+                  {lib_with_boundaries.app, path: "#{Path.absname(lib_with_boundaries.path)}"},
+                  {lib_without_boundaries.app, path: "#{Path.absname(lib_without_boundaries.path)}"}
+                ]
+              ]
+            ],
+            &compile_project/1
+          )
+        end)
+      end)
 
-    context = compile_project(project)
-    {:ok, context}
+    {:ok, compile_result}
+  end
+
+  test "works with an empty project" do
+    TestProject.in_project(fn _project -> assert TestProject.compile().warnings == [] end)
   end
 
   module1 = unique_module_name()
@@ -216,8 +226,11 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               end
               """ do
     assert [warning] = warnings
-    assert warning.message == "forbidden call to #{unquote(module1)}.fun/0"
-    assert warning.explanation == "(calls from #{unquote(module2)} to #{unquote(module1)} are not allowed)"
+
+    assert warning.message =~ """
+           forbidden call to #{unquote(module1)}.fun/0
+             (calls from #{unquote(module2)} to #{unquote(module1)} are not allowed)
+           """
   end
 
   module1 = unique_module_name()
@@ -236,7 +249,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               """
               defmodule #{module1} do use Boundary, deps: [NoSuchBoundary] end
               """ do
-    assert warnings == [%{line: 1, message: "unknown boundary NoSuchBoundary is listed as a dependency"}]
+    assert [%{position: 1, message: "unknown boundary NoSuchBoundary is listed as a dependency"}] = warnings
   end
 
   module1 = unique_module_name()
@@ -247,7 +260,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               defmodule #{module1} do use Boundary, deps: [#{module2}] end
               defmodule #{module2} do use Boundary, ignore?: true end
               """ do
-    assert warnings == [%{line: 1, message: "ignored boundary #{unquote(module2)} is listed as a dependency"}]
+    assert [%{position: 1, message: "ignored boundary #{unquote(module2)} is listed as a dependency"}] = warnings
   end
 
   module1 = unique_module_name()
@@ -271,7 +284,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               """
               defmodule #{module1} do use Boundary, exports: [NoSuchModule] end
               """ do
-    assert warnings == [%{line: 1, message: "unknown module #{unquote(module1)}.NoSuchModule is listed as an export"}]
+    assert [%{message: "unknown module #{unquote(module1)}.NoSuchModule is listed as an export"}] = warnings
   end
 
   module1 = unique_module_name()
@@ -283,12 +296,8 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
                 defmodule Inner do use Boundary end
               end
               """ do
-    assert warnings == [
-             %{
-               line: 2,
-               message: "module #{unquote(module1)}.Inner can't be exported because it's not a part of this boundary"
-             }
-           ]
+    assert [%{message: "module #{unquote(module1)}.Inner can't be exported because it's not a part of this boundary"}] =
+             warnings
   end
 
   module1 = unique_module_name()
@@ -307,8 +316,11 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               end
               """ do
     assert [warning] = warnings
-    assert warning.message == "forbidden call to #{unquote(module2)}.fun/0"
-    assert warning.explanation == "(calls from #{unquote(module1)} to #{unquote(module2)} are not allowed)"
+
+    assert warning.message =~ """
+           forbidden call to #{unquote(module2)}.fun/0
+             (calls from #{unquote(module1)} to #{unquote(module2)} are not allowed)
+           """
   end
 
   module1 = unique_module_name()
@@ -327,10 +339,11 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               end
               """ do
     assert [warning] = warnings
-    assert warning.message == "forbidden call to #{unquote(module2)}.Inner.fun/0"
 
-    assert warning.explanation ==
-             "(module #{unquote(module2)}.Inner is not exported by its owner boundary #{unquote(module2)})"
+    assert warning.message =~ """
+           forbidden call to #{unquote(module2)}.Inner.fun/0
+             (module #{unquote(module2)}.Inner is not exported by its owner boundary #{unquote(module2)})
+           """
   end
 
   module1 = unique_module_name()
@@ -348,8 +361,11 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               end
               """ do
     assert [warning] = warnings
-    assert warning.message == "forbidden call to #{unquote(module1)}.Inner.fun/0"
-    assert warning.explanation == "(calls from #{unquote(module1)} to #{unquote(module1)}.Inner are not allowed)"
+
+    assert warning.message =~ """
+           forbidden call to #{unquote(module1)}.Inner.fun/0
+             (calls from #{unquote(module1)} to #{unquote(module1)}.Inner are not allowed)
+           """
   end
 
   module1 = unique_module_name()
@@ -377,11 +393,17 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               """ do
     assert [warning1, warning2] = warnings
 
-    assert warning1.message == "forbidden call to LibWithBoundaries.Boundary1.fun/0"
-    assert warning1.explanation == "(calls from #{unquote(module1)} to LibWithBoundaries.Boundary1 are not allowed)"
+    assert warning1.message =~
+             """
+             forbidden call to LibWithBoundaries.Boundary1.fun/0
+               (calls from #{unquote(module1)} to LibWithBoundaries.Boundary1 are not allowed)
+             """
 
-    assert warning2.message == "forbidden call to LibWithoutBoundaries.Module1.fun/0"
-    assert warning2.explanation == "(calls from #{unquote(module1)} to LibWithoutBoundaries.Module1 are not allowed)"
+    assert warning2.message =~
+             """
+             forbidden call to LibWithoutBoundaries.Module1.fun/0
+               (calls from #{unquote(module1)} to LibWithoutBoundaries.Module1 are not allowed)
+             """
   end
 
   module1 = unique_module_name()
@@ -410,11 +432,16 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               """ do
     assert [warning1, warning2] = warnings
 
-    assert warning1.message == "forbidden call to LibWithBoundaries.Boundary2.fun/0"
-    assert warning1.explanation == "(calls from #{unquote(module1)} to LibWithBoundaries.Boundary2 are not allowed)"
+    assert warning1.message =~ """
+           forbidden call to LibWithBoundaries.Boundary2.fun/0
+             (calls from #{unquote(module1)} to LibWithBoundaries.Boundary2 are not allowed)
+           """
 
-    assert warning2.message == "forbidden call to LibWithoutBoundaries.Module4.fun/0"
-    assert warning2.explanation == "(calls from #{unquote(module1)} to LibWithoutBoundaries.Module4 are not allowed)"
+    assert warning2.message =~
+             """
+             forbidden call to LibWithoutBoundaries.Module4.fun/0
+               (calls from #{unquote(module1)} to LibWithoutBoundaries.Module4 are not allowed)
+             """
   end
 
   module1 = unique_module_name()
@@ -433,10 +460,11 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               """ do
     assert [warning] = warnings
 
-    assert warning.message == "forbidden call to LibWithoutBoundaries.Module1.Module2.Module3.fun/0"
-
-    assert warning.explanation ==
-             "(calls from #{unquote(module1)} to LibWithoutBoundaries.Module1.Module2.Module3 are not allowed)"
+    assert warning.message =~
+             """
+             forbidden call to LibWithoutBoundaries.Module1.Module2.Module3.fun/0
+               (calls from #{unquote(module1)} to LibWithoutBoundaries.Module1.Module2.Module3 are not allowed)
+             """
   end
 
   module1 = unique_module_name()
@@ -460,12 +488,13 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               end
               """ do
     assert [warning] = warnings
-    assert warning.message == "forbidden runtime call to LibWithBoundaries.Boundary2.fun/0"
 
-    assert warning.explanation ==
-             "(runtime calls from #{unquote(module1)} to LibWithBoundaries.Boundary2 are not allowed)"
+    assert warning.message =~ """
+           forbidden runtime call to LibWithBoundaries.Boundary2.fun/0
+             (runtime calls from #{unquote(module1)} to LibWithBoundaries.Boundary2 are not allowed)
+           """
 
-    assert warning.line == 8
+    assert warning.position == 8
   end
 
   module1 = unique_module_name()
@@ -518,54 +547,152 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     assert [%{message: "extra_externals can't be provided in strict mode"}] = warnings
   end
 
-  defp lib_with_boundaries do
-    lib = TestProject.create()
+  describe "recompilation tests" do
+    setup do
+      Mix.shell(Mix.Shell.Process)
+      Logger.disable(self())
+      :ok
+    end
 
-    File.write!(
-      Path.join([lib.path, "lib", "code.ex"]),
-      """
-      defmodule LibWithBoundaries.Boundary1 do
-        use Boundary, deps: [], exports: []
-        def fun(), do: :ok
+    test "preserves surviving warnings on partial recompile" do
+      module1 = unique_module_name()
+      module2 = unique_module_name()
+      module3 = unique_module_name()
+      module4 = unique_module_name()
 
-        defmodule Submodule do def fun(), do: :ok end
-      end
+      TestProject.in_project(fn project ->
+        File.write!(Path.join([project.path, "lib", "mod1.ex"]), "defmodule #{module1} do end")
+        File.write!(Path.join([project.path, "lib", "mod2.ex"]), "defmodule #{module2} do end")
+        File.write!(Path.join([project.path, "lib", "mod3.ex"]), "defmodule #{module3} do end")
 
-      defmodule LibWithBoundaries.Boundary2 do
-        use Boundary, deps: [], exports: []
-        def fun(), do: :ok
-        defmacro macro(), do: :ok
-      end
-      """
-    )
+        # compile to force internal caching in compiler
+        TestProject.compile()
 
-    lib
+        # removing one module with warning
+        File.rm_rf!(Path.join([project.path, "lib", "mod1.ex"]))
+
+        # fixing a warning in another module
+        File.write!(Path.join([project.path, "lib", "mod2.ex"]), "defmodule #{module2} do use Boundary end")
+
+        # creating a new file
+        File.write!(Path.join([project.path, "lib", "mod4.ex"]), "defmodule #{module4} do end")
+
+        # we're checking that compiler reports remaing warning (for the file which hasn't been recompiled), as well as
+        # the newly introduced warning
+        assert [warning1, warning2] = TestProject.compile().warnings
+        assert warning1.message == "#{module3} is not included in any boundary"
+        assert warning2.message == "#{module4} is not included in any boundary"
+      end)
+    end
+
+    test "correctly reports errors if referenced externals change" do
+      module1 = unique_module_name()
+
+      in_lib_with_boundaries(fn lib ->
+        TestProject.in_project(
+          [mix_opts: [deps: [{lib.app, path: "#{Path.absname(lib.path)}"}]]],
+          fn project ->
+            File.write!(
+              Path.join([project.path, "lib", "mod1.ex"]),
+              """
+              defmodule #{module1} do
+                use Boundary
+                def fun(), do: LibWithBoundaries.Boundary1.Submodule.fun()
+              end
+              """
+            )
+
+            # doesn't report a warning because external is not listed as a dep
+            assert TestProject.compile().warnings == []
+
+            File.write!(
+              Path.join([project.path, "lib", "mod1.ex"]),
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [LibWithBoundaries.Boundary1]
+                def fun(), do: LibWithBoundaries.Boundary1.Submodule.fun()
+              end
+              """
+            )
+
+            # Reports an error on recompile. This proves that if an external is added as a dep, boundary will correctly
+            # recreate the view of the world. Internally, this proves the correct inner working of the cache.
+            assert [warning] = TestProject.compile().warnings
+
+            assert warning.message =~
+                     """
+                     forbidden call to LibWithBoundaries.Boundary1.Submodule.fun/0
+                       (module LibWithBoundaries.Boundary1.Submodule is not exported by its owner boundary LibWithBoundaries.Boundary1)
+                     """
+          end
+        )
+      end)
+    end
+
+    test "doesn't load new apps" do
+      module1 = unique_module_name()
+      loaded_apps_before = Enum.into(Application.loaded_applications(), MapSet.new(), fn {app, _, _} -> app end)
+
+      TestProject.in_project(fn project ->
+        File.write!(Path.join([project.path, "lib", "mod1.ex"]), "defmodule #{module1} do end")
+        TestProject.compile()
+        loaded_apps_after = Enum.into(Application.loaded_applications(), MapSet.new(), fn {app, _, _} -> app end)
+        assert MapSet.equal?(loaded_apps_before, loaded_apps_after)
+      end)
+    end
   end
 
-  defp lib_without_boundaries do
-    lib = TestProject.create(mix_opts: [deps: [], compilers: []])
-
-    File.write!(
-      Path.join([lib.path, "lib", "code.ex"]),
-      """
-      defmodule LibWithoutBoundaries.Module1 do
-        def fun(), do: :ok
-
-        defmodule Module2 do
+  defp in_lib_with_boundaries(fun) do
+    TestProject.in_project(fn project ->
+      File.write!(
+        Path.join([project.path, "lib", "code.ex"]),
+        """
+        defmodule LibWithBoundaries.Boundary1 do
+          use Boundary, deps: [], exports: []
           def fun(), do: :ok
 
-          defmodule Module3 do
+          defmodule Submodule do def fun(), do: :ok end
+        end
+
+        defmodule LibWithBoundaries.Boundary2 do
+          use Boundary, deps: [], exports: []
+          def fun(), do: :ok
+          defmacro macro(), do: :ok
+        end
+        """
+      )
+
+      fun.(project)
+    end)
+  end
+
+  defp in_lib_without_boundaries(fun) do
+    TestProject.in_project(
+      [mix_opts: [deps: [], compilers: []]],
+      fn project ->
+        File.write!(
+          Path.join([project.path, "lib", "code.ex"]),
+          """
+          defmodule LibWithoutBoundaries.Module1 do
+            def fun(), do: :ok
+
+            defmodule Module2 do
+              def fun(), do: :ok
+
+              defmodule Module3 do
+                def fun(), do: :ok
+              end
+            end
+          end
+
+          defmodule LibWithoutBoundaries.Module4 do
             def fun(), do: :ok
           end
-        end
-      end
+          """
+        )
 
-      defmodule LibWithoutBoundaries.Module4 do
-        def fun(), do: :ok
+        fun.(project)
       end
-      """
     )
-
-    lib
   end
 end

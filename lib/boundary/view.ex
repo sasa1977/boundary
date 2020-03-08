@@ -145,5 +145,5 @@ defmodule Boundary.View do
 
   defp app_modules(app),
     # we're currently supporting only Elixir modules
-    do: Enum.filter(Application.spec(app, :modules), &String.starts_with?(Atom.to_string(&1), "Elixir."))
+    do: Enum.filter(Application.spec(app, :modules) || [], &String.starts_with?(Atom.to_string(&1), "Elixir."))
 end

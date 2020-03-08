@@ -1,20 +1,19 @@
-defmodule Boundary.CompilerCase do
+defmodule Boundary.CompilerTester do
   @moduledoc """
-  This is a special case template made for the purpose of compiler tests.
+  This is a special helper made for the purpose of compiler tests.
 
   The challenge of compiler test is that we want to perform many mix compilations, which makes the tests very slow. To
-  address this, this case template takes a somewhat different approach, which allows us to define multiple tests which,
-  use custom Elixir code, while the mix compilation is executed only once for all of the tests.
+  address this, this module provides a special `module_test` macro which allows us to define multiple tests that will
+  evaluate the output of a single compilation.
 
   This approach has its set of problems, as can be seen from the `Mix.Tasks.Compile.BoundaryTest` code, but it gives us
   a solid compromise, allowing us to test the full feature, while keeping the test execution time fairly low.
   """
 
   # credo:disable-for-this-file Credo.Check.Readability.Specs
-  use ExUnit.CaseTemplate
   alias Boundary.TestProject
 
-  using do
+  defmacro __using__(_opts) do
     quote do
       @before_compile unquote(__MODULE__)
 
@@ -35,10 +34,7 @@ defmodule Boundary.CompilerCase do
       project = unquote(project)
       for {file, code} <- __tests__(), do: File.write!(Path.join([project.path, "lib", file]), code)
 
-      case TestProject.compile(project) do
-        {:ok, output} -> %{warnings: unquote(__MODULE__).warnings(output), output: output}
-        {:error, output} -> raise ExUnit.AssertionError, message: output
-      end
+      TestProject.compile()
     end
   end
 
@@ -51,7 +47,7 @@ defmodule Boundary.CompilerCase do
       test unquote(desc), unquote(context) = context do
         var!(warnings) =
           context.warnings
-          |> Enum.filter(&(&1.file == unquote(file)))
+          |> Enum.filter(&(&1.file == "lib/#{unquote(file)}"))
           |> Enum.map(&Map.delete(&1, :file))
 
         # dummy expression to suppress warnings if `warnings` is not used

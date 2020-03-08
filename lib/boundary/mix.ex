@@ -29,7 +29,11 @@ defmodule Boundary.Mix do
   end
 
   @spec write_manifest(String.t(), term) :: :ok
-  def write_manifest(name, data), do: File.write!(manifest_path(name), :erlang.term_to_binary(data))
+  def write_manifest(name, data) do
+    path = manifest_path(name)
+    File.mkdir_p!(Path.dirname(path))
+    File.write!(path, :erlang.term_to_binary(data))
+  end
 
   defp load_app_recursive(app_name, visited \\ MapSet.new()) do
     if MapSet.member?(visited, app_name) do

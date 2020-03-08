@@ -1,59 +1,61 @@
 defmodule Mix.Tasks.Boundary.SpecTest do
-  use Boundary.ProjectTestCase, async: true
+  use ExUnit.Case, async: false
+  alias Boundary.TestProject
 
-  test "produces the expected output", context do
-    File.write!(
-      Path.join([context.project.path, "lib", "source.ex"]),
-      """
-      defmodule Boundary1 do
-        use Boundary, deps: [Boundary2, Boundary3], exports: [Foo, Bar]
+  test "produces the expected output" do
+    Mix.shell(Mix.Shell.Process)
+    Logger.disable(self())
 
-        defmodule Foo do end
-        defmodule Bar do end
-      end
+    TestProject.in_project(fn project ->
+      File.write!(
+        Path.join([project.path, "lib", "source.ex"]),
+        """
+        defmodule Boundary1 do
+          use Boundary, deps: [Boundary2, Boundary3], exports: [Foo, Bar]
 
-      defmodule Boundary2 do
-        use Boundary, deps: [], exports: [], extra_externals: [:logger]
-      end
+          defmodule Foo do end
+          defmodule Bar do end
+        end
 
-      defmodule Boundary3 do
-        use Boundary, deps: [], exports: []
-      end
+        defmodule Boundary2 do
+          use Boundary, deps: [], exports: [], extra_externals: [:logger]
+        end
 
-      defmodule Ignored do
-        use Boundary, ignore?: true
-      end
-      """
-    )
+        defmodule Boundary3 do
+          use Boundary, deps: [], exports: []
+        end
 
-    TestProject.compile!(context.project)
+        defmodule Ignored do
+          use Boundary, ignore?: true
+        end
+        """
+      )
 
-    output =
-      TestProject.mix!(context.project, ~w/boundary.spec/)
-      |> String.split("\n")
-      |> Enum.map(&String.trim_trailing/1)
-      |> Enum.join("\n")
+      output =
+        TestProject.run_task("boundary.spec").output
+        |> String.split("\n")
+        |> Enum.map(&String.trim_trailing/1)
+        |> Enum.join("\n")
 
-    assert output ==
-             """
+      assert output =~
+               """
+               Boundary1
+                 deps: Boundary2, Boundary3
+                 exports: Bar, Foo
+                 externals:
 
-             Boundary1
-               deps: Boundary2, Boundary3
-               exports: Bar, Foo
-               externals:
+               Boundary2
+                 deps:
+                 exports:
+                 externals: :logger
 
-             Boundary2
-               deps:
-               exports:
-               externals: :logger
+               Boundary3
+                 deps:
+                 exports:
+                 externals:
 
-             Boundary3
-               deps:
-               exports:
-               externals:
-
-             Ignored (ignored)
-
-             """
+               Ignored (ignored)
+               """
+    end)
   end
 end

@@ -1,41 +1,43 @@
 defmodule Mix.Tasks.Boundary.FindExternalDepsTest do
-  use Boundary.ProjectTestCase, async: true
+  use ExUnit.Case, async: false
+  alias Boundary.TestProject
 
-  test "produces the expected output", context do
-    File.write!(
-      Path.join([context.project.path, "lib", "source.ex"]),
-      """
-      defmodule Boundary1 do
-        use Boundary
+  test "produces the expected output" do
+    Mix.shell(Mix.Shell.Process)
+    Logger.disable(self())
 
-        def fun() do
-          require Logger
-          Logger.info("foo")
+    TestProject.in_project(fn project ->
+      File.write!(
+        Path.join([project.path, "lib", "source.ex"]),
+        """
+        defmodule Boundary1 do
+          use Boundary
+
+          def fun() do
+            require Logger
+            Logger.info("foo")
+          end
         end
-      end
 
-      defmodule Boundary2 do
-        use Boundary
-      end
-      """
-    )
+        defmodule Boundary2 do
+          use Boundary
+        end
+        """
+      )
 
-    TestProject.compile!(context.project)
+      output =
+        TestProject.run_task("boundary.find_external_deps").output
+        |> String.split("\n")
+        |> Enum.map(&String.trim_trailing/1)
+        |> Enum.join("\n")
 
-    output =
-      TestProject.mix!(context.project, ~w/boundary.find_external_deps/)
-      |> String.split("\n")
-      |> Enum.map(&String.trim_trailing/1)
-      |> Enum.join("\n")
+      assert output =~
+               """
+               #{[IO.ANSI.bright()]}Boundary1#{IO.ANSI.reset()}:
+                 :logger
 
-    assert output ==
-             """
-
-             #{[IO.ANSI.bright()]}Boundary1#{IO.ANSI.reset()}:
-               :logger
-
-             #{[IO.ANSI.bright()]}Boundary2#{IO.ANSI.reset()} - no external deps
-
-             """
+               #{[IO.ANSI.bright()]}Boundary2#{IO.ANSI.reset()} - no external deps
+               """
+    end)
   end
 end
