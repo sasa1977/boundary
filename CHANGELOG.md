@@ -1,3 +1,8 @@
+# 0.4.3
+
+- Fixed a few bugs which were noticed in ElixirLS
+- Expanded cache to further reduce check time
+
 # 0.4.2
 
 - Remote calls from macro are treated as compile-time calls.
