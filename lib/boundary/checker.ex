@@ -105,7 +105,7 @@ defmodule Boundary.Checker do
   end
 
   defp call_error(view, call, from_boundary, []) do
-    if check_external_dep?(view, call, from_boundary),
+    if cross_app_call?(view, call) and check_external_dep?(view, call, from_boundary),
       do: {:invalid_external_dep_call, call.callee_module},
       else: nil
   end

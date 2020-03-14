@@ -188,6 +188,23 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module1 = unique_module_name()
   module2 = unique_module_name()
 
+  module_test "call to an unclassified module is not reported",
+              """
+              defmodule #{module1} do
+                use Boundary, externals_mode: :strict
+                def fun1(), do: #{module2}.fun()
+              end
+
+              defmodule #{module2} do
+                def fun(), do: :ok
+              end
+              """ do
+    assert [%{message: "Module49 is not included in any boundary"}] = warnings
+  end
+
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
   module_test "protocol implementation is by default ignored",
               """
               defmodule #{module1} do
