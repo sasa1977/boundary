@@ -77,7 +77,6 @@ defmodule Boundary.Checker do
   defp invalid_calls(view, calls) do
     for call <- calls,
         from_boundary = Boundary.for_module(view, call.caller_module),
-        not from_boundary.ignore?,
         to_boundaries = to_boundaries(view, call),
         {type, to_boundary_name} <- [call_error(view, call, from_boundary, to_boundaries)] do
       {:invalid_call,
@@ -104,7 +103,12 @@ defmodule Boundary.Checker do
     Enum.reject([to_boundary, parent_boundary], &is_nil/1)
   end
 
+  defp call_error(_view, _call, %{ignore?: true}, _to_boundaries), do: nil
+
   defp call_error(view, call, from_boundary, []) do
+    # If we end up here, we couldn't determine a target boundary, so this is either a cross-app call, or a call
+    # to an unclassified boundary. In the former case we'll report an error if the externals_mode is strict. In the
+    # latter case, we won't report an error.
     if cross_app_call?(view, call) and check_external_dep?(view, call, from_boundary),
       do: {:invalid_external_dep_call, call.callee_module},
       else: nil
@@ -112,6 +116,8 @@ defmodule Boundary.Checker do
 
   defp call_error(view, call, from_boundary, [_ | _] = to_boundaries) do
     errors = Enum.map(to_boundaries, &call_error(view, call, from_boundary, &1))
+
+    # if call to at least one candidate to_boundary is allowed, this succeeds
     unless Enum.any?(errors, &is_nil/1), do: Enum.find(errors, &(not is_nil(&1)))
   end
 
