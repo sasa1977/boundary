@@ -471,10 +471,6 @@ defmodule Boundary do
   def parent(_view, %{ancestors: []}), do: nil
   def parent(view, %{ancestors: [parent_name]}), do: fetch!(view, parent_name)
 
-  defmodule Error do
-    defexception [:message, :file, :line]
-  end
-
   defp normalize_references(references) do
     Enum.flat_map(
       references,
@@ -486,5 +482,9 @@ defmodule Boundary do
           end
       end
     )
+  end
+
+  defmodule Error do
+    defexception [:message, :file, :line]
   end
 end
