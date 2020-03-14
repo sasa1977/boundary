@@ -547,6 +547,19 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     assert [%{message: "extra_externals can't be provided in strict mode"}] = warnings
   end
 
+  module1 = unique_module_name()
+
+  module_test "module is classified to its own app",
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [{Mix, :compile}]
+
+                def fun(), do: Mix.MyTask.fun()
+              end
+              """ do
+    assert warnings == []
+  end
+
   describe "recompilation tests" do
     setup do
       Mix.shell(Mix.Shell.Process)
@@ -697,6 +710,10 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
           end
 
           defmodule LibWithoutBoundaries.Module4 do
+            def fun(), do: :ok
+          end
+
+          defmodule Mix.MyTask do
             def fun(), do: :ok
           end
           """
