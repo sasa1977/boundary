@@ -466,6 +466,11 @@ defmodule Boundary do
   @spec protocol_impl?(module) :: boolean
   def protocol_impl?(module), do: function_exported?(module, :__impl__, 1)
 
+  @doc "Returns the immediate parent of the boundary, or nil if the boundary is a top-level boundary."
+  @spec parent(view, t) :: t | nil
+  def parent(_view, %{ancestors: []}), do: nil
+  def parent(view, %{ancestors: [parent_name]}), do: fetch!(view, parent_name)
+
   defmodule Error do
     defexception [:message, :file, :line]
   end

@@ -36,10 +36,13 @@ defmodule Boundary.Checker do
         do: error
   end
 
-  defp validate_export(view, boundary, export) do
+  defp validate_export(view, %{name: boundary_name} = boundary, export) do
     cond do
       is_nil(Boundary.app(view, export.name)) ->
         {:unknown_export, export}
+
+      match?(%{ancestors: [^boundary_name | _]}, Boundary.get(view, export.name)) ->
+        nil
 
       (Boundary.for_module(view, export.name) || %{name: nil}).name != boundary.name ->
         {:export_not_in_boundary, export}
@@ -75,9 +78,8 @@ defmodule Boundary.Checker do
     for call <- calls,
         from_boundary = Boundary.for_module(view, call.caller_module),
         not from_boundary.ignore?,
-        to_boundary = Boundary.for_module(view, call.callee_module) || :unknown,
-        from_boundary != to_boundary,
-        {type, to_boundary_name} <- [call_error(view, call, from_boundary, to_boundary)] do
+        to_boundaries = to_boundaries(view, call),
+        {type, to_boundary_name} <- [call_error(view, call, from_boundary, to_boundaries)] do
       {:invalid_call,
        %{
          type: type,
@@ -91,15 +93,32 @@ defmodule Boundary.Checker do
     end
   end
 
-  defp call_error(view, call, from_boundary, :unknown) do
+  defp to_boundaries(view, call) do
+    to_boundary = Boundary.for_module(view, call.callee_module)
+
+    # main sub-boundary module may also be exported by its parent
+    parent_boundary =
+      if not is_nil(to_boundary) and call.callee_module == to_boundary.name,
+        do: Boundary.parent(view, to_boundary)
+
+    Enum.reject([to_boundary, parent_boundary], &is_nil/1)
+  end
+
+  defp call_error(view, call, from_boundary, []) do
     if check_external_dep?(view, call, from_boundary),
       do: {:invalid_external_dep_call, call.callee_module},
       else: nil
   end
 
+  defp call_error(view, call, from_boundary, [_ | _] = to_boundaries) do
+    errors = Enum.map(to_boundaries, &call_error(view, call, from_boundary, &1))
+    unless Enum.any?(errors, &is_nil/1), do: Enum.find(errors, &(not is_nil(&1)))
+  end
+
   defp call_error(view, call, from_boundary, to_boundary) do
     cond do
       to_boundary.ignore? -> nil
+      to_boundary == from_boundary -> nil
       cross_app_call?(view, call) and not check_external_dep?(view, call, from_boundary) -> nil
       not allowed?(from_boundary, to_boundary, call) -> invalid_cross_call_error(call, from_boundary, to_boundary)
       not exported?(to_boundary, call.callee_module) -> {:not_exported, to_boundary.name}

@@ -292,12 +292,18 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module_test "export can't be from another boundary",
               """
               defmodule #{module1} do
-                use Boundary, exports: [Inner]
-                defmodule Inner do use Boundary end
+                use Boundary, exports: [Inner.Private]
+                defmodule Inner do
+                  use Boundary
+
+                  defmodule Private do end
+                end
               end
               """ do
-    assert [%{message: "module #{unquote(module1)}.Inner can't be exported because it's not a part of this boundary"}] =
-             warnings
+    assert [warning] = warnings
+
+    assert warning.message ==
+             "module #{unquote(module1)}.Inner.Private can't be exported because it's not a part of this boundary"
   end
 
   module1 = unique_module_name()
@@ -355,7 +361,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
                 def fun(), do: #{module1}.Inner.fun()
 
                 defmodule Inner do
-                  use Boundary
+                  use Boundary, top_level?: true
                   def fun(), do: :ok
                 end
               end
@@ -555,6 +561,29 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
                 use Boundary, deps: [{Mix, :compile}]
 
                 def fun(), do: Mix.MyTask.fun()
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
+  module_test "boundary can export the top-level module of its sub-boundary",
+              """
+              defmodule #{module1} do
+                use Boundary, exports: [SubModule]
+                def fun(), do: :ok
+
+                defmodule SubModule do
+                  use Boundary
+                  def fun(), do: :ok
+                end
+              end
+
+              defmodule #{module2} do
+                use Boundary, deps: [#{module1}]
+                def fun(), do: #{module1}.SubModule.fun()
               end
               """ do
     assert warnings == []
