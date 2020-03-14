@@ -125,7 +125,7 @@ defmodule Boundary.View do
               {dep, user_boundary} ->
                 app
                 |> Boundary.Definition.normalize(dep, [], user_boundary)
-                |> Map.merge(%{name: dep, implicit?: true})
+                |> Map.merge(%{name: dep, implicit?: true, top_level?: true})
             end)
           end
 

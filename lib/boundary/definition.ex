@@ -78,7 +78,7 @@ defmodule Boundary.Definition do
 
   defp merge_user_opts(definition, user_opts) do
     user_opts = Map.new(user_opts)
-    valid_keys = ~w/deps exports ignore? extra_externals externals_mode/a
+    valid_keys = ~w/deps exports ignore? extra_externals externals_mode top_level?/a
 
     definition
     |> Map.merge(Map.take(user_opts, valid_keys))
@@ -116,7 +116,8 @@ defmodule Boundary.Definition do
       externals: [],
       extra_externals: [],
       externals_mode: Mix.Project.config() |> Keyword.get(:boundary, []) |> Keyword.get(:externals_mode, :relaxed),
-      errors: []
+      errors: [],
+      top_level?: false
     }
   end
 
