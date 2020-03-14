@@ -355,6 +355,7 @@ defmodule Boundary do
 
   @type t :: %{
           name: name,
+          ancestors: [name],
           deps: [{name, mode}],
           exports: [module],
           externals: [atom],
