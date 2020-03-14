@@ -28,10 +28,19 @@ defmodule Boundary.Classifier do
   @spec classify(t, [module], [Boundary.t()]) :: t
   def classify(classifier, modules, boundaries) do
     trie = build_trie(boundaries)
-    boundaries = boundaries(trie)
 
-    boundaries = Enum.into(boundaries, classifier.boundaries, &{&1.name, &1})
-    classifier = %{classifier | boundaries: boundaries}
+    classifier = %{
+      classifier
+      | boundaries:
+          trie
+          |> boundaries()
+          |> Stream.map(fn
+            %{top_level?: true} = boundary -> %{boundary | ancestors: []}
+            %{top_level?: false} = boundary -> boundary
+          end)
+          |> Stream.map(&Map.delete(&1, :top_level?))
+          |> Enum.into(classifier.boundaries, &{&1.name, &1})
+    }
 
     for module <- modules,
         boundary = find_boundary(trie, module),
