@@ -138,6 +138,8 @@ defmodule Boundary.Checker do
          Enum.member?(from_boundary.externals, Boundary.app(view, call.callee_module)))
   end
 
+  defp allowed?(%{name: parent}, %{ancestors: [parent | _]}, _call), do: true
+
   defp allowed?(from_boundary, %{name: name}, call) do
     Enum.any?(
       from_boundary.deps,

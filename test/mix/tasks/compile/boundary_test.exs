@@ -199,7 +199,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
                 def fun(), do: :ok
               end
               """ do
-    assert [%{message: "Module49 is not included in any boundary"}] = warnings
+    assert [%{message: "#{unquote(module2)} is not included in any boundary"}] = warnings
   end
 
   module1 = unique_module_name()
@@ -604,6 +604,47 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               end
               """ do
     assert warnings == []
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary is allowed to invoke exports of its direct children",
+              """
+              defmodule #{module1} do
+                use Boundary
+
+                def fun() do
+                  #{module1}.SubBoundary.fun()
+                  #{module1}.SubBoundary.Foo.fun()
+                end
+
+                defmodule SubBoundary do
+                  use Boundary, exports: [Foo]
+                  def fun(), do: :ok
+
+                  defmodule Foo do def fun() do :ok end end
+                end
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary is not allowed to invoke internals of its direct children",
+              """
+              defmodule #{module1} do
+                use Boundary
+                def fun() do #{module1}.SubBoundary.Foo.fun() end
+
+                defmodule SubBoundary do
+                  use Boundary
+                  defmodule Foo do def fun() do :ok end end
+                end
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "module #{unquote(module1)}.SubBoundary.Foo is not exported by its owner boundary"
   end
 
   describe "recompilation tests" do
