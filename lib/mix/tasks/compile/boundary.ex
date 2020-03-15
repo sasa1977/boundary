@@ -216,6 +216,14 @@ defmodule Mix.Tasks.Compile.Boundary do
     )
   end
 
+  defp to_diagnostic_error({:forbidden_dep, dep}) do
+    diagnostic(
+      "#{inspect(dep.name)} can't be listed as a dependency because it's not a sibling, an ancestor, or a top-level boundary",
+      file: Path.relative_to_cwd(dep.file),
+      position: dep.line
+    )
+  end
+
   defp to_diagnostic_error({:unknown_export, export}) do
     diagnostic("unknown module #{inspect(export.name)} is listed as an export",
       file: Path.relative_to_cwd(export.file),

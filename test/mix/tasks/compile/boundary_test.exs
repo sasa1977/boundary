@@ -536,7 +536,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module_test "can't use dep or export in an ignored boundary",
               """
               defmodule #{module1} do
-                use Boundary, ignore?: true, exports: [Foo], deps: [#{module1}.Bar]
+                use Boundary, ignore?: true, exports: [Foo], deps: [LibWithBoundaries.Boundary1]
 
                 defmodule Foo do end
                 defmodule Bar do use Boundary end
@@ -645,6 +645,87 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               """ do
     assert [warning] = warnings
     assert warning.message =~ "module #{unquote(module1)}.SubBoundary.Foo is not exported by its owner boundary"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can't depend on itself",
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [#{module1}]
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "#{unquote(module1)} can't be listed as a dependency"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can't depend on its child",
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [#{module1}.SubBoundary]
+                defmodule SubBoundary do use Boundary end
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "#{unquote(module1)}.SubBoundary can't be listed as a dependency"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can depend on its child if it's explicitly declared as a top-level boundary",
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [#{module1}.SubBoundary]
+                defmodule SubBoundary do use Boundary, top_level?: true end
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
+  module_test "boundary can't depend on someone else's child",
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [#{module2}.SubBoundary]
+                defmodule SubBoundary do use Boundary end
+              end
+
+              defmodule #{module2} do
+                use Boundary
+                defmodule SubBoundary do use Boundary end
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "#{unquote(module2)}.SubBoundary can't be listed as a dependency"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can't depend on an external's subboundary",
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [LibWithBoundaries.Boundary1.SubBoundary]
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "LibWithBoundaries.Boundary1.SubBoundary can't be listed as a dependency"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can depend on it's sibling",
+              """
+              defmodule #{module1} do
+                use Boundary
+                defmodule SubBoundary1 do use Boundary, deps: [#{module1}.SubBoundary2] end
+                defmodule SubBoundary2 do use Boundary end
+              end
+              """ do
+    assert warnings == []
   end
 
   describe "recompilation tests" do
@@ -763,6 +844,11 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
           def fun(), do: :ok
 
           defmodule Submodule do def fun(), do: :ok end
+
+          defmodule SubBoundary do
+            use Boundary
+            def fun(), do: :ok
+          end
         end
 
         defmodule LibWithBoundaries.Boundary2 do

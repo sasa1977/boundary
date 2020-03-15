@@ -17,16 +17,44 @@ defmodule Boundary.Checker do
   defp invalid_deps(view) do
     for boundary <- Boundary.all(view),
         {dep, _type} <- boundary.deps,
-        error = validate_dep(Boundary.get(view, dep), %{name: dep, file: boundary.file, line: boundary.line}),
+        error = validate_dep(view, boundary, dep),
+        error != :ok,
         into: MapSet.new(),
         do: error
   end
 
   defp invalid_config(view), do: view |> Boundary.all() |> Enum.flat_map(& &1.errors)
 
-  defp validate_dep(nil, dep), do: {:unknown_dep, dep}
-  defp validate_dep(%{ignore?: true}, dep), do: {:ignored_dep, dep}
-  defp validate_dep(_boundary, _dep), do: nil
+  defp validate_dep(view, from_boundary, dep) do
+    with {:ok, to_boundary} <- fetch_dep_boundary(view, from_boundary, dep),
+         :ok <- validate_dep_not_ignored(from_boundary, to_boundary),
+         do: validate_dep_allowed(view, from_boundary, to_boundary)
+  end
+
+  defp fetch_dep_boundary(view, from_boundary, dep) do
+    case Boundary.get(view, dep) do
+      nil -> {:unknown_dep, %{name: dep, file: from_boundary.file, line: from_boundary.line}}
+      to_boundary -> {:ok, to_boundary}
+    end
+  end
+
+  defp validate_dep_not_ignored(from_boundary, to_boundary) do
+    if to_boundary.ignore?,
+      do: {:ignored_dep, %{name: to_boundary.name, file: from_boundary.file, line: from_boundary.line}},
+      else: :ok
+  end
+
+  defp validate_dep_allowed(view, from_boundary, to_boundary) do
+    # 1. Can't depend on itself
+    # 2. Can depend on top-level boundaries
+    # 3. Can depend on siblings (boundaries which have the same parent)
+    if from_boundary != to_boundary and
+         (to_boundary.ancestors == [] or
+            Boundary.parent(view, from_boundary) == Boundary.parent(view, to_boundary) or
+            to_boundary.name in from_boundary.ancestors),
+       do: :ok,
+       else: {:forbidden_dep, %{name: to_boundary.name, file: from_boundary.file, line: from_boundary.line}}
+  end
 
   defp invalid_exports(view) do
     for boundary <- Boundary.all(view),
