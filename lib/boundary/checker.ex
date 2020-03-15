@@ -44,14 +44,15 @@ defmodule Boundary.Checker do
       else: :ok
   end
 
+  defp validate_dep_allowed(_view, from_boundary, from_boundary),
+    do: {:forbidden_dep, %{name: from_boundary.name, file: from_boundary.file, line: from_boundary.line}}
+
   defp validate_dep_allowed(view, from_boundary, to_boundary) do
-    # 1. Can't depend on itself
-    # 2. Can depend on top-level boundaries
-    # 3. Can depend on siblings (boundaries which have the same parent)
-    if from_boundary != to_boundary and
-         (to_boundary.ancestors == [] or
-            Boundary.parent(view, from_boundary) == Boundary.parent(view, to_boundary) or
-            to_boundary.name in from_boundary.ancestors),
+    # A boundary can only depend on its siblings, or any sibling of its ancestor.
+    if from_boundary
+       |> Stream.iterate(&Boundary.parent(view, &1))
+       |> Stream.take_while(&(not is_nil(&1)))
+       |> Enum.any?(&(&1 == to_boundary or Boundary.parent(view, &1) == Boundary.parent(view, to_boundary))),
        do: :ok,
        else: {:forbidden_dep, %{name: to_boundary.name, file: from_boundary.file, line: from_boundary.line}}
   end

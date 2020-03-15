@@ -729,6 +729,46 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   end
 
   module1 = unique_module_name()
+
+  module_test "boundary can depend on the sibling of its ancestor",
+              """
+              defmodule #{module1} do
+                use Boundary
+
+                defmodule SubBoundary1 do use Boundary end
+
+                defmodule SubBoundary2 do
+                  use Boundary
+                  defmodule SubBoundary3 do use Boundary, deps: [#{module1}.SubBoundary1] end
+                end
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can't depend on a sub-boundary of a sibling of its ancestor",
+              """
+              defmodule #{module1} do
+                use Boundary
+
+                defmodule SubBoundary1 do
+                  use Boundary
+                  defmodule SubBoundary2 do use Boundary end
+                end
+
+                defmodule SubBoundary3 do
+                  use Boundary
+                  defmodule SubBoundary4 do use Boundary, deps: [#{module1}.SubBoundary1.SubBoundary2] end
+                end
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "#{unquote(module1)}.SubBoundary1.SubBoundary2 can't be listed as a dependency"
+  end
+
+  module1 = unique_module_name()
   module2 = unique_module_name()
 
   module_test "exporting multiple deps",
