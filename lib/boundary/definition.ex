@@ -62,7 +62,7 @@ defmodule Boundary.Definition do
   def normalize(app, boundary, definition, env) do
     definition
     |> normalize!(app, env)
-    |> expand_exports(boundary)
+    |> normalize_exports(boundary)
     |> normalize_deps()
   end
 
@@ -85,15 +85,18 @@ defmodule Boundary.Definition do
     |> add_errors(user_opts |> Map.drop(valid_keys) |> Map.keys() |> Enum.map(&{:unknown_option, name: &1}))
   end
 
-  defp expand_exports(definition, boundary) do
+  defp normalize_exports(definition, boundary) do
     update_in(
       definition.exports,
       fn exports ->
-        expanded_aliases = Enum.map(exports, &Module.concat(boundary, &1))
-        [boundary | expanded_aliases]
+        normalized_exports = Enum.map(exports, &normalize_export(boundary, &1))
+        [{boundary, []} | normalized_exports]
       end
     )
   end
+
+  defp normalize_export(boundary, export) when is_atom(export), do: normalize_export(boundary, {export, []})
+  defp normalize_export(boundary, {export, opts}), do: {Module.concat(boundary, export), opts}
 
   defp normalize_deps(definition) do
     update_in(

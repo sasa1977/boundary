@@ -728,6 +728,35 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     assert warnings == []
   end
 
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
+  module_test "exporting multiple deps",
+              """
+              defmodule #{module1} do
+                use Boundary, exports: [{Schemas, except: [Base]}]
+
+                defmodule Schemas.Base do def fun(), do: :ok end
+                defmodule Schemas.Foo do def fun(), do: :ok end
+                defmodule Schemas.Bar do def fun(), do: :ok end
+              end
+
+              defmodule #{module2} do
+                use Boundary, deps: [#{module1}]
+
+                def fun() do
+                  #{module1}.Schemas.Foo.fun()
+                  #{module1}.Schemas.Bar.fun()
+                  #{module1}.Schemas.Base.fun()
+                end
+              end
+              """ do
+    assert [warning] = warnings
+
+    assert warning.message =~
+             "#{unquote(module1)}.Schemas.Base is not exported by its owner boundary #{unquote(module1)}"
+  end
+
   describe "recompilation tests" do
     setup do
       Mix.shell(Mix.Shell.Process)

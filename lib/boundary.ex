@@ -155,6 +155,26 @@ defmodule Boundary do
   and `MySystem.User`. All other modules of this boundary are considered to be internal, and
   they may not be used by modules from other boundaries.
 
+  ### Mass exports
+
+  It's also possible to mass-export multiple modules with a single export item.
+
+  For example, let's say that we keep Ecto schemas under the `MySystem.Schemas` namespace. Now we
+  want to export all of these modules except `MySystem.Schemas.Base` which is a base module `use`-d
+  by our schemas. We could list each individual schema in the exports section but that becomes
+  tedious, and the `use Boundary` expression might become quite long and noisy. Instead, we can
+  export all of these modules with the `exports: [{Schemas, except: [Base]}, ...]`.
+
+  Mass export is not advised in most situations. Prefer explicitly listing exported modules. If
+  your export list is long, it's a possible indication of an overly fragmented interface. Consider
+  instead consolidating the interface in the main boundary module, which would act as a facade.
+  Alternatively, perhaps the boundary needs to be split.
+
+  However, cases such as Ecto schemas present a valid exception, since these modules are typically
+  a part of the public context interface, since they are passed back and forth between the
+  context and the interface layer (such as web).
+
+
   ## Dependencies
 
   Each boundary may depend on other boundaries. These dependencies are used to defined allowed
