@@ -65,7 +65,7 @@ defmodule Boundary do
   single boundary, called `MySystem`. This boundary will contain the root module (`MySystem`),
   as well as all modules whose name starts with `MySystem.`.
 
-  In addition, it's possible to extract some of the modules from a boundary into its own boundary.
+  In addition, it's possible to extract some of the modules from a boundary into another boundary.
   For example:
 
   ```
@@ -78,10 +78,7 @@ defmodule Boundary do
   end
   ```
 
-  Here, modules from `MySystem.Endpoint` namespace are promoted into its own boundary. It's
-  worth noting that `MySystem.Endpoint` is considered as a peer boundary of `MySystem`, not its
-  child. At the moment, nesting of boundaries (defining internal boundaries within other
-  boundaries) is not supported by this library.
+  See the "Nested boundaries" section for details.
 
   ### Mix tasks
 
@@ -366,6 +363,117 @@ defmodule Boundary do
     use Boundary, exports: [Endpoint], deps: [...]
   end
   ```
+
+
+  ## Nested boundaries
+
+  It is possible to define boundaries within boundaries, and arbitrarily deep nesting level is
+  supported. Nested boundaries provide fine granularity of dependency management.
+
+  For example, suppose that we're building a Phoenix-powered blog engine, and we organized the
+  domain code in two contexts, `BlogEngine.Accounts` and `BlogEngine.Articles`. We want to setup
+  top-level context boundaries `BlogEngine` and `BlogEngineWeb`:
+
+  ```
+  defmodule BlogEngine do
+    use Boundary, exports: [Accounts, Articles]
+  end
+
+  defmodule BlogEngineWeb do
+    use Boundary, deps: [BlogEngine]
+  end
+  ```
+
+  This is a typical desired high-level design in Phoenix-powered systems. We don't allow context
+  to call web functions, and we constrain the context modules which are open to the web tier.
+
+  However, we want to refine the control further, allowing `Articles` to depend on `Accounts`, but
+  not the other way around. Here's how we can do that:
+
+  ```
+  defmodule BlogEngine.Accounts do
+    use Boundary
+  end
+
+  defmodule BlogEngine.Articles do
+    use Boundary, deps: [BlogEngine.Accounts]
+  end
+  ```
+
+  Here, we've introduced two sub-boundaries. The `BlogEngine` is considered as a parent boundary of
+  the `BlogEngine.Accounts` and `BlogEngine.Articles` sub-boundaries.
+
+  The parent boundary is allowed to export top-level modules of its immediate children. In this
+  example, modules `BlogEngine.Accounts` and `BlogEngine.Articles` are exported by the parent
+  boundary `BlogEngine`, and at the same time they form their own sub-boundaries. Other modules of
+  those sub-boundaries can't be exported by the parent. In particular, a parent can't export
+  an export of its child.
+
+  ### In-app dependency rules
+
+  The concept of sub-boundaries introduces some constraints with respect to cross-boundary
+  dependencies:
+
+  1. A boundary may depend on any of its siblings (boundaries which share the same parent).
+  2. A boundary may depend on any of its ancestors.
+  3. A boundary may depend on any in-app dependency of its ancestors.
+
+  Notice that these dependencies must still be explicitly allowed via the `:deps` section.
+
+  In addition to these constraints, a boundary is implicitly allowed to use exported modules of its
+  immediate children. Note that such dependencies are always implicit, and can't be made explicit
+  in the `:deps` section.
+
+  No other dependencies are allowed. Some examples of forbidden dependencies are:
+
+  1. Dependency to a sub-sub-boundary
+  2. Dependency to a sub-boundary of a sibling
+  3. Dependency to a sub-boundary of an ancestor
+
+  Top-level boundaries (boundaries without a parent) follow the same rules. A top-level boundary
+  may only depend on other top-level boundaries.
+
+  Finally, it's worth noting that a sub-boundary doesn't "inherit" any deps from its ancestors.
+
+  ### Cross-app dependency rules
+
+  Dependencies to boundaries from other apps are not restrained with respect to the in-app
+  hierarchy. A sub-boundary may depend on an external dep, even though its parent doesn't.
+
+  If the external lib defines its own boundaries, you can only depend on the top-level boundaries.
+  If implicit boundaries are used (app doesn't define its own boundaries), all such boundaries
+  are considered as top-level, and you can depend on any boundary from such app.
+
+
+  ### Promoting boundaries to top-level
+
+  It's possible to turn a nested boundary into a top-level boundary:
+
+  ```
+  defmodule MySystem.Application do
+    use Boundary, top_level?: true
+  end
+  ```
+
+  In this case `MySystem.Application` is not considered to be a sub-boundary of `MySystem`. This is
+  a hacky option which is usually discouraged because it introduces a mismatch between file and
+  namespace hierarchy, and the logical model hierarchy.
+
+  The OTP application is a notable counter-example, because in a typical Phoenix-powered system,
+  the application module depends on both context and the web. Promoting the app to top-level allows
+  you to express this relationship without needing to include web as a dep of the context (which
+  you can't do anyway, since cycles are not supported).
+
+  However, a better option is to rename the module into `MySystemApp`:
+
+  ```
+  defmodule MySystemApp do
+    use Application
+    use Boundary, deps: [MySystem, MySystemWeb]
+  end
+  ```
+
+  That way the folder and the namespace structure will follow the logical model hierarchy.
   """
 
   require Boundary.Definition
