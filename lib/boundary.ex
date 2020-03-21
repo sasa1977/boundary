@@ -45,8 +45,8 @@ defmodule Boundary do
 
   ## Defining a boundary
 
-  A boundary is defined via `use Boundary` expression in the top-level (aka root) module. For example,
-  the context boundary named `MySystem` can be defined as follows:
+  A boundary is defined via `use Boundary` expression in the root module. For example, the context
+  boundary named `MySystem` can be defined as follows:
 
   ```
   defmodule MySystem do
@@ -364,15 +364,15 @@ defmodule Boundary do
   end
   ```
 
-
   ## Nested boundaries
 
-  It is possible to define boundaries within boundaries, and arbitrarily deep nesting level is
-  supported. Nested boundaries provide fine granularity of dependency management.
+  It is possible to define boundaries within boundaries. Nested boundaries allow you to further
+  control the dependency graph inside the boundary, and make some in-boundary modules private to
+  others.
 
-  For example, suppose that we're building a Phoenix-powered blog engine, and we organized the
-  domain code in two contexts, `BlogEngine.Accounts` and `BlogEngine.Articles`. We want to setup
-  top-level context boundaries `BlogEngine` and `BlogEngineWeb`:
+  Let's see this in an example. Suppose that we're building a Phoenix-powered blog engine. Our
+  context layer, `BlogEngine`, exposes two modules, `Accounts` and `Articles` (note that
+  `BlogEngine.` prefix is omitted for brevity) to the web tier:
 
   ```
   defmodule BlogEngine do
@@ -384,87 +384,97 @@ defmodule Boundary do
   end
   ```
 
-  This is a typical desired high-level design in Phoenix-powered systems. We don't allow context
-  to call web functions, and we constrain the context modules which are open to the web tier.
+  But beyond this, we want to further manage the dependencies inside the context. The context tier
+  consists of the modules `Repo, `Articles, `Accounts, and `Accounts.Mailer`. We'd like to
+  introduce the following constraints:
 
-  However, we want to refine the control further, allowing `Articles` to depend on `Accounts`, but
-  not the other way around. Here's how we can do that:
+  - `Articles` can use `Accounts` (but not the other way around).
+  - Both `Articles` and `Accounts` can use `Repo`, but `Repo` can't use any other module.
+  - Only the `Accounts` module can use the internal `Accounts.Mailer` module.
+
+  Here's how we can do that:
 
   ```
-  defmodule BlogEngine.Accounts do
+  defmodule BlogEngine.Repo do
     use Boundary
   end
 
   defmodule BlogEngine.Articles do
-    use Boundary, deps: [BlogEngine.Accounts]
+    use Boundary, deps: [BlogEngine.{Accounts, Repo}]
+  end
+
+  defmodule BlogEngine.Accounts do
+    use Boundary, deps: [BlogEngine.Repo]
   end
   ```
 
-  Here, we've introduced two sub-boundaries. The `BlogEngine` is considered as a parent boundary of
-  the `BlogEngine.Accounts` and `BlogEngine.Articles` sub-boundaries.
+  Conceptually, we've built a boundary sub-tree inside `BlogEngine` which looks as:
 
-  The parent boundary is allowed to export top-level modules of its immediate children. In this
-  example, modules `BlogEngine.Accounts` and `BlogEngine.Articles` are exported by the parent
-  boundary `BlogEngine`, and at the same time they form their own sub-boundaries. Other modules of
-  those sub-boundaries can't be exported by the parent. In particular, a parent can't export
-  an export of its child.
+  ```text
+  BlogEngine
+  |
+  +----Repo
+  |
+  +----Articles
+  |
+  +----Accounts
+  ```
 
-  ### In-app dependency rules
+  With the following dependencies:
 
-  The concept of sub-boundaries introduces some constraints with respect to cross-boundary
-  dependencies:
+  ```text
+  Articles ----> Repo
+     |            ^
+     v            |
+  Accounts -------+
+  ```
 
-  1. A boundary may depend on any of its siblings (boundaries which share the same parent).
-  2. A boundary may depend on any of its ancestors.
-  3. A boundary may depend on any in-app dependency of its ancestors.
+  ### Root module
 
-  Notice that these dependencies must still be explicitly allowed via the `:deps` section.
+  The root module of a sub-boundary plays a special role. This module can be exported by the parent
+  boundary, and at the same time it defines its own boundary. This can be seen in the previous
+  example, where all three modules, `Articles`, `Accounts`, and `Repo` are exported by
+  `BlogEngine`, while at the same time these modules define their own sub-boundaries.
 
-  In addition to these constraints, a boundary is implicitly allowed to use exported modules of its
-  immediate children. Note that such dependencies are always implicit, and can't be made explicit
-  in the `:deps` section.
+  This demonstrates the main purpose of sub-boundaries. They are a mechanism which allows you to
+  control the dependencies within the parent boundary. The parent boundary still gets to decide
+  which of these sub-modules will it exports. In this example, `Articles` and `Accounts` are
+  exported, while `Repo` isn't. The sub-boundaries decide what will they depend on themselves.
 
-  No other dependencies are allowed. Some examples of forbidden dependencies are:
+  ### Dependencies
 
-  1. Dependency to a sub-sub-boundary
-  2. Dependency to a sub-boundary of a sibling
-  3. Dependency to a sub-boundary of an ancestor
+  A boundary may only depend on its direct siblings, its parent, and any dependency of its parent.
 
-  Top-level boundaries (boundaries without a parent) follow the same rules. A top-level boundary
-  may only depend on other top-level boundaries.
+  In other words, a boundary inherits all the constraints of its parent, and it can't bring in any
+  new deps. However, a boundary doesn't inherit its parent's deps by default. Instead, it has to
+  declare these deps explicitly.
 
-  Finally, it's worth noting that a sub-boundary doesn't "inherit" any deps from its ancestors.
+  A boundary can't depend on its descendants. However, the modules from the parent boundary are
+  implicitly allowed to use the exports of the child sub-boundaries (but not of the descendants).
 
-  ### Cross-app dependency rules
-
-  Dependencies to boundaries from other apps are not restrained with respect to the in-app
-  hierarchy. A sub-boundary may depend on an external dep, even though its parent doesn't.
+  #### Cross-app dependencies
 
   If the external lib defines its own boundaries, you can only depend on the top-level boundaries.
   If implicit boundaries are used (app doesn't define its own boundaries), all such boundaries
   are considered as top-level, and you can depend on any boundary from such app.
-
 
   ### Promoting boundaries to top-level
 
   It's possible to turn a nested boundary into a top-level boundary:
 
   ```
-  defmodule MySystem.Application do
+  defmodule BlogEngine.Application do
     use Boundary, top_level?: true
   end
   ```
 
-  In this case `MySystem.Application` is not considered to be a sub-boundary of `MySystem`. This is
-  a hacky option which is usually discouraged because it introduces a mismatch between file and
-  namespace hierarchy, and the logical model hierarchy.
+  In this case `BlogEngine.Application` is not considered to be a sub-boundary of `BlogEngine`.
+  This option is discouraged because it introduces a mismatch between the namespace hierarchy,
+  and the logical model. Conceptually, `BlogEngine.Application` is a sibling of `BlogEngine` and
+  `BlogEngineWeb`, but in the namespace hierarchy it usually resides under the context namespace
+  (courtesy of generators such as `mix new` and `mix phx.new`).
 
-  The OTP application is a notable counter-example, because in a typical Phoenix-powered system,
-  the application module depends on both context and the web. Promoting the app to top-level allows
-  you to express this relationship without needing to include web as a dep of the context (which
-  you can't do anyway, since cycles are not supported).
-
-  However, a better option is to rename the module into `MySystemApp`:
+  An alternative is to rename the module to `MySystemApp`:
 
   ```
   defmodule MySystemApp do
@@ -473,7 +483,7 @@ defmodule Boundary do
   end
   ```
 
-  That way the folder and the namespace structure will follow the logical model hierarchy.
+  That way the namespace hierarchy will match the logical model.
   """
 
   require Boundary.Definition

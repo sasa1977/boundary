@@ -16,8 +16,8 @@ defmodule Boundary.Checker do
 
   defp invalid_deps(view) do
     for boundary <- Boundary.all(view),
-        {dep, _type} <- boundary.deps,
-        error = validate_dep(view, boundary, dep),
+        {dep, type} <- boundary.deps,
+        error = validate_dep(view, boundary, dep, type),
         error != :ok,
         into: MapSet.new(),
         do: error
@@ -25,10 +25,10 @@ defmodule Boundary.Checker do
 
   defp invalid_config(view), do: view |> Boundary.all() |> Enum.flat_map(& &1.errors)
 
-  defp validate_dep(view, from_boundary, dep) do
+  defp validate_dep(view, from_boundary, dep, type) do
     with {:ok, to_boundary} <- fetch_dep_boundary(view, from_boundary, dep),
          :ok <- validate_dep_not_ignored(from_boundary, to_boundary),
-         do: validate_dep_allowed(view, from_boundary, to_boundary)
+         do: validate_dep_allowed(view, from_boundary, to_boundary, type)
   end
 
   defp fetch_dep_boundary(view, from_boundary, dep) do
@@ -44,15 +44,15 @@ defmodule Boundary.Checker do
       else: :ok
   end
 
-  defp validate_dep_allowed(_view, from_boundary, from_boundary),
+  defp validate_dep_allowed(_view, from_boundary, from_boundary, _type),
     do: {:forbidden_dep, %{name: from_boundary.name, file: from_boundary.file, line: from_boundary.line}}
 
-  defp validate_dep_allowed(view, from_boundary, to_boundary) do
-    # A boundary can only depend on its siblings, or any sibling of its ancestor.
-    if from_boundary
-       |> Stream.iterate(&Boundary.parent(view, &1))
-       |> Stream.take_while(&(not is_nil(&1)))
-       |> Enum.any?(&(&1 == to_boundary or Boundary.parent(view, &1) == Boundary.parent(view, to_boundary))),
+  defp validate_dep_allowed(view, from_boundary, to_boundary, type) do
+    parent_boundary = Boundary.parent(view, from_boundary)
+
+    # a boundary can depend on its sibling or a dep of its parent
+    if parent_boundary == Boundary.parent(view, to_boundary) or
+         (not is_nil(parent_boundary) and {to_boundary.name, type} in parent_boundary.deps),
        do: :ok,
        else: {:forbidden_dep, %{name: to_boundary.name, file: from_boundary.file, line: from_boundary.line}}
   end
@@ -70,6 +70,7 @@ defmodule Boundary.Checker do
       is_nil(Boundary.app(view, export.name)) ->
         {:unknown_export, export}
 
+      # boundary can export top-level module of its direct child sub-boundary
       match?(%{ancestors: [^boundary_name | _]}, Boundary.get(view, export.name)) ->
         nil
 
