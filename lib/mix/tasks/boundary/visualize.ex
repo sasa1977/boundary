@@ -33,13 +33,10 @@ defmodule Mix.Tasks.Boundary.Visualize do
   end
 
   defp boundary_to_edges(%{name: name, deps: deps}) do
-    boundary_node = format_node(name)
-
     deps
     |> Enum.sort()
-    |> Enum.map(fn {name, _mode} ->
-      dep_node = format_node(name)
-      {boundary_node, dep_node}
+    |> Enum.map(fn {dep_name, mode} ->
+      {name, dep_name, mode}
     end)
   end
 
@@ -54,18 +51,19 @@ defmodule Mix.Tasks.Boundary.Visualize do
     """
   end
 
+  defp format_edge({node1, node2}), do: format_edge({node1, node2, []})
+
+  defp format_edge({node1, node2, mode}),
+    do: "#{format_node(node1)} -> #{format_node(node2)}#{format_attributes(mode)}"
+
   def format_node(module_name) do
     module_name
     |> Module.split()
     |> Enum.join(".")
   end
 
-  defp format_edge({node1, node2}), do: format_edge({node1, node2, []})
-  defp format_edge({node1, node2, attributes}), do: "#{node1} -> #{node2}#{format_attributes(attributes)}"
-
-  defp format_attributes([]), do: ""
-  defp format_attributes(attributes), do: " [#{attributes |> Enum.map(&format_attribute/1) |> Enum.join(", ")}]"
-  defp format_attribute({name, value}), do: "#{name} = #{value}"
+  defp format_attributes(:runtime), do: ""
+  defp format_attributes(:compile), do: " [style = dashed, color = gray, label = \"compile\"]"
 
   defp write_graph(name, content) do
     output_path = Path.join([File.cwd!(), @output_folder])
