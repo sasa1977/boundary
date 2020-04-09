@@ -12,73 +12,111 @@ defmodule Mix.Tasks.Boundary.Visualize do
     Mix.Task.run("compile")
     Boundary.Mix.load_app()
 
-    app_name = Boundary.Mix.app_name()
+    File.mkdir(@output_folder)
 
-    graph =
-      format_graph(
-        "#{app_name} application",
-        app_name
-        |> Boundary.view()
-        |> Boundary.all()
-        |> Stream.filter(&(&1.app == Boundary.Mix.app_name()))
-        |> Stream.reject(&Enum.empty?(&1.deps))
-        |> Stream.filter(&Enum.empty?(&1.ancestors))
-        |> Enum.sort_by(& &1.name)
-        |> Enum.flat_map(&boundary_to_edges/1)
-      )
+    view = Boundary.Mix.app_name() |> Boundary.view()
 
-    write_graph("app", graph) |> draw_graph
+    view
+    |> Boundary.all()
+    |> Enum.group_by(&Boundary.parent(view, &1))
+    |> Enum.each(fn {main_boundary, boundaries} ->
+      nodes = build_nodes(main_boundary, boundaries)
+      edges = build_edges(main_boundary, boundaries)
+      title = format_title(main_boundary)
+      graph = format_graph(title, nodes, edges)
+      file_path = format_file_path(main_boundary)
+
+      File.write!(file_path, graph)
+
+      # image_file_path = "#{Path.rootname(file_path)}.png"
+      # System.cmd("dot", ["-Tpng", file_path, "-o", image_file_path])
+      # System.cmd("open", [image_file_path])
+      # Process.sleep(1000)
+    end)
 
     :ok
   end
 
-  defp boundary_to_edges(%{name: name, deps: deps}) do
-    deps
-    |> Enum.sort()
-    |> Enum.map(fn {dep_name, mode} ->
-      {name, dep_name, mode}
+  defp build_nodes(main_boundary, boundaries) do
+    boundaries
+    |> Enum.flat_map(fn %{name: name, deps: deps} ->
+      [name | Enum.map(deps, &elem(&1, 0))]
+    end)
+    |> Enum.uniq()
+    |> Enum.map(&build_node(main_boundary, &1))
+  end
+
+  defp build_node(nil, module), do: {module, :sibling}
+
+  defp build_node(main_boundary, module) do
+    if Module.split(main_boundary.name) == Module.split(module) |> Enum.drop(-1) do
+      {module, :sibling}
+    else
+      {module, nil}
+    end
+  end
+
+  defp build_edges(_main_boundary, boundaries) do
+    boundaries
+    |> Enum.flat_map(fn %{name: name, deps: deps} ->
+      Enum.map(deps, fn {dep_name, mode} ->
+        {name, dep_name, mode}
+      end)
     end)
   end
 
-  defp format_graph(title, edges) do
+  defp format_file_path(boundary) do
+    name = if is_nil(boundary), do: "app", else: format_name(boundary.name)
+    Path.join([File.cwd!(), @output_folder, "#{name}.dot"])
+  end
+
+  defp format_title(nil), do: "#{Boundary.Mix.app_name()} application"
+  defp format_title(boundary), do: "#{format_name(boundary.name)} boundary"
+
+  defp format_graph(title, nodes, edges) do
     """
     digraph {
-      #{edges |> Enum.map(&format_edge/1) |> Enum.join(";\n  ")};
-
       label="#{title}";
       labelloc=top;
+
+      #{format_nodes(nodes)};
+
+      #{format_edges(edges)};
     }
     """
   end
 
-  defp format_edge({node1, node2}), do: format_edge({node1, node2, []})
+  defp format_nodes(nodes) do
+    nodes
+    |> Enum.sort()
+    |> Enum.map(&format_node_description/1)
+    |> Enum.join(";\n  ")
+  end
 
-  defp format_edge({node1, node2, mode}),
-    do: "#{format_node(node1)} -> #{format_node(node2)}#{format_attributes(mode)}"
+  def format_node_description({module, :sibling}), do: format_node(module)
+  def format_node_description({module, _}), do: "#{format_node(module)} [color = \"gray\"]"
 
-  def format_node(module_name) do
-    module_name
+  defp format_edges(edges) do
+    edges
+    |> Enum.sort()
+    |> Enum.map(&format_edge/1)
+    |> Enum.join(";\n  ")
+  end
+
+  defp format_edge(edge = {module1, module2, _}) do
+    "#{format_node(module1)} -> #{format_node(module2)}#{format_edge_attributes(edge)}"
+  end
+
+  def format_node(module) when is_atom(module) do
+    "\"#{format_name(module)}\""
+  end
+
+  defp format_name(module) when is_atom(module) do
+    module
     |> Module.split()
     |> Enum.join(".")
   end
 
-  defp format_attributes(:runtime), do: ""
-  defp format_attributes(:compile), do: " [style = dashed, color = gray, label = \"compile\"]"
-
-  defp write_graph(name, content) do
-    output_path = Path.join([File.cwd!(), @output_folder])
-    dot_file_path = Path.join(output_path, "#{name}.dot")
-    File.mkdir(output_path)
-    File.write!(dot_file_path, content)
-    dot_file_path
-  end
-
-  defp draw_graph(dot_file_path) do
-    image_dir_path = Path.dirname(dot_file_path)
-    image_file_name = Path.basename(dot_file_path, ".dot")
-    image_file_path = Path.join([image_dir_path, "#{image_file_name}.png"]) |> IO.inspect()
-    System.cmd("dot", ["-Tpng", dot_file_path, "-o", image_file_path])
-    System.cmd("open", [image_file_path])
-    Process.sleep(1000)
-  end
+  defp format_edge_attributes(_node = {_, _, :runtime}), do: ""
+  defp format_edge_attributes(_node = {_, _, :compile}), do: " [label = \"compile\"]"
 end

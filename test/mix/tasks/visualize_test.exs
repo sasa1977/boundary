@@ -15,7 +15,7 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
 
           defmodule Repo do end
           defmodule Accounts do
-            use Boundary, deps: [Repo]
+            use Boundary, deps: [Repo, {Mix, :compile}]
           end
           defmodule Articles do
             use Boundary, deps: [Repo, Accounts]
@@ -27,7 +27,7 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
         end
 
         defmodule BlogEngineApp do
-          use Boundary, deps: [BlogEngineWeb, BlogEngine], exports: []
+          use Boundary, deps: [BlogEngineWeb, BlogEngine, {Mix, :compile}], exports: []
         end
         """
       )
@@ -38,33 +38,45 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
         Path.join([project.path, "dot", "app.dot"]),
         """
         digraph {
-          BlogEngineApp -> BlogEngine;
-          BlogEngineApp -> BlogEngineWeb;
-          BlogEngineWeb -> BlogEngine;
-
-          label="test_project_2 application";
+          label="#{project.app} application";
           labelloc=top;
+
+          "BlogEngine";
+          "BlogEngineApp";
+          "BlogEngineWeb";
+          "Mix";
+
+          "BlogEngineApp" -> "BlogEngine";
+          "BlogEngineApp" -> "BlogEngineWeb";
+          "BlogEngineApp" -> "Mix" [label = \"compile\"];
+          "BlogEngineWeb" -> "BlogEngine";
         }
         """
       )
 
-      # test_output_file(
-      #   Path.join([project.path, "dot", "BlogEngine.dot"]),
-      #   """
-      #   digraph {
-      #     Articles -> Accounts;
-      #     Articles -> Repo;
-      #     Accounts -> Repo;
+      test_output_file(
+        Path.join([project.path, "dot", "BlogEngine.dot"]),
+        """
+        digraph {
+          label="BlogEngine boundary";
+          labelloc=top;
 
-      #     label="test_project_2 boundary";
-      #     labelloc=top;
-      #   }
-      #   """
-      # )
+          "BlogEngine.Accounts";
+          "BlogEngine.Articles";
+          "BlogEngine.Repo";
+          "Mix" [color = \"gray\"];
+
+          "BlogEngine.Accounts" -> "BlogEngine.Repo";
+          "BlogEngine.Accounts" -> "Mix" [label = \"compile\"];
+          "BlogEngine.Articles" -> "BlogEngine.Accounts";
+          "BlogEngine.Articles" -> "BlogEngine.Repo";
+        }
+        """
+      )
     end)
   end
 
-  def test_output_file(path, content) do
+  defp test_output_file(path, content) do
     assert File.exists?(path)
     assert File.read!(path) =~ content
   end
