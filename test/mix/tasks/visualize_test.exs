@@ -35,7 +35,7 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
       TestProject.run_task("boundary.visualize")
 
       test_output_file(
-        Path.join([project.path, "dot", "app.dot"]),
+        Path.join([project.path, "boundary", "app.dot"]),
         """
         digraph {
           label="#{project.app} application";
@@ -55,7 +55,7 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
       )
 
       test_output_file(
-        Path.join([project.path, "dot", "BlogEngine.dot"]),
+        Path.join([project.path, "boundary", "BlogEngine.dot"]),
         """
         digraph {
           label="BlogEngine boundary";

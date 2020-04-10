@@ -5,7 +5,7 @@ defmodule Mix.Tasks.Boundary.Visualize do
   use Boundary, classify_to: Boundary.Mix
   use Mix.Task
 
-  @output_folder "dot"
+  @output_folder "boundary"
 
   @impl Mix.Task
   def run(_argv) do
