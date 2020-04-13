@@ -48,7 +48,7 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
 
           "BlogEngineApp" -> "BlogEngine";
           "BlogEngineApp" -> "BlogEngineWeb";
-          "BlogEngineApp" -> "Mix" [label = \"compile\"];
+          "BlogEngineApp" -> "Mix" [label = "compile"];
           "BlogEngineWeb" -> "BlogEngine";
         }
         """
@@ -67,7 +67,7 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
           "Mix" [color = \"gray\"];
 
           "BlogEngine.Accounts" -> "BlogEngine.Repo";
-          "BlogEngine.Accounts" -> "Mix" [label = \"compile\"];
+          "BlogEngine.Accounts" -> "Mix" [label = "compile"];
           "BlogEngine.Articles" -> "BlogEngine.Accounts";
           "BlogEngine.Articles" -> "BlogEngine.Repo";
         }

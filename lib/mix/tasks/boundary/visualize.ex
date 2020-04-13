@@ -79,7 +79,7 @@ defmodule Mix.Tasks.Boundary.Visualize do
   end
 
   def format_node_description({module, :sibling}), do: format_node(module)
-  def format_node_description({module, _}), do: "#{format_node(module)} [color = \"gray\"]"
+  def format_node_description({module, _}), do: ~s/#{format_node(module)} [color = "gray"]/
 
   defp format_edges(edges) do
     edges
@@ -93,7 +93,7 @@ defmodule Mix.Tasks.Boundary.Visualize do
   end
 
   def format_node(module) when is_atom(module) do
-    "\"#{format_name(module)}\""
+    ~s/"#{format_name(module)}"/
   end
 
   defp format_name(module) when is_atom(module) do
@@ -103,5 +103,5 @@ defmodule Mix.Tasks.Boundary.Visualize do
   end
 
   defp format_edge_attributes(_node = {_, _, :runtime}), do: ""
-  defp format_edge_attributes(_node = {_, _, :compile}), do: " [label = \"compile\"]"
+  defp format_edge_attributes(_node = {_, _, :compile}), do: ~s/ [label = "compile"]/
 end
