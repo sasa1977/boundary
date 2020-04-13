@@ -27,11 +27,6 @@ defmodule Mix.Tasks.Boundary.Visualize do
       file_path = format_file_path(main_boundary)
 
       File.write!(file_path, graph)
-
-      # image_file_path = "#{Path.rootname(file_path)}.png"
-      # System.cmd("dot", ["-Tpng", file_path, "-o", image_file_path])
-      # System.cmd("open", [image_file_path])
-      # Process.sleep(1000)
     end)
 
     :ok
