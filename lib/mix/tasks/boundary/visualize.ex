@@ -51,12 +51,12 @@ defmodule Mix.Tasks.Boundary.Visualize do
   end
 
   defp format_file_path(boundary) do
-    name = if is_nil(boundary), do: "app", else: format_name(boundary.name)
+    name = if is_nil(boundary), do: "app", else: inspect(boundary.name)
     Path.join([File.cwd!(), @output_folder, "#{name}.dot"])
   end
 
   defp format_title(nil), do: "#{Boundary.Mix.app_name()} application"
-  defp format_title(boundary), do: "#{format_name(boundary.name)} boundary"
+  defp format_title(boundary), do: "#{inspect(boundary.name)} boundary"
 
   defp format_graph(title, nodes, edges) do
     """
@@ -93,13 +93,7 @@ defmodule Mix.Tasks.Boundary.Visualize do
   end
 
   def format_node(module) do
-    ~s/"#{format_name(module)}"/
-  end
-
-  defp format_name(module) do
-    module
-    |> Module.split()
-    |> Enum.join(".")
+    ~s/"#{inspect(module)}"/
   end
 
   defp format_edge_attributes(_node = {_, _, :runtime}), do: ""
