@@ -92,11 +92,11 @@ defmodule Mix.Tasks.Boundary.Visualize do
     "#{format_node(module1)} -> #{format_node(module2)}#{format_edge_attributes(edge)}"
   end
 
-  def format_node(module) when is_atom(module) do
+  def format_node(module) do
     ~s/"#{format_name(module)}"/
   end
 
-  defp format_name(module) when is_atom(module) do
+  defp format_name(module) do
     module
     |> Module.split()
     |> Enum.join(".")
