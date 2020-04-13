@@ -33,31 +33,21 @@ defmodule Mix.Tasks.Boundary.Visualize do
   end
 
   defp build_nodes(main_boundary, boundaries) do
-    boundaries
-    |> Enum.flat_map(fn %{name: name, deps: deps} ->
-      [name | Enum.map(deps, &elem(&1, 0))]
-    end)
+    for(%{name: name, deps: deps} <- boundaries, {dep_name, _mode} <- deps, do: [name, dep_name])
+    |> List.flatten()
     |> Enum.uniq()
-    |> Enum.map(&build_node(main_boundary, &1))
-  end
-
-  defp build_node(nil, module), do: {module, :sibling}
-
-  defp build_node(main_boundary, module) do
-    if Module.split(main_boundary.name) == Module.split(module) |> Enum.drop(-1) do
-      {module, :sibling}
-    else
-      {module, nil}
-    end
+    |> Enum.sort()
+    |> Enum.map(fn module ->
+      cond do
+        is_nil(main_boundary) -> {module, :sibling}
+        Module.split(main_boundary.name) == Module.split(module) |> Enum.drop(-1) -> {module, :sibling}
+        true -> {module, nil}
+      end
+    end)
   end
 
   defp build_edges(boundaries) do
-    boundaries
-    |> Enum.flat_map(fn %{name: name, deps: deps} ->
-      Enum.map(deps, fn {dep_name, mode} ->
-        {name, dep_name, mode}
-      end)
-    end)
+    for %{name: name, deps: deps} <- boundaries, {dep_name, mode} <- deps, do: {name, dep_name, mode}
   end
 
   defp format_file_path(boundary) do
