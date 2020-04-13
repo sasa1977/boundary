@@ -21,7 +21,7 @@ defmodule Mix.Tasks.Boundary.Visualize do
     |> Enum.group_by(&Boundary.parent(view, &1))
     |> Enum.each(fn {main_boundary, boundaries} ->
       nodes = build_nodes(main_boundary, boundaries)
-      edges = build_edges(main_boundary, boundaries)
+      edges = build_edges(boundaries)
       title = format_title(main_boundary)
       graph = format_graph(title, nodes, edges)
       file_path = format_file_path(main_boundary)
@@ -51,7 +51,7 @@ defmodule Mix.Tasks.Boundary.Visualize do
     end
   end
 
-  defp build_edges(_main_boundary, boundaries) do
+  defp build_edges(boundaries) do
     boundaries
     |> Enum.flat_map(fn %{name: name, deps: deps} ->
       Enum.map(deps, fn {dep_name, mode} ->
