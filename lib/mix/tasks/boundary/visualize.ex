@@ -1,6 +1,6 @@
 defmodule Mix.Tasks.Boundary.Visualize do
-  @shortdoc "Generates a graphviz a dot file for each non-empty boundary."
-  @moduledoc "Generates a graphviz a dot file for each non-empty boundary."
+  @shortdoc "Generates a graphviz dot file for each non-empty boundary."
+  @moduledoc "Generates a graphviz dot file for each non-empty boundary."
 
   use Boundary, classify_to: Boundary.Mix
   use Mix.Task
@@ -14,13 +14,14 @@ defmodule Mix.Tasks.Boundary.Visualize do
 
     File.mkdir(@output_folder)
 
-    view = Boundary.Mix.app_name() |> Boundary.view()
+    view = Boundary.view(Boundary.Mix.app_name())
 
     view
     |> Boundary.all()
+    |> Stream.filter(&(&1.app == Boundary.Mix.app_name()))
     |> Enum.group_by(&Boundary.parent(view, &1))
     |> Enum.each(fn {main_boundary, boundaries} ->
-      nodes = build_nodes(main_boundary, boundaries)
+      nodes = build_nodes(view, main_boundary, boundaries)
       edges = build_edges(boundaries)
       title = format_title(main_boundary)
       graph = format_graph(title, nodes, edges)
@@ -29,25 +30,28 @@ defmodule Mix.Tasks.Boundary.Visualize do
       File.write!(file_path, graph)
     end)
 
+    Mix.shell().info([:green, "Files successfully generated in the `#{@output_folder}` folder."])
+
     :ok
   end
 
-  defp build_nodes(main_boundary, boundaries) do
-    for(%{name: name, deps: deps} <- boundaries, {dep_name, _mode} <- deps, do: [name, dep_name])
-    |> List.flatten()
-    |> Enum.uniq()
+  defp build_nodes(view, main_boundary, boundaries) do
+    boundaries
+    |> Stream.flat_map(&[&1.name | Enum.map(&1.deps, fn {name, _type} -> name end)])
+    |> Stream.uniq()
     |> Enum.sort()
     |> Enum.map(fn module ->
-      cond do
-        is_nil(main_boundary) -> {module, :sibling}
-        Module.split(main_boundary.name) == Module.split(module) |> Enum.drop(-1) -> {module, :sibling}
-        true -> {module, nil}
-      end
+      {
+        module,
+        if(Boundary.parent(view, Boundary.fetch!(view, module)) == main_boundary, do: :sibling, else: nil)
+      }
     end)
   end
 
   defp build_edges(boundaries) do
-    for %{name: name, deps: deps} <- boundaries, {dep_name, mode} <- deps, do: {name, dep_name, mode}
+    for %{name: name, deps: deps} <- boundaries,
+        {dep_name, mode} <- deps,
+        do: {name, dep_name, mode}
   end
 
   defp format_file_path(boundary) do
@@ -59,43 +63,42 @@ defmodule Mix.Tasks.Boundary.Visualize do
   defp format_title(boundary), do: "#{inspect(boundary.name)} boundary"
 
   defp format_graph(title, nodes, edges) do
-    """
-    digraph {
-      label="#{title}";
-      labelloc=top;
+    body =
+      [
+        [
+          ~s/label="#{title}"/,
+          ~s/labelloc=top/
+        ],
+        node_clauses(nodes),
+        edge_clauses(edges)
+      ]
+      |> Stream.reject(&Enum.empty?/1)
+      |> Stream.intersperse(?\n)
+      |> Enum.map(fn part -> with [_ | _] = clauses <- part, do: Enum.map(clauses, &"  #{&1};\n") end)
 
-      #{format_nodes(nodes)};
-
-      #{format_edges(edges)};
-    }
-    """
+    "digraph {\n#{body}}\n"
   end
 
-  defp format_nodes(nodes) do
+  defp node_clauses(nodes) do
     nodes
     |> Enum.sort()
     |> Enum.map(&format_node_description/1)
-    |> Enum.join(";\n  ")
   end
 
-  def format_node_description({module, :sibling}), do: format_node(module)
-  def format_node_description({module, _}), do: ~s/#{format_node(module)} [color = "gray"]/
+  defp format_node_description({module, :sibling}), do: format_node(module)
+  defp format_node_description({module, _}), do: ~s/#{format_node(module)} [color = "gray"]/
 
-  defp format_edges(edges) do
+  defp edge_clauses(edges) do
     edges
     |> Enum.sort()
     |> Enum.map(&format_edge/1)
-    |> Enum.join(";\n  ")
   end
 
-  defp format_edge(edge = {module1, module2, _}) do
-    "#{format_node(module1)} -> #{format_node(module2)}#{format_edge_attributes(edge)}"
-  end
+  defp format_edge({module1, module2, _} = edge),
+    do: "#{format_node(module1)} -> #{format_node(module2)}#{format_edge_attributes(edge)}"
 
-  def format_node(module) do
-    ~s/"#{inspect(module)}"/
-  end
+  defp format_node(module), do: ~s/"#{inspect(module)}"/
 
-  defp format_edge_attributes(_node = {_, _, :runtime}), do: ""
-  defp format_edge_attributes(_node = {_, _, :compile}), do: ~s/ [label = "compile"]/
+  defp format_edge_attributes({_, _, :runtime}), do: ""
+  defp format_edge_attributes({_, _, :compile}), do: ~s/ [label = "compile"]/
 end

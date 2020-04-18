@@ -13,10 +13,14 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
         defmodule BlogEngine do
           use Boundary
 
-          defmodule Repo do end
+          defmodule Repo do
+            use Boundary
+          end
+
           defmodule Accounts do
             use Boundary, deps: [Repo, {Mix, :compile}]
           end
+
           defmodule Articles do
             use Boundary, deps: [Repo, Accounts]
           end
