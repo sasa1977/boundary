@@ -531,21 +531,8 @@ defmodule Boundary do
 
   @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
 
-  defmacro __using__(opts) do
-    opts =
-      Enum.map(
-        opts,
-        fn
-          {key, references} when key in ~w/deps exports/a -> {key, normalize_references(references)}
-          other -> other
-        end
-      )
-
-    quote do
-      require Boundary.Definition
-      Definition.generate(unquote(opts))
-    end
-  end
+  @doc false
+  defmacro __using__(opts), do: Boundary.Definition.generate(__CALLER__, opts)
 
   @spec view(atom) :: view
   def view(app), do: View.build(app)
@@ -608,19 +595,6 @@ defmodule Boundary do
   @spec parent(view, t) :: t | nil
   def parent(_view, %{ancestors: []}), do: nil
   def parent(view, %{ancestors: [parent_name | _]}), do: fetch!(view, parent_name)
-
-  defp normalize_references(references) do
-    Enum.flat_map(
-      references,
-      fn
-        reference ->
-          case Macro.decompose_call(reference) do
-            {parent, :{}, children} -> Enum.map(children, &quote(do: Module.concat(unquote([parent, &1]))))
-            _ -> [reference]
-          end
-      end
-    )
-  end
 
   defmodule Error do
     defexception [:message, :file, :line]

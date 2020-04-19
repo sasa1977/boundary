@@ -3,7 +3,18 @@ defmodule Boundary.Definition do
 
   # credo:disable-for-this-file Credo.Check.Readability.Specs
 
-  defmacro generate(opts) do
+  defmacro generate(opts), do: generate(__CALLER__, opts)
+
+  def generate(caller, opts) do
+    opts =
+      Enum.map(
+        opts,
+        fn
+          {key, references} when key in ~w/deps exports/a -> {key, normalize_references(references, caller)}
+          other -> other
+        end
+      )
+
     quote bind_quoted: [opts: opts, app: Keyword.fetch!(Mix.Project.config(), :app)] do
       @boundary_opts opts
       @env __ENV__
@@ -13,6 +24,22 @@ defmodule Boundary.Definition do
       # a protocol, which we can only do right before the module is about to be compiled.
       @before_compile Boundary.Definition
     end
+  end
+
+  defp normalize_references(references, caller) do
+    Enum.flat_map(
+      references,
+      fn
+        reference ->
+          references =
+            case Macro.decompose_call(reference) do
+              {parent, :{}, children} -> Enum.map(children, &quote(do: Module.concat(unquote([parent, &1]))))
+              _ -> [reference]
+            end
+
+          Enum.map(references, &Macro.expand(&1, %{caller | function: {:boundary, 1}}))
+      end
+    )
   end
 
   @doc false
