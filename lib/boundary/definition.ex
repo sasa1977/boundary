@@ -1,89 +1,127 @@
+# credo:disable-for-this-file Credo.Check.Readability.Specs
+
 defmodule Boundary.Definition do
   @moduledoc false
 
-  # credo:disable-for-this-file Credo.Check.Readability.Specs
-
-  defmacro generate(opts), do: generate(__CALLER__, opts)
-
-  def generate(caller, opts) do
-    opts =
-      Enum.map(
-        opts,
-        fn
-          {key, references} when key in ~w/deps exports/a -> {key, normalize_references(references, caller)}
-          other -> other
-        end
-      )
+  def generate(opts) do
+    # We'll store the definition as an encoded binary. This will avoid adding any runtime or
+    # compile time dependencies to referenced modules (deps and exports).
+    opts = :erlang.term_to_binary(opts)
 
     quote bind_quoted: [opts: opts, app: Keyword.fetch!(Mix.Project.config(), :app)] do
-      @boundary_opts opts
+      @opts opts
       @env __ENV__
       @app app
 
-      # Definition will be injected in before compile, because we need to check if this module is
+      # Definition will be injected before compile, because we need to check if this module is
       # a protocol, which we can only do right before the module is about to be compiled.
       @before_compile Boundary.Definition
     end
   end
 
-  defp normalize_references(references, caller) do
-    Enum.flat_map(
-      references,
-      fn
-        reference ->
-          references =
-            case Macro.decompose_call(reference) do
-              {parent, :{}, children} -> Enum.map(children, &quote(do: Module.concat(unquote([parent, &1]))))
-              _ -> [reference]
-            end
-
-          Enum.map(references, &Macro.expand(&1, %{caller | function: {:boundary, 1}}))
-      end
-    )
-  end
-
   @doc false
   defmacro __before_compile__(_) do
     quote do
-      case Keyword.pop(@boundary_opts, :classify_to, nil) do
-        {nil, opts} ->
-          Module.register_attribute(__MODULE__, Boundary, persist: true, accumulate: false)
+      Module.register_attribute(__MODULE__, Boundary, persist: true, accumulate: false)
 
-          Module.put_attribute(
-            __MODULE__,
-            Boundary,
-            Boundary.Definition.normalize(@app, __MODULE__, opts, @env)
-          )
+      protocol? = Module.defines?(__MODULE__, {:__impl__, 1}, :def)
+      mix_task? = String.starts_with?(inspect(__MODULE__), "Mix.Tasks.")
 
-        {boundary, opts} ->
-          protocol? = Module.defines?(__MODULE__, {:__impl__, 1}, :def)
-          mix_task? = String.starts_with?(inspect(__MODULE__), "Mix.Tasks.")
-
-          unless protocol? or mix_task?,
-            do: raise(":classify_to can only be provided in protocol implementations and mix tasks")
-
-          if opts != [],
-            do: raise("no other option is allowed with :classify_to")
-
-          Module.register_attribute(__MODULE__, Boundary.Target, persist: true, accumulate: false)
-          Module.put_attribute(__MODULE__, Boundary.Target, %{boundary: boundary, file: @env.file, line: @env.line})
-      end
+      Module.put_attribute(
+        __MODULE__,
+        Boundary,
+        %{
+          opts: @opts,
+          env: @env,
+          app: @app,
+          protocol?: protocol?,
+          mix_task?: mix_task?
+        }
+      )
     end
   end
 
   def get(boundary) do
-    case Keyword.get(boundary.__info__(:attributes), Boundary) do
-      [definition] -> definition
-      nil -> nil
+    with decoded when not is_nil(decoded) <- decode(boundary) do
+      case Keyword.pop(decoded.opts, :classify_to, nil) do
+        {nil, opts} ->
+          normalize(decoded.app, boundary, opts, decoded.env)
+
+        {_boundary, opts} ->
+          if decoded.protocol? or decoded.mix_task? do
+            nil
+          else
+            IO.warn(
+              ":classify_to can only be provided in protocol implementations and mix tasks",
+              Macro.Env.stacktrace(decoded.env)
+            )
+
+            normalize(decoded.app, boundary, opts, decoded.env)
+          end
+      end
     end
   end
 
   def classified_to(module) do
-    case Keyword.get(module.__info__(:attributes), Boundary.Target) do
-      [classify_to] -> classify_to
-      nil -> nil
+    with decoded when not is_nil(decoded) <- decode(module) do
+      case Keyword.pop(decoded.opts, :classify_to, nil) do
+        {nil, _opts} ->
+          nil
+
+        {boundary, opts} ->
+          unless Enum.empty?(opts),
+            do: IO.warn("no other option is allowed if :classify_to is provided", Macro.Env.stacktrace(decoded.env))
+
+          if decoded.protocol? or decoded.mix_task?,
+            do: %{boundary: boundary, file: decoded.env.file, line: decoded.env.line}
+      end
     end
   end
+
+  defp decode(boundary) do
+    with [definition] <- Keyword.get(boundary.__info__(:attributes), Boundary) do
+      Map.update!(
+        definition,
+        :opts,
+        fn encoded ->
+          {decoded, _} =
+            encoded
+            |> :erlang.binary_to_term()
+            |> Enum.map(fn
+              {key, references} when key in ~w/deps exports/a -> {key, expand_references(references, definition.env)}
+              other -> other
+            end)
+            |> Code.eval_quoted([], definition.env)
+
+          decoded
+        end
+      )
+    end
+  end
+
+  defp expand_references(references, env) do
+    Enum.flat_map(
+      references,
+      fn
+        reference ->
+          case Macro.decompose_call(reference) do
+            {parent, :{}, children} ->
+              parent = expand_as_runtime_dep(parent, env)
+              Enum.map(children, &Module.concat(parent, expand_as_runtime_dep(&1, env)))
+
+            _ ->
+              [expand_as_runtime_dep(reference, env)]
+          end
+      end
+    )
+  end
+
+  defp expand_as_runtime_dep(reference, env),
+    # This ensures that dependency to the reference is treated by the compiler as a runtime dep.
+    # Strictly speaking this is not needed, since this function runs after the compilation.
+    # However, we'll still do it because it's not dangerous, and it might reduce compilation time
+    # in stateful compilers, such as ElixirLS.
+    do: Macro.expand(reference, %{env | function: {:boundary, 1}})
 
   @doc false
   def normalize(app, boundary, definition, env) do

@@ -489,7 +489,7 @@ defmodule Boundary do
   require Boundary.Definition
   alias Boundary.{Definition, View}
 
-  Definition.generate(deps: [], exports: [])
+  Code.eval_quoted(Definition.generate(deps: [], exports: []), [], __ENV__)
 
   @type t :: %{
           name: name,
@@ -532,7 +532,7 @@ defmodule Boundary do
   @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
 
   @doc false
-  defmacro __using__(opts), do: Boundary.Definition.generate(__CALLER__, opts)
+  defmacro __using__(opts), do: Definition.generate(opts)
 
   @spec view(atom) :: view
   def view(app), do: View.build(app)
