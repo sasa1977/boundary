@@ -1,3 +1,10 @@
+# 0.5.0
+
+- Support sub-boundaries ([docs](https://hexdocs.pm/boundary/Boundary.html#module-nested-boundaries))
+- Support mass export ([docs](https://hexdocs.pm/boundary/Boundary.html#module-mass-exports))
+- New boundary.visualize mix task which generates a graphiviz dot file for each non-empty boundary
+- Eliminated compile-time dependencies to deps and exports.
+
 # 0.4.4
 
 - Fixed app config bug related to unloading
