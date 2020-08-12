@@ -50,8 +50,9 @@ defmodule Boundary.Checker do
   defp validate_dep_allowed(view, from_boundary, to_boundary, type) do
     parent_boundary = Boundary.parent(view, from_boundary)
 
-    # a boundary can depend on its sibling or a dep of its parent
-    if parent_boundary == Boundary.parent(view, to_boundary) or
+    # a boundary can depend on its parent, sibling, or a dep of its parent
+    if parent_boundary == to_boundary or
+         parent_boundary == Boundary.parent(view, to_boundary) or
          (not is_nil(parent_boundary) and {to_boundary.name, type} in parent_boundary.deps),
        do: :ok,
        else: {:forbidden_dep, %{name: to_boundary.name, file: from_boundary.file, line: from_boundary.line}}

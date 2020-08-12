@@ -717,12 +717,24 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
   module1 = unique_module_name()
 
-  module_test "boundary can depend on it's sibling",
+  module_test "boundary can depend on its sibling",
               """
               defmodule #{module1} do
                 use Boundary
                 defmodule SubBoundary1 do use Boundary, deps: [#{module1}.SubBoundary2] end
                 defmodule SubBoundary2 do use Boundary end
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can depend on its parent",
+              """
+              defmodule #{module1} do
+                use Boundary
+                defmodule SubBoundary do use Boundary, deps: [#{module1}] end
               end
               """ do
     assert warnings == []
