@@ -385,7 +385,7 @@ defmodule Boundary do
   ```
 
   But beyond this, we want to further manage the dependencies inside the context. The context tier
-  consists of the modules `Repo, `Articles, `Accounts, and `Accounts.Mailer`. We'd like to
+  consists of the modules `Repo`, `Articles`, `Accounts`, and `Accounts.Mailer`. We'd like to
   introduce the following constraints:
 
   - `Articles` can use `Accounts` (but not the other way around).
