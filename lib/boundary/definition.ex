@@ -20,7 +20,14 @@ defmodule Boundary.Definition do
   end
 
   @doc false
-  defmacro __before_compile__(_) do
+  defmacro __before_compile__(_env) do
+    module_doc_meta =
+      if Mix.Project.config()[:boundary][:docs_meta] do
+        quote do
+          @moduledoc boundary: :yes
+        end
+      end
+
     quote do
       Module.register_attribute(__MODULE__, Boundary, persist: true, accumulate: false)
 
@@ -38,6 +45,8 @@ defmodule Boundary.Definition do
           mix_task?: mix_task?
         }
       )
+
+      unquote(module_doc_meta)
     end
   end
 
