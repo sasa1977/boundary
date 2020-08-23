@@ -1,6 +1,40 @@
 defmodule Mix.Tasks.Boundary.ExDocGroups do
   @shortdoc "Creates a boundary.exs holding ex_doc module group defintions."
-  @moduledoc "Creates a boundary.exs holding ex_doc module group defintions."
+  @moduledoc """
+  Creates a `boundary.exs` holding ex_doc module group defintions.
+
+  ## Integration with ExDoc
+
+  The `boundary.exs` file can be integrated with ex_doc in your mix.exs:
+
+        def project do
+          [
+            …,
+            aliases: aliases(),
+            docs: docs()
+          ]
+        end
+
+        defp aliases do
+          [
+            …,
+            docs: ["boundary.ex_doc_groups", "docs"]
+          ]
+        end
+
+        defp docs do
+          [
+            …,
+            groups_for_modules: groups_for_modules()
+          ]
+        end
+
+        defp groups_for_modules do
+          {list, _} = Code.eval_file("boundary.exs")
+          list
+        end
+
+  """
 
   # credo:disable-for-this-file Credo.Check.Readability.Specs
 
@@ -35,38 +69,8 @@ defmodule Mix.Tasks.Boundary.ExDocGroups do
 
     File.write("boundary.exs", header <> inspect(mapping))
 
-    doc = """
-    Can be integrated with ex_doc in your mix.exs:
+    Mix.shell().info("\n* creating boundary.exs")
 
-        def project do
-          [
-            …,
-            aliases: aliases(),
-            docs: docs()
-          ]
-        end
-
-        defp aliases do
-          [
-            …,
-            docs: ["boundary.ex_doc_groups", "docs"]
-          ]
-        end
-
-        defp docs do
-          [
-            …,
-            groups_for_modules: groups_for_modules()
-          ]
-        end
-
-        defp groups_for_modules do
-          {list, _} = Code.eval_file("boundary.exs")
-          list
-        end
-    """
-
-    Mix.shell().info("\n* creating boundary.exs\n\n#{doc}")
   end
 
   defp module_name_to_group_key(name) do
