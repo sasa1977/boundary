@@ -29,14 +29,37 @@ defmodule Boundary.Classifier do
   def classify(classifier, modules, boundaries) do
     trie = build_trie(boundaries)
 
-    boundaries = Enum.reduce(boundaries, classifier.boundaries, &Map.put_new(&2, &1.name, &1))
-    classifier = %{classifier | boundaries: boundaries}
+    classifier = %{
+      classifier
+      | boundaries:
+          trie
+          |> boundaries()
+          |> Stream.map(fn
+            %{top_level?: true} = boundary -> %{boundary | ancestors: []}
+            %{top_level?: false} = boundary -> boundary
+          end)
+          |> Stream.map(&Map.delete(&1, :top_level?))
+          |> Enum.into(classifier.boundaries, &{&1.name, &1})
+    }
 
     for module <- modules,
         boundary = find_boundary(trie, module),
         reduce: classifier do
       classifier -> Map.update!(classifier, :modules, &Map.put(&1, module, boundary.name))
     end
+  end
+
+  defp boundaries(trie, ancestors \\ []) do
+    ancestors = if is_nil(trie.boundary), do: ancestors, else: [trie.boundary.name | ancestors]
+
+    child_boundaries =
+      trie.children
+      |> Map.values()
+      |> Enum.flat_map(&boundaries(&1, ancestors))
+
+    if is_nil(trie.boundary),
+      do: child_boundaries,
+      else: [Map.put(trie.boundary, :ancestors, tl(ancestors)) | child_boundaries]
   end
 
   defp build_trie(boundaries), do: Enum.reduce(boundaries, new_trie(), &add_boundary(&2, &1))

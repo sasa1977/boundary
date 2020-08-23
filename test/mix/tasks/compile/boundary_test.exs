@@ -188,6 +188,23 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module1 = unique_module_name()
   module2 = unique_module_name()
 
+  module_test "call to an unclassified module is not reported",
+              """
+              defmodule #{module1} do
+                use Boundary, externals_mode: :strict
+                def fun1(), do: #{module2}.fun()
+              end
+
+              defmodule #{module2} do
+                def fun(), do: :ok
+              end
+              """ do
+    assert [%{message: "#{unquote(module2)} is not included in any boundary"}] = warnings
+  end
+
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
   module_test "protocol implementation is by default ignored",
               """
               defmodule #{module1} do
@@ -292,12 +309,18 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module_test "export can't be from another boundary",
               """
               defmodule #{module1} do
-                use Boundary, exports: [Inner]
-                defmodule Inner do use Boundary end
+                use Boundary, exports: [Inner.Private]
+                defmodule Inner do
+                  use Boundary
+
+                  defmodule Private do end
+                end
               end
               """ do
-    assert [%{message: "module #{unquote(module1)}.Inner can't be exported because it's not a part of this boundary"}] =
-             warnings
+    assert [warning] = warnings
+
+    assert warning.message ==
+             "module #{unquote(module1)}.Inner.Private can't be exported because it's not a part of this boundary"
   end
 
   module1 = unique_module_name()
@@ -355,7 +378,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
                 def fun(), do: #{module1}.Inner.fun()
 
                 defmodule Inner do
-                  use Boundary
+                  use Boundary, top_level?: true
                   def fun(), do: :ok
                 end
               end
@@ -513,7 +536,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module_test "can't use dep or export in an ignored boundary",
               """
               defmodule #{module1} do
-                use Boundary, ignore?: true, exports: [Foo], deps: [#{module1}.Bar]
+                use Boundary, ignore?: true, exports: [Foo], deps: [LibWithBoundaries.Boundary1]
 
                 defmodule Foo do end
                 defmodule Bar do use Boundary end
@@ -545,6 +568,245 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               end
               """ do
     assert [%{message: "extra_externals can't be provided in strict mode"}] = warnings
+  end
+
+  module1 = unique_module_name()
+
+  module_test "module is classified to its own app",
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [{Mix, :compile}]
+
+                def fun(), do: Mix.MyTask.fun()
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
+  module_test "boundary can export the top-level module of its sub-boundary",
+              """
+              defmodule #{module1} do
+                use Boundary, exports: [SubModule]
+                def fun(), do: :ok
+
+                defmodule SubModule do
+                  use Boundary
+                  def fun(), do: :ok
+                end
+              end
+
+              defmodule #{module2} do
+                use Boundary, deps: [#{module1}]
+                def fun(), do: #{module1}.SubModule.fun()
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary is allowed to invoke exports of its direct children",
+              """
+              defmodule #{module1} do
+                use Boundary
+
+                def fun() do
+                  #{module1}.SubBoundary.fun()
+                  #{module1}.SubBoundary.Foo.fun()
+                end
+
+                defmodule SubBoundary do
+                  use Boundary, exports: [Foo]
+                  def fun(), do: :ok
+
+                  defmodule Foo do def fun() do :ok end end
+                end
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary is not allowed to invoke internals of its direct children",
+              """
+              defmodule #{module1} do
+                use Boundary
+                def fun() do #{module1}.SubBoundary.Foo.fun() end
+
+                defmodule SubBoundary do
+                  use Boundary
+                  defmodule Foo do def fun() do :ok end end
+                end
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "module #{unquote(module1)}.SubBoundary.Foo is not exported by its owner boundary"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can't depend on itself",
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [#{module1}]
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "#{unquote(module1)} can't be listed as a dependency"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can't depend on its child",
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [#{module1}.SubBoundary]
+                defmodule SubBoundary do use Boundary end
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "#{unquote(module1)}.SubBoundary can't be listed as a dependency"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can depend on its child if it's explicitly declared as a top-level boundary",
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [#{module1}.SubBoundary]
+                defmodule SubBoundary do use Boundary, top_level?: true end
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
+  module_test "boundary can't depend on someone else's child",
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [#{module2}.SubBoundary]
+                defmodule SubBoundary do use Boundary end
+              end
+
+              defmodule #{module2} do
+                use Boundary
+                defmodule SubBoundary do use Boundary end
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "#{unquote(module2)}.SubBoundary can't be listed as a dependency"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can't depend on an external's subboundary",
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [LibWithBoundaries.Boundary1.SubBoundary]
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "LibWithBoundaries.Boundary1.SubBoundary can't be listed as a dependency"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can depend on its sibling",
+              """
+              defmodule #{module1} do
+                use Boundary
+                defmodule SubBoundary1 do use Boundary, deps: [#{module1}.SubBoundary2] end
+                defmodule SubBoundary2 do use Boundary end
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can depend on its parent",
+              """
+              defmodule #{module1} do
+                use Boundary
+                defmodule SubBoundary do use Boundary, deps: [#{module1}] end
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can depend on a dep of its parent",
+              """
+              defmodule #{module1} do
+                use Boundary
+
+                defmodule SubBoundary1 do use Boundary end
+
+                defmodule SubBoundary2 do
+                  use Boundary, deps: [#{module1}.SubBoundary1]
+                  defmodule SubBoundary3 do use Boundary, deps: [#{module1}.SubBoundary1] end
+                end
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can't depend on a sub-boundary of a sibling of its ancestor",
+              """
+              defmodule #{module1} do
+                use Boundary
+
+                defmodule SubBoundary1 do
+                  use Boundary
+                  defmodule SubBoundary2 do use Boundary end
+                end
+
+                defmodule SubBoundary3 do
+                  use Boundary
+                  defmodule SubBoundary4 do use Boundary, deps: [#{module1}.SubBoundary1.SubBoundary2] end
+                end
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "#{unquote(module1)}.SubBoundary1.SubBoundary2 can't be listed as a dependency"
+  end
+
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
+  module_test "exporting multiple deps",
+              """
+              defmodule #{module1} do
+                use Boundary, exports: [{Schemas, except: [Base]}]
+
+                defmodule Schemas.Base do def fun(), do: :ok end
+                defmodule Schemas.Foo do def fun(), do: :ok end
+                defmodule Schemas.Bar do def fun(), do: :ok end
+              end
+
+              defmodule #{module2} do
+                use Boundary, deps: [#{module1}]
+
+                def fun() do
+                  #{module1}.Schemas.Foo.fun()
+                  #{module1}.Schemas.Bar.fun()
+                  #{module1}.Schemas.Base.fun()
+                end
+              end
+              """ do
+    assert [warning] = warnings
+
+    assert warning.message =~
+             "#{unquote(module1)}.Schemas.Base is not exported by its owner boundary #{unquote(module1)}"
   end
 
   describe "recompilation tests" do
@@ -628,6 +890,29 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
         )
       end)
     end
+
+    test "warns on unlisted externals in strict mode" do
+      module1 = unique_module_name()
+
+      TestProject.in_project(
+        [mix_opts: [project_opts: [boundary: [externals_mode: :strict]]]],
+        fn project ->
+          File.write!(
+            Path.join([project.path, "lib", "mod1.ex"]),
+            """
+            defmodule #{module1} do
+              use Boundary
+              def fun(), do: Mix.env()
+            end
+            """
+          )
+
+          # doesn't report a warning because external is not listed as a dep
+          assert [warning] = TestProject.compile().warnings
+          assert warning.message =~ "forbidden call to Mix.env/0"
+        end
+      )
+    end
   end
 
   defp in_lib_with_boundaries(fun) do
@@ -640,6 +925,11 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
           def fun(), do: :ok
 
           defmodule Submodule do def fun(), do: :ok end
+
+          defmodule SubBoundary do
+            use Boundary
+            def fun(), do: :ok
+          end
         end
 
         defmodule LibWithBoundaries.Boundary2 do
@@ -674,6 +964,10 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
           end
 
           defmodule LibWithoutBoundaries.Module4 do
+            def fun(), do: :ok
+          end
+
+          defmodule Mix.MyTask do
             def fun(), do: :ok
           end
           """

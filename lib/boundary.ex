@@ -45,8 +45,8 @@ defmodule Boundary do
 
   ## Defining a boundary
 
-  A boundary is defined via `use Boundary` expression in the top-level (aka root) module. For example,
-  the context boundary named `MySystem` can be defined as follows:
+  A boundary is defined via `use Boundary` expression in the root module. For example, the context
+  boundary named `MySystem` can be defined as follows:
 
   ```
   defmodule MySystem do
@@ -65,7 +65,7 @@ defmodule Boundary do
   single boundary, called `MySystem`. This boundary will contain the root module (`MySystem`),
   as well as all modules whose name starts with `MySystem.`.
 
-  In addition, it's possible to extract some of the modules from a boundary into its own boundary.
+  In addition, it's possible to extract some of the modules from a boundary into another boundary.
   For example:
 
   ```
@@ -78,10 +78,7 @@ defmodule Boundary do
   end
   ```
 
-  Here, modules from `MySystem.Endpoint` namespace are promoted into its own boundary. It's
-  worth noting that `MySystem.Endpoint` is considered as a peer boundary of `MySystem`, not its
-  child. At the moment, nesting of boundaries (defining internal boundaries within other
-  boundaries) is not supported by this library.
+  See the "Nested boundaries" section for details.
 
   ### Mix tasks
 
@@ -154,6 +151,26 @@ defmodule Boundary do
   In this example, we're defining the `MySystem` boundary which exports the modules `MySystem`
   and `MySystem.User`. All other modules of this boundary are considered to be internal, and
   they may not be used by modules from other boundaries.
+
+  ### Mass exports
+
+  It's also possible to mass-export multiple modules with a single export item.
+
+  For example, let's say that we keep Ecto schemas under the `MySystem.Schemas` namespace. Now we
+  want to export all of these modules except `MySystem.Schemas.Base` which is a base module `use`-d
+  by our schemas. We could list each individual schema in the exports section but that becomes
+  tedious, and the `use Boundary` expression might become quite long and noisy. Instead, we can
+  export all of these modules with the `exports: [{Schemas, except: [Base]}, ...]`.
+
+  Mass export is not advised in most situations. Prefer explicitly listing exported modules. If
+  your export list is long, it's a possible indication of an overly fragmented interface. Consider
+  instead consolidating the interface in the main boundary module, which would act as a facade.
+  Alternatively, perhaps the boundary needs to be split.
+
+  However, cases such as Ecto schemas present a valid exception, since these modules are typically
+  a part of the public context interface, since they are passed back and forth between the
+  context and the interface layer (such as web).
+
 
   ## Dependencies
 
@@ -346,15 +363,137 @@ defmodule Boundary do
     use Boundary, exports: [Endpoint], deps: [...]
   end
   ```
+
+  ## Nested boundaries
+
+  It is possible to define boundaries within boundaries. Nested boundaries allow you to further
+  control the dependency graph inside the boundary, and make some in-boundary modules private to
+  others.
+
+  Let's see this in an example. Suppose that we're building a Phoenix-powered blog engine. Our
+  context layer, `BlogEngine`, exposes two modules, `Accounts` and `Articles` (note that
+  `BlogEngine.` prefix is omitted for brevity) to the web tier:
+
+  ```
+  defmodule BlogEngine do
+    use Boundary, exports: [Accounts, Articles]
+  end
+
+  defmodule BlogEngineWeb do
+    use Boundary, deps: [BlogEngine]
+  end
+  ```
+
+  But beyond this, we want to further manage the dependencies inside the context. The context tier
+  consists of the modules `Repo`, `Articles`, `Accounts`, and `Accounts.Mailer`. We'd like to
+  introduce the following constraints:
+
+  - `Articles` can use `Accounts` (but not the other way around).
+  - Both `Articles` and `Accounts` can use `Repo`, but `Repo` can't use any other module.
+  - Only the `Accounts` module can use the internal `Accounts.Mailer` module.
+
+  Here's how we can do that:
+
+  ```
+  defmodule BlogEngine.Repo do
+    use Boundary
+  end
+
+  defmodule BlogEngine.Articles do
+    use Boundary, deps: [BlogEngine.{Accounts, Repo}]
+  end
+
+  defmodule BlogEngine.Accounts do
+    use Boundary, deps: [BlogEngine.Repo]
+  end
+  ```
+
+  Conceptually, we've built a boundary sub-tree inside `BlogEngine` which looks as:
+
+  ```text
+  BlogEngine
+  |
+  +----Repo
+  |
+  +----Articles
+  |
+  +----Accounts
+  ```
+
+  With the following dependencies:
+
+  ```text
+  Articles ----> Repo
+     |            ^
+     v            |
+  Accounts -------+
+  ```
+
+  ### Root module
+
+  The root module of a sub-boundary plays a special role. This module can be exported by the parent
+  boundary, and at the same time it defines its own boundary. This can be seen in the previous
+  example, where all three modules, `Articles`, `Accounts`, and `Repo` are exported by
+  `BlogEngine`, while at the same time these modules define their own sub-boundaries.
+
+  This demonstrates the main purpose of sub-boundaries. They are a mechanism which allows you to
+  control the dependencies within the parent boundary. The parent boundary still gets to decide
+  which of these sub-modules will it exports. In this example, `Articles` and `Accounts` are
+  exported, while `Repo` isn't. The sub-boundaries decide what will they depend on themselves.
+
+  ### Dependencies
+
+  A boundary may only depend on its direct siblings, its parent, and any dependency of its parent.
+
+  In other words, a boundary inherits all the constraints of its parent, and it can't bring in any
+  new deps. However, a boundary doesn't inherit its parent's deps by default. Instead, it has to
+  declare these deps explicitly.
+
+  A boundary can't depend on its descendants. However, the modules from the parent boundary are
+  implicitly allowed to use the exports of the child sub-boundaries (but not of the descendants).
+
+  #### Cross-app dependencies
+
+  If the external lib defines its own boundaries, you can only depend on the top-level boundaries.
+  If implicit boundaries are used (app doesn't define its own boundaries), all such boundaries
+  are considered as top-level, and you can depend on any boundary from such app.
+
+  ### Promoting boundaries to top-level
+
+  It's possible to turn a nested boundary into a top-level boundary:
+
+  ```
+  defmodule BlogEngine.Application do
+    use Boundary, top_level?: true
+  end
+  ```
+
+  In this case `BlogEngine.Application` is not considered to be a sub-boundary of `BlogEngine`.
+  This option is discouraged because it introduces a mismatch between the namespace hierarchy,
+  and the logical model. Conceptually, `BlogEngine.Application` is a sibling of `BlogEngine` and
+  `BlogEngineWeb`, but in the namespace hierarchy it usually resides under the context namespace
+  (courtesy of generators such as `mix new` and `mix phx.new`).
+
+  An alternative is to rename the module to `MySystemApp`:
+
+  ```
+  defmodule MySystemApp do
+    use Application
+    use Boundary, deps: [MySystem, MySystemWeb]
+  end
+  ```
+
+  That way the namespace hierarchy will match the logical model.
   """
 
   require Boundary.Definition
   alias Boundary.{Definition, View}
 
-  Definition.generate(deps: [], exports: [])
+  Code.eval_quoted(Definition.generate(deps: [], exports: []), [], __ENV__)
 
   @type t :: %{
           name: name,
+          ancestors: [name],
           deps: [{name, mode}],
           exports: [module],
           externals: [atom],
@@ -392,21 +531,8 @@ defmodule Boundary do
 
   @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
 
-  defmacro __using__(opts) do
-    opts =
-      Enum.map(
-        opts,
-        fn
-          {key, references} when key in ~w/deps exports/a -> {key, normalize_references(references)}
-          other -> other
-        end
-      )
-
-    quote do
-      require Boundary.Definition
-      Definition.generate(unquote(opts))
-    end
-  end
+  @doc false
+  defmacro __using__(opts), do: Definition.generate(opts)
 
   @spec view(atom) :: view
   def view(app), do: View.build(app)
@@ -465,20 +591,12 @@ defmodule Boundary do
   @spec protocol_impl?(module) :: boolean
   def protocol_impl?(module), do: function_exported?(module, :__impl__, 1)
 
+  @doc "Returns the immediate parent of the boundary, or nil if the boundary is a top-level boundary."
+  @spec parent(view, t) :: t | nil
+  def parent(_view, %{ancestors: []}), do: nil
+  def parent(view, %{ancestors: [parent_name | _]}), do: fetch!(view, parent_name)
+
   defmodule Error do
     defexception [:message, :file, :line]
-  end
-
-  defp normalize_references(references) do
-    Enum.flat_map(
-      references,
-      fn
-        reference ->
-          case Macro.decompose_call(reference) do
-            {parent, :{}, children} -> Enum.map(children, &quote(do: Module.concat(unquote([parent, &1]))))
-            _ -> [reference]
-          end
-      end
-    )
   end
 end
