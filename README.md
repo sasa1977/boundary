@@ -59,7 +59,7 @@ defmodule MySystemWeb do
 end
 
 defmodule MySystem.Application do
-  use Boundary, deps: [MySystem, MySystemWeb]
+  use Boundary, top_level?: true, deps: [MySystem, MySystemWeb]
   # ...
 end
 ```
