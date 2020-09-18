@@ -22,7 +22,7 @@ defmodule Mix.Tasks.Boundary.Visualize do
     |> Enum.group_by(&Boundary.parent(view, &1))
     |> Enum.each(fn {main_boundary, boundaries} ->
       nodes = build_nodes(view, main_boundary, boundaries)
-      edges = build_edges(boundaries)
+      edges = build_edges(view, main_boundary, boundaries)
       title = format_title(main_boundary)
       graph = format_graph(title, nodes, edges)
       file_path = format_file_path(main_boundary)
@@ -39,20 +39,22 @@ defmodule Mix.Tasks.Boundary.Visualize do
     boundaries
     |> Stream.flat_map(&[&1.name | Enum.map(&1.deps, fn {name, _type} -> name end)])
     |> Stream.uniq()
+    |> Stream.filter(&include?(view, main_boundary, Boundary.fetch!(view, &1)))
+    |> Stream.map(fn name -> {name, if(name != main_boundary[:name], do: :sibling, else: nil)} end)
     |> Enum.sort()
-    |> Enum.map(fn module ->
-      {
-        module,
-        if(Boundary.parent(view, Boundary.fetch!(view, module)) == main_boundary, do: :sibling, else: nil)
-      }
-    end)
   end
 
-  defp build_edges(boundaries) do
+  defp build_edges(view, main_boundary, boundaries) do
     for %{name: name, deps: deps} <- boundaries,
         {dep_name, mode} <- deps,
+        include?(view, main_boundary, Boundary.fetch!(view, dep_name)),
         do: {name, dep_name, mode}
   end
+
+  defp include?(_view, %{name: name}, %{name: name}), do: true
+
+  defp include?(view, main_boundary, boundary),
+    do: boundary.app == Boundary.Mix.app_name() and Boundary.parent(view, boundary) == main_boundary
 
   defp format_file_path(boundary) do
     name = if is_nil(boundary), do: "app", else: inspect(boundary.name)

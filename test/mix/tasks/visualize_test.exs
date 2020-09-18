@@ -22,7 +22,7 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
           end
 
           defmodule Articles do
-            use Boundary, deps: [Repo, Accounts]
+            use Boundary, deps: [BlogEngine, Repo, Accounts]
           end
         end
 
@@ -48,11 +48,9 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
           "BlogEngine";
           "BlogEngineApp";
           "BlogEngineWeb";
-          "Mix";
 
           "BlogEngineApp" -> "BlogEngine";
           "BlogEngineApp" -> "BlogEngineWeb";
-          "BlogEngineApp" -> "Mix" [label = "compile"];
           "BlogEngineWeb" -> "BlogEngine";
         }
         """
@@ -65,13 +63,13 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
           label="BlogEngine boundary";
           labelloc=top;
 
+          "BlogEngine" [color = "gray"];
           "BlogEngine.Accounts";
           "BlogEngine.Articles";
           "BlogEngine.Repo";
-          "Mix" [color = \"gray\"];
 
           "BlogEngine.Accounts" -> "BlogEngine.Repo";
-          "BlogEngine.Accounts" -> "Mix" [label = "compile"];
+          "BlogEngine.Articles" -> "BlogEngine";
           "BlogEngine.Articles" -> "BlogEngine.Accounts";
           "BlogEngine.Articles" -> "BlogEngine.Repo";
         }
