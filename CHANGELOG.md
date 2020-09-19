@@ -1,6 +1,7 @@
 # 0.6.0
 
-- **[Breaking]** renamed `:extra_externals` to `check_apps`
+- **[Breaking]** the `:externals_mode` option is renamed to `type`
+- **[Breaking]** the `:extra_externals` option is renamed to `check_apps`
 
 # 0.5.0
 

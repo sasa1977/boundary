@@ -246,11 +246,11 @@ defmodule Boundary do
   list of external applications, but we're not including any boundary from this library in deps, so the context layer
   is not allowed to use plug functions.
 
-  In addition, a strict external mode is supported via the `:externals_mode` option:
+  In addition, a strict external mode is supported via the `:type` option:
 
   ```
   defmodule MySystem do
-    use Boundary, externals_mode: :strict
+    use Boundary, type: :strict
   end
   ```
 
@@ -264,7 +264,7 @@ defmodule Boundary do
     def project do
       [
         # ...
-        boundary: [externals_mode: :strict]
+        boundary: [type: :strict]
       ]
     end
 
@@ -273,7 +273,7 @@ defmodule Boundary do
   ```
 
   At this point, all boundaries will be checked with the strict mode. If you want to override this for some boundaries,
-  you can do it with `use Boundary, externals_mode: :relaxed`.
+  you can do it with `use Boundary, type: :relaxed`.
 
   Note that restraining calls to the `:elixir`, `:boundary`, and pure Erlang applications, such as
   `:crypto` or `:cowboy`, is currently not possible.
@@ -498,7 +498,7 @@ defmodule Boundary do
           exports: [module],
           externals: [atom],
           check_apps: [atom],
-          externals_mode: :strict | :regular,
+          type: :strict | :regular,
           ignore?: boolean,
           file: String.t(),
           line: pos_integer,

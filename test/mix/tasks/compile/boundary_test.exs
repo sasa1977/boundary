@@ -191,7 +191,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module_test "call to an unclassified module is not reported",
               """
               defmodule #{module1} do
-                use Boundary, externals_mode: :strict
+                use Boundary, type: :strict
                 def fun1(), do: #{module2}.fun()
               end
 
@@ -409,7 +409,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module_test "calls to undeclared external deps are not allowed in strict mode",
               """
               defmodule #{module1} do
-                use Boundary, deps: [], externals_mode: :strict
+                use Boundary, deps: [], type: :strict
                 def fun1(), do: LibWithBoundaries.Boundary1.fun()
                 def fun2(), do: LibWithoutBoundaries.Module1.fun()
               end
@@ -550,13 +550,13 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
   module1 = unique_module_name()
 
-  module_test "invalid externals_mode",
+  module_test "invalid type",
               """
               defmodule #{module1} do
-                use Boundary, externals_mode: :invalid
+                use Boundary, type: :invalid
               end
               """ do
-    assert [%{message: "invalid externals_mode"}] = warnings
+    assert [%{message: "invalid type"}] = warnings
   end
 
   module1 = unique_module_name()
@@ -564,7 +564,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module_test "can't provide extra externals in strict mode",
               """
               defmodule #{module1} do
-                use Boundary, externals_mode: :strict, check_apps: [:mix]
+                use Boundary, type: :strict, check_apps: [:mix]
               end
               """ do
     assert [%{message: "check_apps can't be provided in strict mode"}] = warnings
@@ -923,7 +923,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
       module1 = unique_module_name()
 
       TestProject.in_project(
-        [mix_opts: [project_opts: [boundary: [externals_mode: :strict]]]],
+        [mix_opts: [project_opts: [boundary: [type: :strict]]]],
         fn project ->
           File.write!(
             Path.join([project.path, "lib", "mod1.ex"]),

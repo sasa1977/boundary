@@ -303,8 +303,8 @@ defmodule Mix.Tasks.Compile.Boundary do
     )
   end
 
-  defp to_diagnostic_error({:invalid_externals_mode, data}) do
-    diagnostic("invalid externals_mode",
+  defp to_diagnostic_error({:invalid_type, data}) do
+    diagnostic("invalid type",
       file: Path.relative_to_cwd(data.file),
       position: data.line
     )

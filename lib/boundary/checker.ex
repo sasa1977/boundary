@@ -138,7 +138,7 @@ defmodule Boundary.Checker do
 
   defp call_error(view, call, from_boundary, []) do
     # If we end up here, we couldn't determine a target boundary, so this is either a cross-app call, or a call
-    # to an unclassified boundary. In the former case we'll report an error if the externals_mode is strict. In the
+    # to an unclassified boundary. In the former case we'll report an error if the type is strict. In the
     # latter case, we won't report an error.
     if cross_app_call?(view, call) and check_external_dep?(view, call, from_boundary),
       do: {:invalid_external_dep_call, call.callee_module},
@@ -166,7 +166,7 @@ defmodule Boundary.Checker do
     strict? =
       [from_boundary]
       |> Stream.concat(Stream.map(from_boundary.ancestors, &Boundary.fetch!(view, &1)))
-      |> Enum.any?(&(&1.externals_mode == :strict))
+      |> Enum.any?(&(&1.type == :strict))
 
     Boundary.app(view, call.callee_module) != :boundary and
       (strict? or Enum.member?(from_boundary.externals, Boundary.app(view, call.callee_module)))
@@ -210,7 +210,7 @@ defmodule Boundary.Checker do
   defp with_ancestor_deps(view, boundary) do
     [boundary]
     |> Stream.concat(Stream.map(boundary.ancestors, &Boundary.fetch!(view, &1)))
-    |> Stream.take_while(&(&1.externals_mode != :strict))
+    |> Stream.take_while(&(&1.type != :strict))
     |> Stream.flat_map(& &1.deps)
     |> Stream.uniq()
   end
