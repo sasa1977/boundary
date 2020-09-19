@@ -156,30 +156,63 @@ defmodule Boundary.Checker do
     cond do
       to_boundary.ignore? -> nil
       to_boundary == from_boundary -> nil
-      cross_app_call?(view, call) and not check_external_dep?(view, call, from_boundary) -> nil
-      not allowed?(from_boundary, to_boundary, call) -> invalid_cross_call_error(call, from_boundary, to_boundary)
+      not allowed?(view, from_boundary, to_boundary, call) -> invalid_cross_call_error(call, from_boundary, to_boundary)
       not exported?(to_boundary, call.callee_module) -> {:not_exported, to_boundary.name}
       true -> nil
     end
   end
 
   defp check_external_dep?(view, call, from_boundary) do
+    strict? =
+      [from_boundary]
+      |> Stream.concat(Stream.map(from_boundary.ancestors, &Boundary.fetch!(view, &1)))
+      |> Enum.any?(&(&1.externals_mode == :strict))
+
     Boundary.app(view, call.callee_module) != :boundary and
-      (from_boundary.externals_mode == :strict or
-         Enum.member?(from_boundary.externals, Boundary.app(view, call.callee_module)))
+      (strict? or Enum.member?(from_boundary.externals, Boundary.app(view, call.callee_module)))
   end
 
-  defp allowed?(%{name: parent}, %{ancestors: [parent | _]}, _call), do: true
+  defp allowed?(view, from_boundary, to_boundary, call) do
+    cond do
+      # parent can call its children
+      match?({%{name: parent}, %{ancestors: [parent | _]}}, {from_boundary, to_boundary}) ->
+        true
 
-  defp allowed?(from_boundary, %{name: name}, call) do
+      # call to a sibling boundary is allowed if sibling is listed in deps
+      Boundary.siblings?(from_boundary, to_boundary) ->
+        in_deps?(to_boundary, from_boundary.deps, call)
+
+      # call to another app's boundary is implicitly allowed unless strict checking is required
+      cross_app_call?(view, call) and not check_external_dep?(view, call, from_boundary) ->
+        true
+
+      # call to a non-sibling (either in-app or cross-app) is allowed if it is a dep of myself or any ancestor
+      in_deps?(to_boundary, with_ancestor_deps(view, from_boundary), call) ->
+        true
+
+      # no other call is allowed
+      true ->
+        false
+    end
+  end
+
+  defp in_deps?(%{name: name}, deps, call) do
     Enum.any?(
-      from_boundary.deps,
+      deps,
       fn
         {^name, :runtime} -> true
         {^name, :compile} -> compile_time_call?(call)
         _ -> false
       end
     )
+  end
+
+  defp with_ancestor_deps(view, boundary) do
+    [boundary]
+    |> Stream.concat(Stream.map(boundary.ancestors, &Boundary.fetch!(view, &1)))
+    |> Stream.take_while(&(&1.externals_mode != :strict))
+    |> Stream.flat_map(& &1.deps)
+    |> Stream.uniq()
   end
 
   defp compile_time_call?(%{mode: :compile}), do: true

@@ -596,6 +596,11 @@ defmodule Boundary do
   def parent(_view, %{ancestors: []}), do: nil
   def parent(view, %{ancestors: [parent_name | _]}), do: fetch!(view, parent_name)
 
+  @doc "Returns true if given boundaries are siblings."
+  @spec siblings?(t, t) :: boolean
+  def siblings?(boundary1, boundary2),
+    do: boundary1.app == boundary2.app and Enum.take(boundary1.ancestors, 1) == Enum.take(boundary2.ancestors, 1)
+
   defmodule Error do
     defexception [:message, :file, :line]
   end

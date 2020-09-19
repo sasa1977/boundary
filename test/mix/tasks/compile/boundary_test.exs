@@ -586,6 +586,34 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module1 = unique_module_name()
   module2 = unique_module_name()
 
+  module_test "boundary can implicitly use ancestor's deps",
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [#{module2}]
+
+                defmodule SubBoundary1 do
+                  use Boundary
+
+                  defmodule SubBoundary3 do
+                    use Boundary
+
+                    def fun, do: #{module2}.fun()
+                  end
+                end
+              end
+
+              defmodule #{module2} do
+                use Boundary
+
+                def fun(), do: :ok
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
   module_test "boundary can export the top-level module of its sub-boundary",
               """
               defmodule #{module1} do
