@@ -431,6 +431,19 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
   module1 = unique_module_name()
 
+  module_test "calls to undeclared external deps are not allowed if app is listed in check deps",
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [], check_apps: [:mix]
+                def fun(), do: Mix.env()
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "forbidden call to Mix.env/0"
+  end
+
+  module1 = unique_module_name()
+
   module_test "can depend on a boundary from an external",
               """
               defmodule #{module1} do
@@ -766,6 +779,24 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               end
               """ do
     assert warnings == []
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary doesn't implicitly depend on its parent",
+              """
+              defmodule #{module1} do
+                use Boundary
+                def fun(), do: :ok
+
+                defmodule SubBoundary do
+                  use Boundary
+                  def fun(), do: #{module1}.fun()
+                end
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "forbidden call to #{unquote(module1)}.fun/0"
   end
 
   module1 = unique_module_name()

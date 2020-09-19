@@ -47,7 +47,7 @@ defmodule Mix.Tasks.Boundary.SpecTest do
                Boundary2
                  deps:
                  exports:
-                 externals: :logger
+                 externals:
 
                Boundary3
                  deps:

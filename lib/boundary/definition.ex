@@ -128,6 +128,7 @@ defmodule Boundary.Definition do
     definition
     |> normalize!(app, env)
     |> normalize_exports(boundary)
+    |> normalize_check_apps()
     |> normalize_deps()
   end
 
@@ -162,6 +163,18 @@ defmodule Boundary.Definition do
 
   defp normalize_export(boundary, export) when is_atom(export), do: normalize_export(boundary, {export, []})
   defp normalize_export(boundary, {export, opts}), do: {Module.concat(boundary, export), opts}
+
+  defp normalize_check_apps(definition) do
+    update_in(
+      definition.check_apps,
+      fn check_apps ->
+        Enum.flat_map(check_apps, fn
+          {_app, _type} = entry -> [entry]
+          app when is_atom(app) -> [{app, :runtime}, {app, :compile}]
+        end)
+      end
+    )
+  end
 
   defp normalize_deps(definition) do
     update_in(
