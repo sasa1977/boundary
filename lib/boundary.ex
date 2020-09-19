@@ -233,17 +233,17 @@ defmodule Boundary do
   In some cases you may want to completely prohibit the usage of some library. However, bare in mind that by default
   calls to an external application are restricted only if the client boundary references at least one dep boundary from
   that application. To force boundary to always restrict calls to some application, you can include the application in
-  the `:extra_externals` list:
+  the `:check_apps` list:
 
   ```
   defmodule MySystem do
-    use Boundary, extra_externals: [:plug], deps: []
+    use Boundary, check_apps: [:plug], deps: []
   end
   ```
 
-  The `:extra_externals` list contains additional applications which are always considered. Any calls to given
+  The `:check_apps` list contains additional applications which are always considered. Any calls to given
   applications must be explicitly allowed via the `:deps` option. In the example above, we're including `:plug` in the
-  list of external applications, but we're not including any boundary from this library in depssi, the context layer
+  list of external applications, but we're not including any boundary from this library in deps, so the context layer
   is not allowed to use plug functions.
 
   In addition, a strict external mode is supported via the `:externals_mode` option:
@@ -497,7 +497,7 @@ defmodule Boundary do
           deps: [{name, mode}],
           exports: [module],
           externals: [atom],
-          extra_externals: [atom],
+          check_apps: [atom],
           externals_mode: :strict | :regular,
           ignore?: boolean,
           file: String.t(),

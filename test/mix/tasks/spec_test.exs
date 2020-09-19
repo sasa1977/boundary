@@ -18,7 +18,7 @@ defmodule Mix.Tasks.Boundary.SpecTest do
         end
 
         defmodule Boundary2 do
-          use Boundary, deps: [], exports: [], extra_externals: [:logger]
+          use Boundary, deps: [], exports: [], check_apps: [:logger]
         end
 
         defmodule Boundary3 do

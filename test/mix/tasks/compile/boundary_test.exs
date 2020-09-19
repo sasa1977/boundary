@@ -564,10 +564,10 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module_test "can't provide extra externals in strict mode",
               """
               defmodule #{module1} do
-                use Boundary, externals_mode: :strict, extra_externals: [:mix]
+                use Boundary, externals_mode: :strict, check_apps: [:mix]
               end
               """ do
-    assert [%{message: "extra_externals can't be provided in strict mode"}] = warnings
+    assert [%{message: "check_apps can't be provided in strict mode"}] = warnings
   end
 
   module1 = unique_module_name()

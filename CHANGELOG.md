@@ -1,3 +1,7 @@
+# 0.6.0
+
+- **[Breaking]** renamed `:extra_externals` to `check_apps`
+
 # 0.5.0
 
 - Support sub-boundaries ([docs](https://hexdocs.pm/boundary/Boundary.html#module-nested-boundaries))

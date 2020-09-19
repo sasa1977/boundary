@@ -310,8 +310,8 @@ defmodule Mix.Tasks.Compile.Boundary do
     )
   end
 
-  defp to_diagnostic_error({:extra_externals_in_strict_mode, data}) do
-    diagnostic("extra_externals can't be provided in strict mode",
+  defp to_diagnostic_error({:check_apps_in_strict_mode, data}) do
+    diagnostic("check_apps can't be provided in strict mode",
       file: Path.relative_to_cwd(data.file),
       position: data.line
     )

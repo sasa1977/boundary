@@ -90,7 +90,7 @@ defmodule Boundary.View do
         |> Enum.map(fn {dep, _} -> Map.get(module_to_app, dep) end)
         |> Stream.reject(&is_nil/1)
         |> Stream.reject(&(&1 == app_name))
-        |> Stream.concat(boundary.extra_externals)
+        |> Stream.concat(boundary.check_apps)
         |> Enum.uniq()
 
       Map.merge(boundary, %{name: module, implicit?: false, modules: [], exports: exports, externals: externals})

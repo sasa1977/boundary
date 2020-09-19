@@ -138,12 +138,12 @@ defmodule Boundary.Definition do
     |> validate(&if &1.ignore? and &1.deps != [], do: :dep_in_ignored_boundary)
     |> validate(&if &1.ignore? and &1.exports != [], do: :export_in_ignored_boundary)
     |> validate(&if &1.externals_mode not in ~w/strict relaxed/a, do: :invalid_externals_mode)
-    |> validate(&if &1.externals_mode == :strict and &1.extra_externals != [], do: :extra_externals_in_strict_mode)
+    |> validate(&if &1.externals_mode == :strict and &1.check_apps != [], do: :check_apps_in_strict_mode)
   end
 
   defp merge_user_opts(definition, user_opts) do
     user_opts = Map.new(user_opts)
-    valid_keys = ~w/deps exports ignore? extra_externals externals_mode top_level?/a
+    valid_keys = ~w/deps exports ignore? check_apps externals_mode top_level?/a
 
     definition
     |> Map.merge(Map.take(user_opts, valid_keys))
@@ -182,7 +182,7 @@ defmodule Boundary.Definition do
       exports: [],
       ignore?: false,
       externals: [],
-      extra_externals: [],
+      check_apps: [],
       externals_mode: Mix.Project.config() |> Keyword.get(:boundary, []) |> Keyword.get(:externals_mode, :relaxed),
       errors: [],
       top_level?: false
