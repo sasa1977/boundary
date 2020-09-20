@@ -310,13 +310,6 @@ defmodule Mix.Tasks.Compile.Boundary do
     )
   end
 
-  defp to_diagnostic_error({:check_apps_in_strict_mode, data}) do
-    diagnostic("check_apps can't be provided in strict mode",
-      file: Path.relative_to_cwd(data.file),
-      position: data.line
-    )
-  end
-
   defp module_source(module) do
     module.module_info(:compile)
     |> Keyword.fetch!(:source)

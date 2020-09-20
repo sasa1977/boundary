@@ -3,7 +3,7 @@
 ## Breaking
 
 - the `:externals_mode` option is renamed to `type`
-- the `:extra_externals` option is renamed to `check_apps`
+- the `:extra_externals` option is dropped, use `check: [apps: list_of_apps]` instead
 - global boundary options are now specified via `boundary: [default: default_opts]` in mix project config
 
 # 0.5.0

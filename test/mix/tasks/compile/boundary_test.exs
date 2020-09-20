@@ -434,7 +434,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module_test "calls to undeclared external deps are not allowed if app is listed in check deps",
               """
               defmodule #{module1} do
-                use Boundary, deps: [], check_apps: [:mix]
+                use Boundary, deps: [], check: [apps: [:mix]]
                 def fun(), do: Mix.env()
               end
               """ do
@@ -973,11 +973,11 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
       )
     end
 
-    test "uses global check_apps default" do
+    test "uses global check apps default" do
       module1 = unique_module_name()
 
       TestProject.in_project(
-        [mix_opts: [project_opts: [boundary: [default: [check_apps: [:mix]]]]]],
+        [mix_opts: [project_opts: [boundary: [default: [check: [apps: [:mix]]]]]]],
         fn project ->
           File.write!(
             Path.join([project.path, "lib", "mod1.ex"]),

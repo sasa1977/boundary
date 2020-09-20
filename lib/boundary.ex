@@ -497,7 +497,7 @@ defmodule Boundary do
           deps: [{name, mode}],
           exports: [module],
           externals: [atom],
-          check_apps: [{atom, mode}],
+          check: %{apps: [{atom, mode}]},
           type: :strict | :regular,
           ignore?: boolean,
           file: String.t(),

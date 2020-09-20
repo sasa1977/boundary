@@ -128,7 +128,7 @@ defmodule Boundary.Definition do
     definition
     |> normalize!(app, env)
     |> normalize_exports(boundary)
-    |> normalize_check_apps()
+    |> normalize_check()
     |> normalize_deps()
   end
 
@@ -139,14 +139,11 @@ defmodule Boundary.Definition do
     |> validate(&if &1.ignore? and &1.deps != [], do: :dep_in_ignored_boundary)
     |> validate(&if &1.ignore? and &1.exports != [], do: :export_in_ignored_boundary)
     |> validate(&if &1.type not in ~w/strict relaxed/a, do: :invalid_type)
-    |> validate(&if &1.type == :strict and &1.check_apps != [], do: :check_apps_in_strict_mode)
   end
 
   defp merge_user_opts(definition, user_opts) do
     user_opts = Map.new(user_opts)
-    valid_keys = ~w/deps exports ignore? check_apps type top_level?/a
-
-    definition = if Map.get(user_opts, :type) == :strict, do: %{definition | check_apps: []}, else: definition
+    valid_keys = ~w/deps exports ignore? check type top_level?/a
 
     definition
     |> Map.merge(Map.take(user_opts, valid_keys))
@@ -166,16 +163,17 @@ defmodule Boundary.Definition do
   defp normalize_export(boundary, export) when is_atom(export), do: normalize_export(boundary, {export, []})
   defp normalize_export(boundary, {export, opts}), do: {Module.concat(boundary, export), opts}
 
-  defp normalize_check_apps(definition) do
-    update_in(
-      definition.check_apps,
-      fn check_apps ->
-        Enum.flat_map(check_apps, fn
-          {_app, _type} = entry -> [entry]
-          app when is_atom(app) -> [{app, :runtime}, {app, :compile}]
-        end)
-      end
-    )
+  defp normalize_check(definition) do
+    definition.check
+    |> update_in(&Map.new(Keyword.merge([in: true, out: true, apps: []], &1)))
+    |> update_in([:check, :apps], &normalize_check_apps/1)
+  end
+
+  defp normalize_check_apps(apps) do
+    Enum.flat_map(apps, fn
+      {_app, _type} = entry -> [entry]
+      app when is_atom(app) -> [{app, :runtime}, {app, :compile}]
+    end)
   end
 
   defp normalize_deps(definition) do
@@ -197,7 +195,7 @@ defmodule Boundary.Definition do
       exports: [],
       ignore?: false,
       externals: [],
-      check_apps: [],
+      check: [],
       type: :relaxed,
       errors: [],
       top_level?: false
@@ -205,7 +203,7 @@ defmodule Boundary.Definition do
 
     user_defaults =
       (Mix.Project.config()[:boundary][:default] || [])
-      |> Keyword.take(~w/type check_apps/a)
+      |> Keyword.take(~w/type check/a)
       |> Map.new()
 
     Map.merge(defaults, user_defaults)

@@ -165,18 +165,18 @@ defmodule Boundary.Checker do
   defp check_external_dep?(view, call, from_boundary) do
     Boundary.app(view, call.callee_module) != :boundary and
       (from_boundary.type == :strict or
-         MapSet.member?(with_ancestors(view, from_boundary, :externals), Boundary.app(view, call.callee_module)) or
+         MapSet.member?(with_ancestors(view, from_boundary, & &1.externals), Boundary.app(view, call.callee_module)) or
          MapSet.member?(
-           with_ancestors(view, from_boundary, :check_apps),
+           with_ancestors(view, from_boundary, & &1.check.apps),
            {Boundary.app(view, call.callee_module), call.mode}
          ))
   end
 
-  defp with_ancestors(view, boundary, key) do
+  defp with_ancestors(view, boundary, fetch_fun) do
     [boundary]
     |> Stream.concat(Stream.map(boundary.ancestors, &Boundary.fetch!(view, &1)))
     |> Stream.take_while(&(&1.type != :strict))
-    |> Stream.flat_map(&Map.fetch!(&1, key))
+    |> Stream.flat_map(&fetch_fun.(&1))
     |> MapSet.new()
   end
 
@@ -195,7 +195,7 @@ defmodule Boundary.Checker do
         true
 
       # call to a non-sibling (either in-app or cross-app) is allowed if it is a dep of myself or any ancestor
-      in_deps?(to_boundary, with_ancestors(view, from_boundary, :deps), call) ->
+      in_deps?(to_boundary, with_ancestors(view, from_boundary, & &1.deps), call) ->
         true
 
       # no other call is allowed
