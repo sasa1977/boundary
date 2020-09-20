@@ -950,11 +950,34 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
       end)
     end
 
-    test "warns on unlisted externals in strict mode" do
+    test "uses global type default" do
       module1 = unique_module_name()
 
       TestProject.in_project(
-        [mix_opts: [project_opts: [boundary: [type: :strict]]]],
+        [mix_opts: [project_opts: [boundary: [default: [type: :strict]]]]],
+        fn project ->
+          File.write!(
+            Path.join([project.path, "lib", "mod1.ex"]),
+            """
+            defmodule #{module1} do
+              use Boundary
+              def fun(), do: Mix.env()
+            end
+            """
+          )
+
+          # doesn't report a warning because external is not listed as a dep
+          assert [warning] = TestProject.compile().warnings
+          assert warning.message =~ "forbidden call to Mix.env/0"
+        end
+      )
+    end
+
+    test "uses global check_apps default" do
+      module1 = unique_module_name()
+
+      TestProject.in_project(
+        [mix_opts: [project_opts: [boundary: [default: [check_apps: [:mix]]]]]],
         fn project ->
           File.write!(
             Path.join([project.path, "lib", "mod1.ex"]),

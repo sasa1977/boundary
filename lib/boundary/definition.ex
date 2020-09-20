@@ -146,6 +146,8 @@ defmodule Boundary.Definition do
     user_opts = Map.new(user_opts)
     valid_keys = ~w/deps exports ignore? check_apps type top_level?/a
 
+    definition = if Map.get(user_opts, :type) == :strict, do: %{definition | check_apps: []}, else: definition
+
     definition
     |> Map.merge(Map.take(user_opts, valid_keys))
     |> add_errors(user_opts |> Map.drop(valid_keys) |> Map.keys() |> Enum.map(&{:unknown_option, name: &1}))
@@ -190,16 +192,23 @@ defmodule Boundary.Definition do
   end
 
   defp defaults do
-    %{
+    defaults = %{
       deps: [],
       exports: [],
       ignore?: false,
       externals: [],
       check_apps: [],
-      type: Mix.Project.config() |> Keyword.get(:boundary, []) |> Keyword.get(:type, :relaxed),
+      type: :relaxed,
       errors: [],
       top_level?: false
     }
+
+    user_defaults =
+      (Mix.Project.config()[:boundary][:default] || [])
+      |> Keyword.take(~w/type check_apps/a)
+      |> Map.new()
+
+    Map.merge(defaults, user_defaults)
   end
 
   defp add_errors(definition, errors) do
