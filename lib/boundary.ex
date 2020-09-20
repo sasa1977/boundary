@@ -233,29 +233,21 @@ defmodule Boundary do
   In some cases you may want to completely prohibit the usage of some library. However, bare in mind that by default
   calls to an external application are restricted only if the client boundary references at least one dep boundary from
   that application. To force boundary to always restrict calls to some application, you can include the application in
-  the `:check_apps` list:
+  the check apps list:
 
   ```
   defmodule MySystem do
-    use Boundary, check_apps: [:plug], deps: []
+    use Boundary, check: [apps: [:plug]], deps: []
   end
   ```
 
-  The `:check_apps` list contains additional applications which are always considered. Any calls to given
-  applications must be explicitly allowed via the `:deps` option. In the example above, we're including `:plug` in the
-  list of external applications, but we're not including any boundary from this library in deps, so the context layer
-  is not allowed to use plug functions.
+  The check apps list contains additional applications which are always checked. Any calls to given applications must
+  be explicitly allowed via the `:deps` option.
 
-  In addition, a strict external mode is supported via the `:type` option:
+  The check list can contain an application name (atom), or a `{app_name, call_mode}` tuple, where `call_mode` is either
+  `:runtime` or `:compile`. If only app name is specified, then both, runtime and compile-time calls will be checked.
 
-  ```
-  defmodule MySystem do
-    use Boundary, type: :strict
-  end
-  ```
-
-  In this mode, boundary will report all calls to all external applications which are not explicitly allowed via the
-  `:dep` option. You can also configure the strict mode globally in your mix.exs:
+  You can also set a list of default apps checked for every boundary in mix.exs:
 
   ```
   defmodule MySystem.MixProject do
@@ -264,7 +256,43 @@ defmodule Boundary do
     def project do
       [
         # ...
-        boundary: [type: :strict]
+        boundary: [
+          default: [
+            check_apps: [{:mix, :runtime}]
+          ]
+        ]
+      ]
+    end
+
+    # ...
+  end
+  ```
+
+  In the example above, we're explicitly checking all runtime mix calls, while compile-time calls won't be checked.
+
+  In addition, you can define boundary as `:strict`:
+
+  ```
+  defmodule MySystem do
+    use Boundary, type: :strict
+  end
+  ```
+
+  With this setting, boundary will report all calls to all external applications which are not explicitly allowed via the
+  `:dep` option. You can also configure the strict type globally in your mix.exs:
+
+  ```
+  defmodule MySystem.MixProject do
+    use Mix.Project
+
+    def project do
+      [
+        # ...
+        boundary: [
+          default: [
+            type: :strict
+          ]
+        ]
       ]
     end
 
@@ -288,6 +316,10 @@ defmodule Boundary do
   not safe to be used at runtime. Limiting their usage to compile-time only can be done as follows:
 
   ```
+  # option 1: force check all runtime calls to mix
+  use Boundary, check: [{:mix, :runtime}]
+
+  # option 2: permit `Mix` implicit boundary at compile time only
   use Boundary, deps: [{Mix, :compile}]
   ```
 
@@ -301,40 +333,36 @@ defmodule Boundary do
   advised to group such modules under a common boundary, such as `MySystem.Mix`, and allow `mix` as a runtime
   dependency only in that boundary.
 
-  Finally, it's worth noting that it's not possible to permit some dependency only at runtime. If a dependency is
+  Finally, it's worth noting that it's not possible permitting some dependency only at runtime. If a dependency is
   allowed at runtime, then it can also be used at compile time.
 
-  ## Ignored boundaries
+  ## Controlling checks
 
-  It is possible to exclude some modules from cross-boundary checks by defining an __ignored__ boundary:
+  You can use the `:check` option to control the checks performed by the boundary compiler. The default value is `check:
+  [in: true, out: true]`, which means that all incoming and outgoing calls will be checked.
 
-  ```
-  defmodule MySystem do
-    use Boundary, ignore?: true
-  end
-  ```
+  The `in: false` setting will allow any boundary to call functions from this boundary. The `out: false` setting will
+  allow this boundary to call any boundary. If both options are set to false, boundary becomes ignored. These settings
+  can only be provided for top-level boundaries. If a boundary has some check disabled, it may not contain
+  sub-boundaries.
 
-  When a boundary is ignored, all modules belonging to it can use any other module, and can be used
-  by any other module.
+  The purpose of these options is to support relaxing rules in some parts of your code. For example, you may wish to
+  ignore boundary constraints for your test support modules. By introducing a top-level boundary for such modules (e.g.
+  `MySystemTest`), and marking this boundary as ignored, you can easily achieve that.
 
-  The purpose of this option is to support relaxing rules in some parts of your code. For example,
-  you may wish to ignore boundary constraints for your test support modules. By introducing a
-  top-level boundary for such modules (e.g. `MySystemTest`), and marking this boundary as ignored,
-  you can easily achieve that.
-
-  Another scenario is when introducing boundaries in an existing, possibly large project, which
-  has many complex dependencies that can't be untangled trivially. In such case, ignored
-  boundaries provide a mechanism for gradually introducing boundaries into the project.
+  Another scenario is when introducing boundaries in an existing, possibly large project, which has many complex
+  dependencies that can't be untangled trivially. In such case, ignored boundaries provide a mechanism for gradually
+  introducing boundaries into the project.
 
   For example, you could first define ignored boundaries which encompass the entire system:
 
   ```
   defmodule MySystem do
-    use Boundary, ignore?: true
+    use Boundary, check: [in: false, out: false]
   end
 
   defmodule MySystemWeb do
-    use Boundary, ignore?: true
+    use Boundary, check: [in: false, out: false]
   end
   ```
 
@@ -342,11 +370,11 @@ defmodule Boundary do
 
   ```
   defmodule MySystem.Context1 do
-    use Boundary, exports: [...], deps: []
+    use Boundary, top_level?: true, exports: [...], deps: []
   end
 
   defmodule MySystemWeb.Controller1 do
-    use Boundary, exports: [], deps: [MySystem.Context1]
+    use Boundary, top_level?: true, exports: [], deps: [MySystem.Context1]
   end
   ```
 
@@ -366,13 +394,12 @@ defmodule Boundary do
 
   ## Nested boundaries
 
-  It is possible to define boundaries within boundaries. Nested boundaries allow you to further
-  control the dependency graph inside the boundary, and make some in-boundary modules private to
-  others.
+  It is possible to define boundaries within boundaries. Nested boundaries allow you to further control the dependency
+  graph inside the boundary, and make some in-boundary modules private to others.
 
-  Let's see this in an example. Suppose that we're building a Phoenix-powered blog engine. Our
-  context layer, `BlogEngine`, exposes two modules, `Accounts` and `Articles` (note that
-  `BlogEngine.` prefix is omitted for brevity) to the web tier:
+  Let's see this in an example. Suppose that we're building a Phoenix-powered blog engine. Our context layer,
+  `BlogEngine`, exposes two modules, `Accounts` and `Articles` (note that `BlogEngine.` prefix is omitted for brevity)
+  to the web tier:
 
   ```
   defmodule BlogEngine do
@@ -384,9 +411,8 @@ defmodule Boundary do
   end
   ```
 
-  But beyond this, we want to further manage the dependencies inside the context. The context tier
-  consists of the modules `Repo`, `Articles`, `Accounts`, and `Accounts.Mailer`. We'd like to
-  introduce the following constraints:
+  But beyond this, we want to further manage the dependencies inside the context. The context tier consists of the
+  modules `Repo`, `Articles`, `Accounts`, and `Accounts.Mailer`. We'd like to introduce the following constraints:
 
   - `Articles` can use `Accounts` (but not the other way around).
   - Both `Articles` and `Accounts` can use `Repo`, but `Repo` can't use any other module.
@@ -431,32 +457,35 @@ defmodule Boundary do
 
   ### Root module
 
-  The root module of a sub-boundary plays a special role. This module can be exported by the parent
-  boundary, and at the same time it defines its own boundary. This can be seen in the previous
-  example, where all three modules, `Articles`, `Accounts`, and `Repo` are exported by
-  `BlogEngine`, while at the same time these modules define their own sub-boundaries.
+  The root module of a sub-boundary plays a special role. This module can be exported by the parent boundary, and at the
+  same time it defines its own boundary. This can be seen in the previous example, where all three modules, `Articles`,
+  `Accounts`, and `Repo` are exported by `BlogEngine`, while at the same time these modules define their own
+  sub-boundaries.
 
-  This demonstrates the main purpose of sub-boundaries. They are a mechanism which allows you to
-  control the dependencies within the parent boundary. The parent boundary still gets to decide
-  which of these sub-modules will it exports. In this example, `Articles` and `Accounts` are
-  exported, while `Repo` isn't. The sub-boundaries decide what will they depend on themselves.
+  This demonstrates the main purpose of sub-boundaries. They are a mechanism which allows you to control the
+  dependencies within the parent boundary. The parent boundary still gets to decide which of these sub-modules will it
+  exports. In this example, `Articles` and `Accounts` are exported, while `Repo` isn't. The sub-boundaries decide what
+  will they depend on themselves.
 
   ### Dependencies
 
-  A boundary may only depend on its direct siblings, its parent, and any dependency of its parent.
+  A sub-boundary inherits the deps from its ancestors by default. If you want to be more explicit, you can set the
+  sub-boundary's type to `:strict`, in which case nothing is inherited by default, and sub-boundary must list its
+  deps. Ancestors deps are inherited up to the first `:strict` ancestor.
 
-  In other words, a boundary inherits all the constraints of its parent, and it can't bring in any
-  new deps. However, a boundary doesn't inherit its parent's deps by default. Instead, it has to
-  declare these deps explicitly.
+  When listing deps, a boundary may only depend on its direct siblings, its parent, and any dependency of its ancestors.
+  In other words, a boundary inherits all the constraints of its ancestors, and it can't bring in any new deps that are
+  not know to some ancestor.
 
-  A boundary can't depend on its descendants. However, the modules from the parent boundary are
-  implicitly allowed to use the exports of the child sub-boundaries (but not of the descendants).
+  A boundary can't depend on its descendants. However, the modules from the parent boundary are implicitly allowed to
+  use the exports of the child sub-boundaries (but not of the descendants). This property holds even if boundary is
+  declared as strict.
 
   #### Cross-app dependencies
 
-  If the external lib defines its own boundaries, you can only depend on the top-level boundaries.
-  If implicit boundaries are used (app doesn't define its own boundaries), all such boundaries
-  are considered as top-level, and you can depend on any boundary from such app.
+  If the external lib defines its own boundaries, you can only depend on the top-level boundaries. If implicit
+  boundaries are used (app doesn't define its own boundaries), all such boundaries are considered as top-level, and you
+  can depend on any boundary from such app.
 
   ### Promoting boundaries to top-level
 
@@ -468,11 +497,10 @@ defmodule Boundary do
   end
   ```
 
-  In this case `BlogEngine.Application` is not considered to be a sub-boundary of `BlogEngine`.
-  This option is discouraged because it introduces a mismatch between the namespace hierarchy,
-  and the logical model. Conceptually, `BlogEngine.Application` is a sibling of `BlogEngine` and
-  `BlogEngineWeb`, but in the namespace hierarchy it usually resides under the context namespace
-  (courtesy of generators such as `mix new` and `mix phx.new`).
+  In this case `BlogEngine.Application` is not considered to be a sub-boundary of `BlogEngine`. This option is
+  discouraged because it introduces a mismatch between the namespace hierarchy, and the logical model. Conceptually,
+  `BlogEngine.Application` is a sibling of `BlogEngine` and `BlogEngineWeb`, but in the namespace hierarchy it usually
+  resides under the context namespace (courtesy of generators such as `mix new` and `mix phx.new`).
 
   An alternative is to rename the module to `MySystemApp`:
 
