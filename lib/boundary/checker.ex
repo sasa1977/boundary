@@ -6,6 +6,8 @@ defmodule Boundary.Checker do
   def errors(view, calls) do
     Enum.concat([
       invalid_config(view),
+      invalid_ignores(view),
+      ancestor_with_ignored_checks(view),
       invalid_deps(view),
       invalid_exports(view),
       cycles(view),
@@ -19,15 +21,30 @@ defmodule Boundary.Checker do
         {dep, type} <- boundary.deps,
         error = validate_dep(view, boundary, dep, type),
         error != :ok,
-        into: MapSet.new(),
         do: error
   end
 
   defp invalid_config(view), do: view |> Boundary.all() |> Enum.flat_map(& &1.errors)
 
+  defp invalid_ignores(view) do
+    for boundary <- Boundary.all(view),
+        boundary.app == view.main_app,
+        not boundary.check.in or not boundary.check.out,
+        not Enum.empty?(boundary.ancestors),
+        do: {:invalid_ignores, boundary}
+  end
+
+  defp ancestor_with_ignored_checks(view) do
+    for boundary <- Boundary.all(view),
+        boundary.app == view.main_app,
+        ancestor <- Enum.map(boundary.ancestors, &Boundary.fetch!(view, &1)),
+        not ancestor.check.in or not ancestor.check.out,
+        do: {:ancestor_with_ignored_checks, boundary, ancestor}
+  end
+
   defp validate_dep(view, from_boundary, dep, type) do
     with {:ok, to_boundary} <- fetch_dep_boundary(view, from_boundary, dep),
-         :ok <- validate_dep_not_ignored(from_boundary, to_boundary),
+         :ok <- validate_dep_check_in(from_boundary, to_boundary),
          do: validate_dep_allowed(view, from_boundary, to_boundary, type)
   end
 
@@ -38,10 +55,10 @@ defmodule Boundary.Checker do
     end
   end
 
-  defp validate_dep_not_ignored(from_boundary, to_boundary) do
-    if to_boundary.ignore?,
-      do: {:ignored_dep, %{name: to_boundary.name, file: from_boundary.file, line: from_boundary.line}},
-      else: :ok
+  defp validate_dep_check_in(from_boundary, to_boundary) do
+    if to_boundary.check.in,
+      do: :ok,
+      else: {:check_in_false_dep, %{name: to_boundary.name, file: from_boundary.file, line: from_boundary.line}}
   end
 
   defp validate_dep_allowed(_view, from_boundary, from_boundary, _type),
@@ -134,7 +151,7 @@ defmodule Boundary.Checker do
     Enum.reject([to_boundary, parent_boundary], &is_nil/1)
   end
 
-  defp call_error(_view, _call, %{ignore?: true}, _to_boundaries), do: nil
+  defp call_error(_view, _call, %{check: %{out: false}}, _to_boundaries), do: nil
 
   defp call_error(view, call, from_boundary, []) do
     # If we end up here, we couldn't determine a target boundary, so this is either a cross-app call, or a call
@@ -154,7 +171,7 @@ defmodule Boundary.Checker do
 
   defp call_error(view, call, from_boundary, to_boundary) do
     cond do
-      to_boundary.ignore? -> nil
+      not to_boundary.check.in -> nil
       to_boundary == from_boundary -> nil
       not allowed?(view, from_boundary, to_boundary, call) -> invalid_cross_call_error(call, from_boundary, to_boundary)
       not exported?(to_boundary, call.callee_module) -> {:not_exported, to_boundary.name}

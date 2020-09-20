@@ -33,7 +33,7 @@ defmodule Mix.Tasks.Boundary.ExDocGroupsTest do
   end
 
   defmodule Ignored do
-    use Boundary, ignore?: true
+    use Boundary, check: [in: false, out: false]
   end
   """
 

@@ -127,27 +127,36 @@ defmodule Boundary.Definition do
   def normalize(app, boundary, definition, env) do
     definition
     |> normalize!(app, env)
-    |> normalize_exports(boundary)
     |> normalize_check()
+    |> normalize_exports(boundary)
     |> normalize_deps()
   end
 
   defp normalize!(user_opts, app, env) do
     defaults()
+    |> Map.merge(project_defaults(user_opts))
     |> Map.merge(%{file: env.file, line: env.line, app: app})
     |> merge_user_opts(user_opts)
-    |> validate(&if &1.ignore? and &1.deps != [], do: :dep_in_ignored_boundary)
-    |> validate(&if &1.ignore? and &1.exports != [], do: :export_in_ignored_boundary)
     |> validate(&if &1.type not in ~w/strict relaxed/a, do: :invalid_type)
   end
 
   defp merge_user_opts(definition, user_opts) do
+    user_opts =
+      case Keyword.get(user_opts, :ignore?) do
+        nil -> user_opts
+        value -> Config.Reader.merge([check: [in: not value, out: not value]], user_opts)
+      end
+
     user_opts = Map.new(user_opts)
-    valid_keys = ~w/deps exports ignore? check type top_level?/a
+    valid_keys = ~w/deps exports check type top_level?/a
 
     definition
     |> Map.merge(Map.take(user_opts, valid_keys))
-    |> add_errors(user_opts |> Map.drop(valid_keys) |> Map.keys() |> Enum.map(&{:unknown_option, name: &1}))
+    |> add_errors(
+      user_opts
+      |> Map.drop(valid_keys)
+      |> Enum.map(fn {key, value} -> {:unknown_option, name: key, value: value} end)
+    )
   end
 
   defp normalize_exports(definition, boundary) do
@@ -167,6 +176,9 @@ defmodule Boundary.Definition do
     definition.check
     |> update_in(&Map.new(Keyword.merge([in: true, out: true, apps: []], &1)))
     |> update_in([:check, :apps], &normalize_check_apps/1)
+    |> validate(&if not &1.check.in and &1.exports != [], do: :exports_in_check_in_false)
+    |> validate(&if not &1.check.out and &1.deps != [], do: :deps_in_check_out_false)
+    |> validate(&if not &1.check.out and &1.check.apps != [], do: :apps_in_check_out_false)
   end
 
   defp normalize_check_apps(apps) do
@@ -190,23 +202,25 @@ defmodule Boundary.Definition do
   end
 
   defp defaults do
-    defaults = %{
+    %{
       deps: [],
       exports: [],
-      ignore?: false,
       externals: [],
       check: [],
       type: :relaxed,
       errors: [],
       top_level?: false
     }
+  end
 
-    user_defaults =
+  defp project_defaults(user_opts) do
+    if user_opts[:check][:out] == false do
+      %{}
+    else
       (Mix.Project.config()[:boundary][:default] || [])
       |> Keyword.take(~w/type check/a)
       |> Map.new()
-
-    Map.merge(defaults, user_defaults)
+    end
   end
 
   defp add_errors(definition, errors) do

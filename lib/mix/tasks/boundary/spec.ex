@@ -24,30 +24,37 @@ defmodule Mix.Tasks.Boundary.Spec do
     Mix.shell().info("\n" <> msg)
   end
 
-  defp boundary_info(%{ignore?: false} = boundary) do
+  defp boundary_info(boundary) do
     """
     #{inspect(boundary.name)}
-      deps: #{deps(boundary)}
       exports: #{exports(boundary)}
-      externals: #{boundary.externals |> Enum.map(&inspect/1) |> Enum.join(", ")}
+      deps: #{deps(boundary)}
     """
   end
 
-  defp boundary_info(%{ignore?: true} = boundary) do
-    """
-    #{inspect(boundary.name)} (ignored)
-    """
-  end
+  defp deps(%{check: %{out: false}}), do: "not checked"
 
   defp deps(boundary) do
-    boundary.deps
-    |> Enum.sort()
-    |> Stream.map(fn
-      {dep, :runtime} -> inspect(dep)
-      {dep, :compile} -> "#{inspect(dep)} (compile only)"
-    end)
-    |> Enum.join(", ")
+    internal_deps =
+      boundary.deps
+      |> Enum.sort()
+      |> Stream.map(fn
+        {dep, :runtime} -> inspect(dep)
+        {dep, :compile} -> "#{inspect(dep)} (compile only)"
+      end)
+      |> Enum.join(", ")
+
+    external_deps = boundary.externals |> Enum.map(&inspect/1) |> Enum.join(", ")
+
+    """
+
+        internal: #{internal_deps}
+        external: #{external_deps}
+    """
+    |> String.trim_trailing()
   end
+
+  defp exports(%{check: %{in: false}}), do: "not checked"
 
   defp exports(boundary) do
     boundary.exports

@@ -6,6 +6,10 @@
 - the `:extra_externals` option is dropped, use `check: [apps: list_of_apps]` instead
 - global boundary options are now specified via `boundary: [default: default_opts]` in mix project config
 
+## Deprecated
+
+- `ignore?: true` is deprecated in favour of `check: [in: false, out: false]`
+
 # 0.5.0
 
 - Support sub-boundaries ([docs](https://hexdocs.pm/boundary/Boundary.html#module-nested-boundaries))

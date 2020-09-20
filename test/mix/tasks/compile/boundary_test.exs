@@ -152,10 +152,10 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module1 = unique_module_name()
   module2 = unique_module_name()
 
-  module_test "ignored boundary can call anyone",
+  module_test "if check.out is false, boundary can call anyone",
               """
               defmodule #{module1} do
-                use Boundary, ignore?: true
+                use Boundary, check: [out: false]
                 def fun1(), do: #{module2}.fun()
               end
 
@@ -170,7 +170,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module1 = unique_module_name()
   module2 = unique_module_name()
 
-  module_test "ignored boundary can be called by anyone",
+  module_test "if check.in is false, boundary can be called by anyone",
               """
               defmodule #{module1} do
                 use Boundary
@@ -178,7 +178,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               end
 
               defmodule #{module2} do
-                use Boundary, ignore?: true
+                use Boundary, check: [in: false]
                 def fun(), do: :ok
               end
               """ do
@@ -272,12 +272,13 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module1 = unique_module_name()
   module2 = unique_module_name()
 
-  module_test "dep can't be an ignored boundary",
+  module_test "dep can't be a boundary with check.in set to false",
               """
               defmodule #{module1} do use Boundary, deps: [#{module2}] end
-              defmodule #{module2} do use Boundary, ignore?: true end
+              defmodule #{module2} do use Boundary, check: [in: false] end
               """ do
-    assert [%{position: 1, message: "ignored boundary #{unquote(module2)} is listed as a dependency"}] = warnings
+    assert [warning] = warnings
+    assert warning.message =~ "boundary #{unquote(module2)} can't be a dependency because it has check.in set to false"
   end
 
   module1 = unique_module_name()
@@ -546,19 +547,40 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
   module1 = unique_module_name()
 
-  module_test "can't use dep or export in an ignored boundary",
+  module_test "can't export if check.in is set to false",
               """
               defmodule #{module1} do
-                use Boundary, ignore?: true, exports: [Foo], deps: [LibWithBoundaries.Boundary1]
+                use Boundary, check: [in: false], exports: [Foo]
 
                 defmodule Foo do end
-                defmodule Bar do use Boundary end
               end
               """ do
-    assert [
-             %{message: "deps can't be provided in an ignored boundary"},
-             %{message: "exports can't be provided in an ignored boundary"}
-           ] = warnings
+    assert [warning] = warnings
+    assert warning.message =~ "can't export modules if check.in is set to false"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "can't set deps if check.out is set to false",
+              """
+              defmodule #{module1} do
+                use Boundary, check: [out: false], deps: [Mix]
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "deps can't be listed if check.out is set to false"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "can't set check.apps if check.out is set to false",
+              """
+              defmodule #{module1} do
+                use Boundary, check: [out: false, apps: [:mix]]
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "check apps can't be listed if check.out is set to false"
   end
 
   module1 = unique_module_name()
@@ -570,17 +592,6 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               end
               """ do
     assert [%{message: "invalid type"}] = warnings
-  end
-
-  module1 = unique_module_name()
-
-  module_test "can't provide extra externals in strict mode",
-              """
-              defmodule #{module1} do
-                use Boundary, type: :strict, check_apps: [:mix]
-              end
-              """ do
-    assert [%{message: "check_apps can't be provided in strict mode"}] = warnings
   end
 
   module1 = unique_module_name()
@@ -866,6 +877,48 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
     assert warning.message =~
              "#{unquote(module1)}.Schemas.Base is not exported by its owner boundary #{unquote(module1)}"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "can't disable checks in a sub-boundary",
+              """
+              defmodule #{module1} do
+                use Boundary
+
+                defmodule SubBoundary1 do
+                  use Boundary, check: [in: false]
+                end
+
+                defmodule SubBoundary2 do
+                  use Boundary, check: [out: false]
+                end
+              end
+              """ do
+    assert [warning1, warning2] = warnings
+    assert warning1.message =~ "can't disable checks in a sub-boundary"
+    assert warning2.message =~ "can't disable checks in a sub-boundary"
+  end
+
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
+  module_test "can't define a sub-boundary if ancestor disables checks disabled",
+              """
+              defmodule #{module1} do
+                use Boundary, check: [in: false]
+
+                defmodule SubBoundary do use Boundary end
+              end
+
+              defmodule #{module2} do
+                use Boundary, check: [out: false]
+                defmodule SubBoundary do use Boundary end
+              end
+              """ do
+    assert [warning1, warning2] = warnings
+    assert warning1.message =~ "sub-boundary inside a boundary with disabled checks (#{unquote(module1)})"
+    assert warning2.message =~ "sub-boundary inside a boundary with disabled checks (#{unquote(module2)})"
   end
 
   describe "recompilation tests" do
