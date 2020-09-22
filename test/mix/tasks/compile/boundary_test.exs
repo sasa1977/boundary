@@ -252,6 +252,74 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
   module1 = unique_module_name()
 
+  module_test "can't classify to an unknown module",
+              """
+              defmodule #{module1} do
+                use Boundary
+                def fun(), do: :ok
+              end
+
+              defmodule Mix.Task.#{module1} do
+                use Boundary, classify_to: UnknownModule
+                def fun(), do: #{module1}.fun()
+              end
+              """ do
+    assert [warning1, warning2] = warnings
+    assert warning1.message =~ "unknown boundary UnknownModule"
+    assert warning2.message =~ "forbidden call to #{unquote(module1)}.fun/0"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "can't classify to a non-boundary",
+              """
+              defmodule #{module1} do
+                use Boundary
+                defmodule NotBoundary do end
+              end
+
+              defmodule Mix.Task.#{module1} do
+                use Boundary, classify_to: #{module1}.NotBoundary
+              end
+              """ do
+    assert [warning1] = warnings
+    assert warning1.message =~ "unknown boundary #{unquote(module1)}.NotBoundary"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "can't classify a regular module",
+              """
+              defmodule #{module1} do use Boundary end
+
+              defmodule #{module1}Web do
+                use Boundary, classify_to: #{module1}
+              end
+              """ do
+    assert [warning1] = warnings
+    assert warning1.message =~ "only mix task and protocol implementation can be reclassified"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "can't classify to a classified boundary",
+              """
+              defmodule #{module1} do use Boundary end
+
+              defmodule Mix.Tasks.#{module1}.Task1 do
+                use Boundary, classify_to: #{module1}
+              end
+
+              defmodule Mix.Tasks.#{module1}.Task2 do
+                use Boundary, classify_to: Mix.Tasks.#{module1}.Task1
+              end
+              """ do
+    assert [warning1] = warnings
+    assert warning1.message =~ "unknown boundary Mix.Tasks.#{unquote(module1)}.Task1"
+  end
+
+  module1 = unique_module_name()
+
   module_test "all boundaries must be classified",
               """
               defmodule #{module1} do end

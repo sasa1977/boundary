@@ -47,39 +47,38 @@ defmodule Boundary.Definition do
         {nil, opts} ->
           normalize(decoded.app, boundary, opts, decoded.env)
 
-        {_boundary, opts} ->
-          if decoded.protocol? or decoded.mix_task? do
-            nil
-          else
-            IO.warn(
-              ":classify_to can only be provided in protocol implementations and mix tasks",
-              Macro.Env.stacktrace(decoded.env)
-            )
+        {classify_to, opts} ->
+          decoded_target = decode(classify_to)
 
-            normalize(decoded.app, boundary, opts, decoded.env)
+          cond do
+            is_nil(decoded_target) or Keyword.get(decoded_target.opts, :classify_to) != nil ->
+              normalize(decoded.app, boundary, opts, decoded.env)
+              |> add_errors([{:unknown_boundary, name: classify_to, file: decoded.env.file, line: decoded.env.line}])
+
+            not decoded.protocol? and not decoded.mix_task? ->
+              normalize(decoded.app, boundary, opts, decoded.env)
+              |> add_errors([{:cant_reclassify, name: boundary, file: decoded.env.file, line: decoded.env.line}])
+
+            true ->
+              nil
           end
       end
     end
   end
 
   def classified_to(module) do
-    with decoded when not is_nil(decoded) <- decode(module) do
-      case Keyword.pop(decoded.opts, :classify_to, nil) do
-        {nil, _opts} ->
-          nil
-
-        {boundary, opts} ->
-          unless Enum.empty?(opts),
-            do: IO.warn("no other option is allowed if :classify_to is provided", Macro.Env.stacktrace(decoded.env))
-
-          if decoded.protocol? or decoded.mix_task?,
-            do: %{boundary: boundary, file: decoded.env.file, line: decoded.env.line}
-      end
+    with decoded when not is_nil(decoded) <- decode(module),
+         {:ok, boundary} <- Keyword.fetch(decoded.opts, :classify_to),
+         true <- decoded.protocol? or decoded.mix_task? do
+      %{boundary: boundary, file: decoded.env.file, line: decoded.env.line}
+    else
+      _ -> nil
     end
   end
 
   defp decode(boundary) do
-    with [definition] <- Keyword.get(boundary.__info__(:attributes), Boundary) do
+    with true <- :code.get_object_code(boundary) != :error,
+         [definition] <- Keyword.get(boundary.__info__(:attributes), Boundary) do
       Map.update!(
         definition,
         :opts,
@@ -96,6 +95,8 @@ defmodule Boundary.Definition do
           decoded
         end
       )
+    else
+      _ -> nil
     end
   end
 

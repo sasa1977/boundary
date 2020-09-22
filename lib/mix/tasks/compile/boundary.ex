@@ -218,7 +218,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   defp to_diagnostic_error({:forbidden_dep, dep}) do
     diagnostic(
-      "#{inspect(dep.name)} can't be listed as a dependency because it's not a sibling, an ancestor, or a top-level boundary",
+      "#{inspect(dep.name)} can't be listed as a dependency because it's not a sibling, a parent, or a dep of some ancestor",
       file: Path.relative_to_cwd(dep.file),
       position: dep.line
     )
@@ -241,6 +241,20 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp to_diagnostic_error({:cycle, cycle}) do
     cycle = cycle |> Stream.map(&inspect/1) |> Enum.join(" -> ")
     diagnostic("dependency cycle found:\n#{cycle}\n")
+  end
+
+  defp to_diagnostic_error({:unknown_boundary, info}) do
+    diagnostic("unknown boundary #{inspect(info.name)}",
+      file: Path.relative_to_cwd(info.file),
+      position: info.line
+    )
+  end
+
+  defp to_diagnostic_error({:cant_reclassify, info}) do
+    diagnostic("only mix task and protocol implementation can be reclassified",
+      file: Path.relative_to_cwd(info.file),
+      position: info.line
+    )
   end
 
   defp to_diagnostic_error({:invalid_call, %{type: type} = error}) when type in ~w/runtime call/a do
