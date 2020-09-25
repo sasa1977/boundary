@@ -51,8 +51,6 @@ defmodule Mix.Tasks.Boundary.Visualize do
         do: {name, dep_name, mode}
   end
 
-  defp include?(_view, %{name: name}, %{name: name}), do: true
-
   defp include?(view, main_boundary, boundary),
     do: boundary.app == Boundary.Mix.app_name() and Boundary.parent(view, boundary) == main_boundary
 

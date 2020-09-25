@@ -63,13 +63,11 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
           label="BlogEngine boundary";
           labelloc=top;
 
-          "BlogEngine" [color = "gray"];
           "BlogEngine.Accounts";
           "BlogEngine.Articles";
           "BlogEngine.Repo";
 
           "BlogEngine.Accounts" -> "BlogEngine.Repo";
-          "BlogEngine.Articles" -> "BlogEngine";
           "BlogEngine.Articles" -> "BlogEngine.Accounts";
           "BlogEngine.Articles" -> "BlogEngine.Repo";
         }
