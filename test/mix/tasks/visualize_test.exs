@@ -45,9 +45,9 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
           label="#{project.app} application";
           labelloc=top;
 
-          "BlogEngine";
-          "BlogEngineApp";
-          "BlogEngineWeb";
+          "BlogEngine" [shape="box"];
+          "BlogEngineApp" [shape="box"];
+          "BlogEngineWeb" [shape="box"];
 
           "BlogEngineApp" -> "BlogEngine";
           "BlogEngineApp" -> "BlogEngineWeb";
@@ -63,9 +63,9 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
           label="BlogEngine boundary";
           labelloc=top;
 
-          "Accounts";
-          "Articles";
-          "Repo";
+          "Accounts" [shape="box"];
+          "Articles" [shape="box"];
+          "Repo" [shape="box"];
 
           "Accounts" -> "Repo";
           "Articles" -> "Accounts";
