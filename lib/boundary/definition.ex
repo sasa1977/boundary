@@ -87,8 +87,11 @@ defmodule Boundary.Definition do
             encoded
             |> :erlang.binary_to_term()
             |> Enum.map(fn
-              {key, references} when key in ~w/deps exports/a -> {key, expand_references(references, definition.env)}
-              other -> other
+              {key, references} when key in ~w/deps exports/a and is_list(references) ->
+                {key, expand_references(references, definition.env)}
+
+              other ->
+                other
             end)
             |> Code.eval_quoted([], definition.env)
 
@@ -160,17 +163,20 @@ defmodule Boundary.Definition do
     )
   end
 
+  defp normalize_exports(%{exports: :all} = definition, boundary),
+    do: normalize_exports(%{definition | exports: {:all, []}}, boundary)
+
+  defp normalize_exports(%{exports: {:all, opts}} = definition, boundary),
+    do: %{definition | exports: [{boundary, opts}]}
+
   defp normalize_exports(definition, boundary) do
     update_in(
       definition.exports,
-      fn exports ->
-        normalized_exports = Enum.map(exports, &normalize_export(boundary, &1))
-        [{boundary, []} | normalized_exports]
-      end
+      fn exports -> Enum.map(exports, &normalize_export(boundary, &1)) end
     )
   end
 
-  defp normalize_export(boundary, export) when is_atom(export), do: normalize_export(boundary, {export, []})
+  defp normalize_export(boundary, export) when is_atom(export), do: Module.concat(boundary, export)
   defp normalize_export(boundary, {export, opts}), do: {Module.concat(boundary, export), opts}
 
   defp normalize_check(definition) do

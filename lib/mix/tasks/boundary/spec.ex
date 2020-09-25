@@ -58,19 +58,9 @@ defmodule Mix.Tasks.Boundary.Spec do
 
   defp exports(boundary) do
     boundary.exports
-    |> Stream.map(&normalize_export(boundary.name, &1))
-    |> Stream.reject(&is_nil/1)
+    |> Stream.map(&inspect/1)
     |> Enum.sort()
     |> Enum.join(", ")
+    |> String.replace("#{inspect(boundary.name)}.", "")
   end
-
-  defp normalize_export(boundary_name, boundary_name), do: nil
-
-  defp normalize_export(boundary_name, exported_module) do
-    parts = relative_to(Module.split(exported_module), Module.split(boundary_name))
-    inspect(Module.concat(parts))
-  end
-
-  defp relative_to([head | tail1], [head | tail2]), do: relative_to(tail1, tail2)
-  defp relative_to(list, _), do: list
 end

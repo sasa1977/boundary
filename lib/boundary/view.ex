@@ -83,8 +83,6 @@ defmodule Boundary.View do
 
   defp load_app_boundaries(app_name, modules, module_to_app) do
     for module <- modules, boundary = Boundary.Definition.get(module) do
-      exports = Enum.flat_map(boundary.exports, &expand_export(&1, modules))
-
       externals =
         boundary.deps
         |> Enum.map(fn {dep, _} -> Map.get(module_to_app, dep) end)
@@ -92,25 +90,7 @@ defmodule Boundary.View do
         |> Stream.reject(&(&1 == app_name))
         |> Enum.uniq()
 
-      Map.merge(boundary, %{name: module, implicit?: false, modules: [], exports: exports, externals: externals})
-    end
-  end
-
-  defp expand_export({module, opts}, modules) do
-    case Keyword.fetch(opts, :except) do
-      :error ->
-        [module]
-
-      {:ok, except} ->
-        prefix = Module.split(module)
-        except = Enum.into(except, MapSet.new(), &Module.concat(module, &1))
-
-        modules
-        |> Stream.reject(&MapSet.member?(except, &1))
-        |> Enum.filter(fn candidate ->
-          candidate = Module.split(candidate)
-          List.starts_with?(candidate, prefix)
-        end)
+      Map.merge(boundary, %{name: module, implicit?: false, modules: [], externals: externals})
     end
   end
 

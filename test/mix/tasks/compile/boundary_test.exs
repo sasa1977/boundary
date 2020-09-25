@@ -921,7 +921,32 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module1 = unique_module_name()
   module2 = unique_module_name()
 
-  module_test "exporting multiple deps",
+  module_test "exporting all modules",
+              """
+              defmodule #{module1} do
+                use Boundary, exports: :all
+
+                defmodule Schemas.Foo do def fun(), do: :ok end
+                defmodule Schemas.Bar do def fun(), do: :ok end
+              end
+
+              defmodule #{module2} do
+                use Boundary, deps: [#{module1}]
+
+                def fun() do
+                  #{module1}.Schemas.Foo.fun()
+                  #{module1}.Schemas.Bar.fun()
+                  #{module1}.Schemas.Base.fun()
+                end
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
+  module_test "exporting multiple submodules of a module",
               """
               defmodule #{module1} do
                 use Boundary, exports: [{Schemas, except: [Base]}]

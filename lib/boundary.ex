@@ -154,13 +154,17 @@ defmodule Boundary do
 
   ### Mass exports
 
-  It's also possible to mass-export multiple modules with a single export item.
+  It's also possible to mass-export multiple modules with a single exports entry.
 
   For example, let's say that we keep Ecto schemas under the `MySystem.Schemas` namespace. Now we
-  want to export all of these modules except `MySystem.Schemas.Base` which is a base module `use`-d
+  want to export all of these modules except `MySystem.Schemas.Base` which is a base module `use`d
   by our schemas. We could list each individual schema in the exports section but that becomes
   tedious, and the `use Boundary` expression might become quite long and noisy. Instead, we can
-  export all of these modules with the `exports: [{Schemas, except: [Base]}, ...]`.
+  export all of these modules with the `exports: [{Schemas, except: [Base]}, ...]`. This will
+  export all `MySystem.Schemas.*` modules, except for `MySystem.Schemas.Base`.
+
+  You can also export all modules of the boundary with `use Boundary, exports: :all`. To exclude
+  some modules from the export list use, `use Boundary, exports: {:all, except: [SomeMod, ...]}`.
 
   Mass export is not advised in most situations. Prefer explicitly listing exported modules. If
   your export list is long, it's a possible indication of an overly fragmented interface. Consider
@@ -523,7 +527,7 @@ defmodule Boundary do
           name: name,
           ancestors: [name],
           deps: [{name, mode}],
-          exports: [module],
+          exports: [export],
           externals: [atom],
           check: %{apps: [{atom, mode}], in: boolean, out: boolean},
           type: :strict | :regular,
@@ -537,6 +541,7 @@ defmodule Boundary do
   @type view :: map
 
   @type name :: module
+  @type export :: module | {module, [except: [module]]}
   @type mode :: :compile | :runtime
 
   @type call :: %{

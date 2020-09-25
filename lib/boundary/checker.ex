@@ -77,23 +77,33 @@ defmodule Boundary.Checker do
 
   defp invalid_exports(view) do
     for boundary <- Boundary.all(view),
-        export <- boundary.exports,
-        error = validate_export(view, boundary, %{name: export, file: boundary.file, line: boundary.line}),
+        export <- exports_to_check(boundary),
+        error = validate_export(view, boundary, export),
         into: MapSet.new(),
         do: error
   end
 
+  defp exports_to_check(boundary) do
+    Enum.flat_map(
+      boundary.exports,
+      fn
+        export when is_atom(export) -> [export]
+        {root, opts} -> Enum.map(Keyword.get(opts, :except, []), &Module.concat(root, &1))
+      end
+    )
+  end
+
   defp validate_export(view, %{name: boundary_name} = boundary, export) do
     cond do
-      is_nil(Boundary.app(view, export.name)) ->
-        {:unknown_export, export}
+      is_nil(Boundary.app(view, export)) ->
+        {:unknown_export, %{name: export, file: boundary.file, line: boundary.line}}
 
       # boundary can export top-level module of its direct child sub-boundary
-      match?(%{ancestors: [^boundary_name | _]}, Boundary.get(view, export.name)) ->
+      match?(%{ancestors: [^boundary_name | _]}, Boundary.get(view, export)) ->
         nil
 
-      (Boundary.for_module(view, export.name) || %{name: nil}).name != boundary.name ->
-        {:export_not_in_boundary, export}
+      (Boundary.for_module(view, export) || %{name: nil}).name != boundary.name ->
+        {:export_not_in_boundary, %{name: export, file: boundary.file, line: boundary.line}}
 
       true ->
         nil
@@ -171,11 +181,20 @@ defmodule Boundary.Checker do
 
   defp call_error(view, call, from_boundary, to_boundary) do
     cond do
-      not to_boundary.check.in -> nil
-      to_boundary == from_boundary -> nil
-      not allowed?(view, from_boundary, to_boundary, call) -> invalid_cross_call_error(call, from_boundary, to_boundary)
-      not exported?(to_boundary, call.callee_module) -> {:not_exported, to_boundary.name}
-      true -> nil
+      not to_boundary.check.in ->
+        nil
+
+      to_boundary == from_boundary ->
+        nil
+
+      not cross_call_allowed?(view, from_boundary, to_boundary, call) ->
+        invalid_cross_call_error(call, from_boundary, to_boundary)
+
+      not exported?(to_boundary, call.callee_module) ->
+        {:not_exported, to_boundary.name}
+
+      true ->
+        nil
     end
   end
 
@@ -197,7 +216,7 @@ defmodule Boundary.Checker do
     |> MapSet.new()
   end
 
-  defp allowed?(view, from_boundary, to_boundary, call) do
+  defp cross_call_allowed?(view, from_boundary, to_boundary, call) do
     cond do
       # call to a child is always allowed
       from_boundary == Boundary.parent(view, to_boundary) ->
@@ -249,5 +268,14 @@ defmodule Boundary.Checker do
     do: Boundary.app(view, call.caller_module) != Boundary.app(view, call.callee_module)
 
   defp exported?(boundary, module),
-    do: boundary.implicit? or Enum.any?(boundary.exports, &(&1 == module))
+    do: boundary.implicit? or module == boundary.name or Enum.any?(boundary.exports, &export_matches?(&1, module))
+
+  defp export_matches?(module, module), do: true
+
+  defp export_matches?({root, opts}, module) do
+    String.starts_with?(to_string(module), to_string(root)) and
+      not Enum.any?(Keyword.get(opts, :except, []), &(Module.concat(root, &1) == module))
+  end
+
+  defp export_matches?(_, _), do: false
 end
