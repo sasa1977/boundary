@@ -30,16 +30,22 @@ defmodule Boundary.View do
       classifier: classifier,
       unclassified_modules: unclassified_modules(main_app, classifier.modules),
       module_to_app: module_to_app,
-      externals: all_externals(main_app_boundaries)
+      externals: all_externals(main_app, main_app_boundaries, module_to_app)
     }
   end
 
   @spec refresh(t) :: t | nil
   def refresh(view) do
+    module_to_app =
+      for {app, _description, _vsn} <- Application.loaded_applications(),
+          module <- app_modules(app),
+          into: %{},
+          do: {module, app}
+
     main_app_modules = app_modules(view.main_app)
     main_app_boundaries = load_app_boundaries(view.main_app, main_app_modules, view.module_to_app)
 
-    if MapSet.equal?(view.externals, all_externals(main_app_boundaries)) do
+    if MapSet.equal?(view.externals, all_externals(view.main_app, main_app_boundaries, module_to_app)) do
       module_to_app = for module <- main_app_modules, into: view.module_to_app, do: {module, view.main_app}
       classifier = Classifier.classify(view.classifier, main_app_modules, main_app_boundaries)
       unclassified_modules = unclassified_modules(view.main_app, classifier.modules)
@@ -74,11 +80,12 @@ defmodule Boundary.View do
     )
   end
 
-  defp all_externals(main_app_boundaries) do
+  defp all_externals(main_app, main_app_boundaries, module_to_app) do
     for boundary <- main_app_boundaries,
-        external <- boundary.externals,
+        {dep, _} <- boundary.deps,
+        Map.get(module_to_app, dep) != main_app,
         into: MapSet.new(),
-        do: external
+        do: dep
   end
 
   defp load_app_boundaries(app_name, modules, module_to_app) do

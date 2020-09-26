@@ -1141,6 +1141,53 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
         end
       )
     end
+
+    test "recomputes implicit boundaries on recompile" do
+      module1 = unique_module_name()
+      module2 = unique_module_name()
+
+      in_lib_without_boundaries(fn lib_without_boundaries ->
+        TestProject.in_project(
+          [mix_opts: [deps: [{lib_without_boundaries.app, path: "#{Path.absname(lib_without_boundaries.path)}"}]]],
+          fn project ->
+            File.write!(
+              Path.join([project.path, "lib", "mod1.ex"]),
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [LibWithoutBoundaries]
+                def fun, do: LibWithoutBoundaries.Module4.fun()
+              end
+              """
+            )
+
+            File.write!(
+              Path.join([project.path, "lib", "mod2.ex"]),
+              """
+              defmodule #{module2} do
+                use Boundary, deps: [LibWithoutBoundaries.Module1]
+                def fun, do: LibWithoutBoundaries.Module1.fun()
+              end
+              """
+            )
+
+            # compile to force internal caching in compiler
+            [] = TestProject.compile().warnings
+
+            File.write!(
+              Path.join([project.path, "lib", "mod1.ex"]),
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [LibWithoutBoundaries.Module4]
+                def fun, do: LibWithoutBoundaries.Module4.fun()
+              end
+              """
+            )
+
+            assert [] = TestProject.compile().warnings
+          end
+        )
+      end)
+    end
   end
 
   defp in_lib_with_boundaries(fun) do
@@ -1179,6 +1226,8 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
         File.write!(
           Path.join([project.path, "lib", "code.ex"]),
           """
+          defmodule LibWithoutBoundaries do end
+
           defmodule LibWithoutBoundaries.Module1 do
             def fun(), do: :ok
 
