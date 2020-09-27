@@ -212,7 +212,6 @@ defmodule Boundary.Definition do
     %{
       deps: [],
       exports: [],
-      externals: [],
       check: [],
       type: :relaxed,
       errors: [],

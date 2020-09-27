@@ -37,15 +37,11 @@ defmodule Mix.Tasks.Boundary.SpecTest do
                """
                Boundary1
                  exports: Bar, Foo
-                 deps:
-                   internal: Boundary2
-                   external:
+                 deps: Boundary2
 
                Boundary2
                  exports:
                  deps:
-                   internal:
-                   external:
 
                Ignored
                  exports: not checked

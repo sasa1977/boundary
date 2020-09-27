@@ -35,23 +35,13 @@ defmodule Mix.Tasks.Boundary.Spec do
   defp deps(%{check: %{out: false}}), do: "not checked"
 
   defp deps(boundary) do
-    internal_deps =
-      boundary.deps
-      |> Enum.sort()
-      |> Stream.map(fn
-        {dep, :runtime} -> inspect(dep)
-        {dep, :compile} -> "#{inspect(dep)} (compile only)"
-      end)
-      |> Enum.join(", ")
-
-    external_deps = boundary.externals |> Enum.map(&inspect/1) |> Enum.join(", ")
-
-    """
-
-        internal: #{internal_deps}
-        external: #{external_deps}
-    """
-    |> String.trim_trailing()
+    boundary.deps
+    |> Enum.sort()
+    |> Stream.map(fn
+      {dep, :runtime} -> inspect(dep)
+      {dep, :compile} -> "#{inspect(dep)} (compile only)"
+    end)
+    |> Enum.join(", ")
   end
 
   defp exports(%{check: %{in: false}}), do: "not checked"

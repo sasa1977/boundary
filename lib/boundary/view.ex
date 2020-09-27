@@ -90,14 +90,20 @@ defmodule Boundary.View do
 
   defp load_app_boundaries(app_name, modules, module_to_app) do
     for module <- modules, boundary = Boundary.Definition.get(module) do
-      externals =
-        boundary.deps
-        |> Enum.map(fn {dep, _} -> Map.get(module_to_app, dep) end)
-        |> Stream.reject(&is_nil/1)
-        |> Stream.reject(&(&1 == app_name))
-        |> Enum.uniq()
+      check_apps =
+        for {dep_name, _mode} <- boundary.deps,
+            app = Map.get(module_to_app, dep_name),
+            app not in [nil, app_name],
+            reduce: boundary.check.apps do
+          check_apps -> [{app, :compile}, {app, :runtime} | check_apps]
+        end
 
-      Map.merge(boundary, %{name: module, implicit?: false, modules: [], externals: externals})
+      Map.merge(boundary, %{
+        name: module,
+        implicit?: false,
+        modules: [],
+        check: %{boundary.check | apps: Enum.sort(Enum.uniq(check_apps))}
+      })
     end
   end
 
@@ -118,7 +124,7 @@ defmodule Boundary.View do
       end
 
     Enum.map(
-      for(boundary <- main_app_boundaries, app <- boundary.externals, into: MapSet.new(), do: app),
+      for(boundary <- main_app_boundaries, {app, _} <- boundary.check.apps, into: MapSet.new(), do: app),
       fn app ->
         modules = app_modules(app)
 

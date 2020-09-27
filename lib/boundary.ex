@@ -528,7 +528,6 @@ defmodule Boundary do
           ancestors: [name],
           deps: [{name, mode}],
           exports: [export],
-          externals: [atom],
           check: %{apps: [{atom, mode}], in: boolean, out: boolean},
           type: :strict | :regular,
           file: String.t(),

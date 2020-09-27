@@ -201,7 +201,6 @@ defmodule Boundary.Checker do
   defp check_external_dep?(view, call, from_boundary) do
     Boundary.app(view, call.callee_module) != :boundary and
       (from_boundary.type == :strict or
-         MapSet.member?(with_ancestors(view, from_boundary, & &1.externals), Boundary.app(view, call.callee_module)) or
          MapSet.member?(
            with_ancestors(view, from_boundary, & &1.check.apps),
            {Boundary.app(view, call.callee_module), call.mode}
