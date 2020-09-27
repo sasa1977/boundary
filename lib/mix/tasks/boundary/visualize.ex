@@ -66,6 +66,7 @@ defmodule Mix.Tasks.Boundary.Visualize do
     digraph {
       label="#{title}";
       labelloc=top;
+      rankdir=LR;
 
     #{node_clauses(main_boundary, nodes) |> Enum.map(&"  #{&1};") |> Enum.intersperse(?\n)}
 

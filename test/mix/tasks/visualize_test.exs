@@ -44,6 +44,7 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
         digraph {
           label="#{project.app} application";
           labelloc=top;
+          rankdir=LR;
 
           "BlogEngine" [shape="box"];
           "BlogEngineApp" [shape="box"];
@@ -62,6 +63,7 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
         digraph {
           label="BlogEngine boundary";
           labelloc=top;
+          rankdir=LR;
 
           "Accounts" [shape="box"];
           "Articles" [shape="box"];
