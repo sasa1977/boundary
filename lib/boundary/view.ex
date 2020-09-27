@@ -3,16 +3,15 @@ defmodule Boundary.View do
   alias Boundary.Classifier
 
   @type t :: %{
+          version: String.t(),
           main_app: app,
           classifier: Classifier.t(),
           unclassified_modules: MapSet.t(module),
           module_to_app: %{module => app},
-          externals: MapSet.t(app)
+          external_deps: MapSet.t(module)
         }
 
   @type app :: atom
-
-  @type opts :: [classified_externals: Classifier.t()]
 
   @spec build(app) :: t
   def build(main_app) do
@@ -26,16 +25,17 @@ defmodule Boundary.View do
     main_app_boundaries = classifier.boundaries |> Map.values() |> Enum.filter(&(&1.app == main_app))
 
     %{
+      version: unquote(Mix.Project.config()[:version]),
       main_app: main_app,
       classifier: classifier,
       unclassified_modules: unclassified_modules(main_app, classifier.modules),
       module_to_app: module_to_app,
-      externals: all_externals(main_app, main_app_boundaries, module_to_app)
+      external_deps: all_external_deps(main_app, main_app_boundaries, module_to_app)
     }
   end
 
   @spec refresh(t) :: t | nil
-  def refresh(view) do
+  def refresh(%{version: unquote(Mix.Project.config()[:version])} = view) do
     module_to_app =
       for {app, _description, _vsn} <- Application.loaded_applications(),
           module <- app_modules(app),
@@ -45,7 +45,7 @@ defmodule Boundary.View do
     main_app_modules = app_modules(view.main_app)
     main_app_boundaries = load_app_boundaries(view.main_app, main_app_modules, view.module_to_app)
 
-    if MapSet.equal?(view.externals, all_externals(view.main_app, main_app_boundaries, module_to_app)) do
+    if MapSet.equal?(view.external_deps, all_external_deps(view.main_app, main_app_boundaries, module_to_app)) do
       module_to_app = for module <- main_app_modules, into: view.module_to_app, do: {module, view.main_app}
       classifier = Classifier.classify(view.classifier, main_app_modules, main_app_boundaries)
       unclassified_modules = unclassified_modules(view.main_app, classifier.modules)
@@ -54,6 +54,8 @@ defmodule Boundary.View do
       nil
     end
   end
+
+  def refresh(_), do: nil
 
   @spec drop_main_app(t) :: t
   def drop_main_app(view) do
@@ -68,11 +70,11 @@ defmodule Boundary.View do
     main_app_modules = app_modules(main_app)
     main_app_boundaries = load_app_boundaries(main_app, main_app_modules, module_to_app)
 
-    classifier = classify_externals(main_app_boundaries, module_to_app)
+    classifier = classify_external_deps(main_app_boundaries, module_to_app)
     Classifier.classify(classifier, main_app_modules, main_app_boundaries)
   end
 
-  defp classify_externals(main_app_boundaries, module_to_app) do
+  defp classify_external_deps(main_app_boundaries, module_to_app) do
     Enum.reduce(
       load_external_boundaries(main_app_boundaries, module_to_app),
       Classifier.new(),
@@ -80,7 +82,7 @@ defmodule Boundary.View do
     )
   end
 
-  defp all_externals(main_app, main_app_boundaries, module_to_app) do
+  defp all_external_deps(main_app, main_app_boundaries, module_to_app) do
     for boundary <- main_app_boundaries,
         {dep, _} <- boundary.deps,
         Map.get(module_to_app, dep) != main_app,
