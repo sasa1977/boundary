@@ -122,11 +122,62 @@ Because `boundary` is implemented as a mix compiler, it integrates seamlessly wi
 
 ![VS Code warning 2](images/vscode_warning_2.png)
 
+
+### Restricting usage of external apps
+
+Boundary can also be used to manage calls to other apps, even if those apps don't define their own boundaries. For example, suppose you want to enforce the following rules:
+
+  - Only `MySystemWeb` can use phoenix modules
+  - Only `MySystem` can use ecto modules, except for Ecto.Changeset which can be used by `MySystemWeb` too
+  - Only `MySystemMix` can use mix modules at runtime. Everyone can use mix modules at compile time.
+
+By default, boundary doesn't check calls to other apps. However, we can instruct it to check calls to the desired apps. This setting can be provided for each individual boundary, or globally. Since we want to restrict calls to these boundaries in the entire project, let's do this globally in mix.exs:
+
+```elixir
+# mix.exs
+
+defmodule MySystem.MixProject do
+  def project do
+   [
+     boundary: [
+       default: [
+         check: [
+           apps: [:phoenix, :ecto, {:mix, :runtime}]
+         ]
+       ]
+     ],
+     # ...
+   ]
+  end
+end
+```
+
+With these settings, boundary will check all calls to phoenix and ecto, and all runtime calls to mix. Compile-time calls to mix won't be checked.
+
+Now we need to allow the calls to these apps in our boundaries:
+
+```elixir
+defmodule MySystemWeb do
+  use Boundary, deps: [Phoenix, Ecto.Changeset]
+end
+
+defmodule MySystem do
+  use Boundary, deps: [Ecto, Ecto.Changeset]
+end
+
+defmodule MySystemMix do
+  use Boundary, deps: [Mix]
+end
+```
+
+Note that in `MySystem` we're specifying both `Ecto` and `Ecto.Changeset`. This is because `Ecto.Changeset` is listed as a dep in `MySystemWeb`, and so it is treated as a separate boundary.
+
+
 ## Roadmap
 
 - [x] validate calls to external deps (e.g. preventing `Ecto` usage from `MySystemWeb`, or `Plug` usage from `MySystem`)
 - [x] support compile time vs runtime deps
-- [ ] support nested boundaries (defining internal boundaries within a boundary)
+- [x] support nested boundaries (defining internal boundaries within a boundary)
 - [ ] support Erlang modules
 
 ## License

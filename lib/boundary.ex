@@ -571,7 +571,7 @@ defmodule Boundary do
   @doc """
   Returns definitions of all boundaries.
 
-  The result will include boundaries from listed externals, as well as implicit boundaries.
+  The result will include boundaries from other applications.
 
   You shouldn't access the data in this result directly, as it may change significantly without warnings. Use exported
   functions of this module to acquire the information you need.
@@ -582,7 +582,7 @@ defmodule Boundary do
   @doc """
   Returns the names of all boundaries.
 
-  The result will include boundaries from listed externals, as well as implicit boundaries.
+  The result will include boundaries from other applications.
   """
   @spec all_names(view) :: [name]
   def all_names(view), do: Map.keys(view.classifier.boundaries)
