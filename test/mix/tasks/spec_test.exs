@@ -11,22 +11,18 @@ defmodule Mix.Tasks.Boundary.SpecTest do
         Path.join([project.path, "lib", "source.ex"]),
         """
         defmodule Boundary1 do
-          use Boundary, deps: [Boundary2, Boundary3], exports: [Foo, Bar]
+          use Boundary, deps: [Boundary2], exports: [Foo, Bar]
 
           defmodule Foo do end
           defmodule Bar do end
         end
 
         defmodule Boundary2 do
-          use Boundary, deps: [], exports: [], extra_externals: [:logger]
-        end
-
-        defmodule Boundary3 do
-          use Boundary, deps: [], exports: []
+          use Boundary, deps: [], exports: [], check: [apps: [:logger]]
         end
 
         defmodule Ignored do
-          use Boundary, ignore?: true
+          use Boundary, check: [out: false, in: false]
         end
         """
       )
@@ -40,21 +36,16 @@ defmodule Mix.Tasks.Boundary.SpecTest do
       assert output =~
                """
                Boundary1
-                 deps: Boundary2, Boundary3
                  exports: Bar, Foo
-                 externals:
+                 deps: Boundary2
 
                Boundary2
-                 deps:
                  exports:
-                 externals: :logger
-
-               Boundary3
                  deps:
-                 exports:
-                 externals:
 
-               Ignored (ignored)
+               Ignored
+                 exports: not checked
+                 deps: not checked
                """
     end)
   end

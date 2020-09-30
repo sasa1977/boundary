@@ -53,7 +53,7 @@ defmodule Mix.Tasks.Boundary.ExDocGroups do
     mapping =
       for module <- modules,
           boundary = Boundary.for_module(view, module),
-          !boundary.ignore? do
+          boundary.check.in or boundary.check.out do
         {module_name_to_group_key(boundary.name), module}
       end
       |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))

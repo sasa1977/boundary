@@ -49,7 +49,7 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
 
     for call <- Xref.calls(),
         boundary = Boundary.for_module(boundary_view, call.caller_module),
-        not boundary.ignore?,
+        boundary.check.out,
         app = Boundary.app(boundary_view, call.callee_module),
         app not in [:boundary, Boundary.Mix.app_name(), nil],
         reduce: Enum.into(Boundary.all_names(boundary_view), %{}, &{&1, MapSet.new()}) do

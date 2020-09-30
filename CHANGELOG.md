@@ -1,3 +1,23 @@
+# 0.6.0
+
+## Breaking
+
+- The `:externals_mode` option is renamed to `type`.
+- The `:extra_externals` option is dropped, use `check: [apps: list_of_apps]` instead.
+- Global boundary options are now specified via `boundary: [default: default_opts]` in mix project config.
+- Diagrams produces by `mix boundary.visualize` won't include boundaries from external apps.
+- Non-strict sub-boundaries implicitly inherit ancestors deps.
+
+## Deprecated
+
+- `ignore?: true` is deprecated in favour of `check: [in: false, out: false]`.
+
+## New
+
+- Added `boundary.ex_doc_groups` mix task for generating ex_doc groups for defined boundaries.
+- Better support for finer-grained ignoring with `check: [in: boolean, out: boolean]`.
+- Support for global default externals checks with `boundary: [default: [check: [apps: apps]]]`.
+
 # 0.5.0
 
 - Support sub-boundaries ([docs](https://hexdocs.pm/boundary/Boundary.html#module-nested-boundaries))

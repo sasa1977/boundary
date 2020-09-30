@@ -209,8 +209,8 @@ defmodule Mix.Tasks.Compile.Boundary do
     )
   end
 
-  defp to_diagnostic_error({:ignored_dep, dep}) do
-    diagnostic("ignored boundary #{inspect(dep.name)} is listed as a dependency",
+  defp to_diagnostic_error({:check_in_false_dep, dep}) do
+    diagnostic("boundary #{inspect(dep.name)} can't be a dependency because it has check.in set to false",
       file: Path.relative_to_cwd(dep.file),
       position: dep.line
     )
@@ -218,7 +218,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   defp to_diagnostic_error({:forbidden_dep, dep}) do
     diagnostic(
-      "#{inspect(dep.name)} can't be listed as a dependency because it's not a sibling, an ancestor, or a top-level boundary",
+      "#{inspect(dep.name)} can't be listed as a dependency because it's not a sibling, a parent, or a dep of some ancestor",
       file: Path.relative_to_cwd(dep.file),
       position: dep.line
     )
@@ -241,6 +241,20 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp to_diagnostic_error({:cycle, cycle}) do
     cycle = cycle |> Stream.map(&inspect/1) |> Enum.join(" -> ")
     diagnostic("dependency cycle found:\n#{cycle}\n")
+  end
+
+  defp to_diagnostic_error({:unknown_boundary, info}) do
+    diagnostic("unknown boundary #{inspect(info.name)}",
+      file: Path.relative_to_cwd(info.file),
+      position: info.line
+    )
+  end
+
+  defp to_diagnostic_error({:cant_reclassify, info}) do
+    diagnostic("only mix task and protocol implementation can be reclassified",
+      file: Path.relative_to_cwd(info.file),
+      position: info.line
+    )
   end
 
   defp to_diagnostic_error({:invalid_call, %{type: type} = error}) when type in ~w/runtime call/a do
@@ -282,6 +296,14 @@ defmodule Mix.Tasks.Compile.Boundary do
     diagnostic(message, file: Path.relative_to_cwd(error.file), position: error.line)
   end
 
+  defp to_diagnostic_error({:unknown_option, %{name: :ignore?, value: value} = data}) do
+    diagnostic(
+      "ignore?: #{value} is deprecated, use check: [in: #{not value}, out: #{not value}] instead",
+      file: Path.relative_to_cwd(data.file),
+      position: data.line
+    )
+  end
+
   defp to_diagnostic_error({:unknown_option, data}) do
     diagnostic("unknown option #{inspect(data.name)}",
       file: Path.relative_to_cwd(data.file),
@@ -289,31 +311,45 @@ defmodule Mix.Tasks.Compile.Boundary do
     )
   end
 
-  defp to_diagnostic_error({:dep_in_ignored_boundary, data}) do
-    diagnostic("deps can't be provided in an ignored boundary",
+  defp to_diagnostic_error({:deps_in_check_out_false, data}) do
+    diagnostic("deps can't be listed if check.out is set to false",
       file: Path.relative_to_cwd(data.file),
       position: data.line
     )
   end
 
-  defp to_diagnostic_error({:export_in_ignored_boundary, data}) do
-    diagnostic("exports can't be provided in an ignored boundary",
+  defp to_diagnostic_error({:apps_in_check_out_false, data}) do
+    diagnostic("check apps can't be listed if check.out is set to false",
       file: Path.relative_to_cwd(data.file),
       position: data.line
     )
   end
 
-  defp to_diagnostic_error({:invalid_externals_mode, data}) do
-    diagnostic("invalid externals_mode",
+  defp to_diagnostic_error({:exports_in_check_in_false, data}) do
+    diagnostic("can't export modules if check.in is set to false",
       file: Path.relative_to_cwd(data.file),
       position: data.line
     )
   end
 
-  defp to_diagnostic_error({:extra_externals_in_strict_mode, data}) do
-    diagnostic("extra_externals can't be provided in strict mode",
+  defp to_diagnostic_error({:invalid_type, data}) do
+    diagnostic("invalid type",
       file: Path.relative_to_cwd(data.file),
       position: data.line
+    )
+  end
+
+  defp to_diagnostic_error({:invalid_ignores, boundary}) do
+    diagnostic("can't disable checks in a sub-boundary",
+      file: Path.relative_to_cwd(boundary.file),
+      position: boundary.line
+    )
+  end
+
+  defp to_diagnostic_error({:ancestor_with_ignored_checks, boundary, ancestor}) do
+    diagnostic("sub-boundary inside a boundary with disabled checks (#{inspect(ancestor.name)})",
+      file: Path.relative_to_cwd(boundary.file),
+      position: boundary.line
     )
   end
 

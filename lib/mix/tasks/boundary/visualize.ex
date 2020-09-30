@@ -18,15 +18,15 @@ defmodule Mix.Tasks.Boundary.Visualize do
 
     view
     |> Boundary.all()
-    |> Stream.filter(&(&1.app == Boundary.Mix.app_name()))
+    |> Stream.filter(&(&1.app == Boundary.Mix.app_name() and (&1.check.in or &1.check.out)))
     |> Enum.group_by(&Boundary.parent(view, &1))
     |> Enum.each(fn {main_boundary, boundaries} ->
       nodes = build_nodes(view, main_boundary, boundaries)
-      edges = build_edges(boundaries)
-      title = format_title(main_boundary)
-      graph = format_graph(title, nodes, edges)
-      file_path = format_file_path(main_boundary)
+      edges = build_edges(view, main_boundary, boundaries)
+      title = title(main_boundary)
+      graph = graph(main_boundary, title, nodes, edges)
 
+      file_path = format_file_path(main_boundary)
       File.write!(file_path, graph)
     end)
 
@@ -39,66 +39,62 @@ defmodule Mix.Tasks.Boundary.Visualize do
     boundaries
     |> Stream.flat_map(&[&1.name | Enum.map(&1.deps, fn {name, _type} -> name end)])
     |> Stream.uniq()
+    |> Stream.filter(&include?(view, main_boundary, Boundary.fetch!(view, &1)))
     |> Enum.sort()
-    |> Enum.map(fn module ->
-      {
-        module,
-        if(Boundary.parent(view, Boundary.fetch!(view, module)) == main_boundary, do: :sibling, else: nil)
-      }
-    end)
   end
 
-  defp build_edges(boundaries) do
+  defp build_edges(view, main_boundary, boundaries) do
     for %{name: name, deps: deps} <- boundaries,
         {dep_name, mode} <- deps,
+        include?(view, main_boundary, Boundary.fetch!(view, dep_name)),
         do: {name, dep_name, mode}
   end
+
+  defp include?(view, main_boundary, boundary),
+    do: boundary.app == Boundary.Mix.app_name() and Boundary.parent(view, boundary) == main_boundary
 
   defp format_file_path(boundary) do
     name = if is_nil(boundary), do: "app", else: inspect(boundary.name)
     Path.join([File.cwd!(), @output_folder, "#{name}.dot"])
   end
 
-  defp format_title(nil), do: "#{Boundary.Mix.app_name()} application"
-  defp format_title(boundary), do: "#{inspect(boundary.name)} boundary"
+  defp title(nil), do: "#{Boundary.Mix.app_name()} application"
+  defp title(boundary), do: "#{inspect(boundary.name)} boundary"
 
-  defp format_graph(title, nodes, edges) do
-    body =
-      [
-        [
-          ~s/label="#{title}"/,
-          ~s/labelloc=top/
-        ],
-        node_clauses(nodes),
-        edge_clauses(edges)
-      ]
-      |> Stream.reject(&Enum.empty?/1)
-      |> Stream.intersperse(?\n)
-      |> Enum.map(fn part -> with [_ | _] = clauses <- part, do: Enum.map(clauses, &"  #{&1};\n") end)
+  defp graph(main_boundary, title, nodes, edges) do
+    """
+    digraph {
+      label="#{title}";
+      labelloc=top;
+      rankdir=LR;
 
-    "digraph {\n#{body}}\n"
+    #{node_clauses(main_boundary, nodes) |> Enum.map(&"  #{&1};") |> Enum.intersperse(?\n)}
+
+    #{edge_clauses(main_boundary, edges) |> Enum.map(&"  #{&1};") |> Enum.intersperse(?\n)}
+    }
+    """
   end
 
-  defp node_clauses(nodes) do
+  defp node_clauses(main_boundary, nodes) do
     nodes
     |> Enum.sort()
-    |> Enum.map(&format_node_description/1)
+    |> Enum.map(&node_clause(main_boundary, &1))
   end
 
-  defp format_node_description({module, :sibling}), do: format_node(module)
-  defp format_node_description({module, _}), do: ~s/#{format_node(module)} [color = "gray"]/
+  defp node_clause(main_boundary, module), do: ~s/"#{node_name(main_boundary, module)}" [shape="box"]/
 
-  defp edge_clauses(edges) do
+  defp edge_clauses(main_boundary, edges) do
     edges
     |> Enum.sort()
-    |> Enum.map(&format_edge/1)
+    |> Enum.map(&edge_clause(main_boundary, &1))
   end
 
-  defp format_edge({module1, module2, _} = edge),
-    do: "#{format_node(module1)} -> #{format_node(module2)}#{format_edge_attributes(edge)}"
+  defp edge_clause(main_boundary, {module1, module2, _} = edge),
+    do: ~s/"#{node_name(main_boundary, module1)}" -> "#{node_name(main_boundary, module2)}"#{edge_attributes(edge)}/
 
-  defp format_node(module), do: ~s/"#{inspect(module)}"/
+  defp node_name(nil, module), do: inspect(module)
+  defp node_name(main_boundary, module), do: String.replace(inspect(module), ~r/^#{inspect(main_boundary.name)}\./, "")
 
-  defp format_edge_attributes({_, _, :runtime}), do: ""
-  defp format_edge_attributes({_, _, :compile}), do: ~s/ [label = "compile"]/
+  defp edge_attributes({_, _, :runtime}), do: ""
+  defp edge_attributes({_, _, :compile}), do: ~s/ [label = "compile"]/
 end

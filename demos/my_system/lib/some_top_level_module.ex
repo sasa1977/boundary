@@ -1,5 +1,5 @@
 defmodule SomeTopLevelModule do
-  use Boundary, ignore?: true
+  use Boundary, check: [in: false, out: false]
 
   def foo do
     MySystemWeb.Endpoint.url()

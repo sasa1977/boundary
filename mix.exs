@@ -1,7 +1,7 @@
 defmodule Boundary.MixProject do
   use Mix.Project
 
-  @version "0.5.0"
+  @version "0.6.0"
 
   def project do
     [
@@ -14,7 +14,8 @@ defmodule Boundary.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       docs: docs(),
       dialyzer: dialyzer(),
-      package: package()
+      package: package(),
+      aliases: aliases()
     ]
   end
 
@@ -63,5 +64,9 @@ defmodule Boundary.MixProject do
     [
       plt_add_apps: [:mix]
     ]
+  end
+
+  defp aliases do
+    [docs: ["docs", fn _ -> File.cp_r!("images", "doc/images") end]]
   end
 end

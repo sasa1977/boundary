@@ -47,39 +47,38 @@ defmodule Boundary.Definition do
         {nil, opts} ->
           normalize(decoded.app, boundary, opts, decoded.env)
 
-        {_boundary, opts} ->
-          if decoded.protocol? or decoded.mix_task? do
-            nil
-          else
-            IO.warn(
-              ":classify_to can only be provided in protocol implementations and mix tasks",
-              Macro.Env.stacktrace(decoded.env)
-            )
+        {classify_to, opts} ->
+          decoded_target = decode(classify_to)
 
-            normalize(decoded.app, boundary, opts, decoded.env)
+          cond do
+            is_nil(decoded_target) or Keyword.get(decoded_target.opts, :classify_to) != nil ->
+              normalize(decoded.app, boundary, opts, decoded.env)
+              |> add_errors([{:unknown_boundary, name: classify_to, file: decoded.env.file, line: decoded.env.line}])
+
+            not decoded.protocol? and not decoded.mix_task? ->
+              normalize(decoded.app, boundary, opts, decoded.env)
+              |> add_errors([{:cant_reclassify, name: boundary, file: decoded.env.file, line: decoded.env.line}])
+
+            true ->
+              nil
           end
       end
     end
   end
 
   def classified_to(module) do
-    with decoded when not is_nil(decoded) <- decode(module) do
-      case Keyword.pop(decoded.opts, :classify_to, nil) do
-        {nil, _opts} ->
-          nil
-
-        {boundary, opts} ->
-          unless Enum.empty?(opts),
-            do: IO.warn("no other option is allowed if :classify_to is provided", Macro.Env.stacktrace(decoded.env))
-
-          if decoded.protocol? or decoded.mix_task?,
-            do: %{boundary: boundary, file: decoded.env.file, line: decoded.env.line}
-      end
+    with decoded when not is_nil(decoded) <- decode(module),
+         {:ok, boundary} <- Keyword.fetch(decoded.opts, :classify_to),
+         true <- decoded.protocol? or decoded.mix_task? do
+      %{boundary: boundary, file: decoded.env.file, line: decoded.env.line}
+    else
+      _ -> nil
     end
   end
 
   defp decode(boundary) do
-    with [definition] <- Keyword.get(boundary.__info__(:attributes), Boundary) do
+    with true <- :code.get_object_code(boundary) != :error,
+         [definition] <- Keyword.get(boundary.__info__(:attributes), Boundary) do
       Map.update!(
         definition,
         :opts,
@@ -88,14 +87,19 @@ defmodule Boundary.Definition do
             encoded
             |> :erlang.binary_to_term()
             |> Enum.map(fn
-              {key, references} when key in ~w/deps exports/a -> {key, expand_references(references, definition.env)}
-              other -> other
+              {key, references} when key in ~w/deps exports/a and is_list(references) ->
+                {key, expand_references(references, definition.env)}
+
+              other ->
+                other
             end)
             |> Code.eval_quoted([], definition.env)
 
           decoded
         end
       )
+    else
+      _ -> nil
     end
   end
 
@@ -127,41 +131,69 @@ defmodule Boundary.Definition do
   def normalize(app, boundary, definition, env) do
     definition
     |> normalize!(app, env)
+    |> normalize_check()
     |> normalize_exports(boundary)
     |> normalize_deps()
   end
 
   defp normalize!(user_opts, app, env) do
     defaults()
+    |> Map.merge(project_defaults(user_opts))
     |> Map.merge(%{file: env.file, line: env.line, app: app})
     |> merge_user_opts(user_opts)
-    |> validate(&if &1.ignore? and &1.deps != [], do: :dep_in_ignored_boundary)
-    |> validate(&if &1.ignore? and &1.exports != [], do: :export_in_ignored_boundary)
-    |> validate(&if &1.externals_mode not in ~w/strict relaxed/a, do: :invalid_externals_mode)
-    |> validate(&if &1.externals_mode == :strict and &1.extra_externals != [], do: :extra_externals_in_strict_mode)
+    |> validate(&if &1.type not in ~w/strict relaxed/a, do: :invalid_type)
   end
 
   defp merge_user_opts(definition, user_opts) do
+    user_opts =
+      case Keyword.get(user_opts, :ignore?) do
+        nil -> user_opts
+        value -> Config.Reader.merge([check: [in: not value, out: not value]], user_opts)
+      end
+
     user_opts = Map.new(user_opts)
-    valid_keys = ~w/deps exports ignore? extra_externals externals_mode top_level?/a
+    valid_keys = ~w/deps exports check type top_level?/a
 
     definition
     |> Map.merge(Map.take(user_opts, valid_keys))
-    |> add_errors(user_opts |> Map.drop(valid_keys) |> Map.keys() |> Enum.map(&{:unknown_option, name: &1}))
+    |> add_errors(
+      user_opts
+      |> Map.drop(valid_keys)
+      |> Enum.map(fn {key, value} -> {:unknown_option, name: key, value: value} end)
+    )
   end
+
+  defp normalize_exports(%{exports: :all} = definition, boundary),
+    do: normalize_exports(%{definition | exports: {:all, []}}, boundary)
+
+  defp normalize_exports(%{exports: {:all, opts}} = definition, boundary),
+    do: %{definition | exports: [{boundary, opts}]}
 
   defp normalize_exports(definition, boundary) do
     update_in(
       definition.exports,
-      fn exports ->
-        normalized_exports = Enum.map(exports, &normalize_export(boundary, &1))
-        [{boundary, []} | normalized_exports]
-      end
+      fn exports -> Enum.map(exports, &normalize_export(boundary, &1)) end
     )
   end
 
-  defp normalize_export(boundary, export) when is_atom(export), do: normalize_export(boundary, {export, []})
+  defp normalize_export(boundary, export) when is_atom(export), do: Module.concat(boundary, export)
   defp normalize_export(boundary, {export, opts}), do: {Module.concat(boundary, export), opts}
+
+  defp normalize_check(definition) do
+    definition.check
+    |> update_in(&Map.new(Keyword.merge([in: true, out: true, apps: []], &1)))
+    |> update_in([:check, :apps], &normalize_check_apps/1)
+    |> validate(&if not &1.check.in and &1.exports != [], do: :exports_in_check_in_false)
+    |> validate(&if not &1.check.out and &1.deps != [], do: :deps_in_check_out_false)
+    |> validate(&if not &1.check.out and &1.check.apps != [], do: :apps_in_check_out_false)
+  end
+
+  defp normalize_check_apps(apps) do
+    Enum.flat_map(apps, fn
+      {_app, _type} = entry -> [entry]
+      app when is_atom(app) -> [{app, :runtime}, {app, :compile}]
+    end)
+  end
 
   defp normalize_deps(definition) do
     update_in(
@@ -180,13 +212,21 @@ defmodule Boundary.Definition do
     %{
       deps: [],
       exports: [],
-      ignore?: false,
-      externals: [],
-      extra_externals: [],
-      externals_mode: Mix.Project.config() |> Keyword.get(:boundary, []) |> Keyword.get(:externals_mode, :relaxed),
+      check: [],
+      type: :relaxed,
       errors: [],
       top_level?: false
     }
+  end
+
+  defp project_defaults(user_opts) do
+    if user_opts[:check][:out] == false do
+      %{}
+    else
+      (Mix.Project.config()[:boundary][:default] || [])
+      |> Keyword.take(~w/type check/a)
+      |> Map.new()
+    end
   end
 
   defp add_errors(definition, errors) do

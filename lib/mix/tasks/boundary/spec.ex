@@ -24,20 +24,15 @@ defmodule Mix.Tasks.Boundary.Spec do
     Mix.shell().info("\n" <> msg)
   end
 
-  defp boundary_info(%{ignore?: false} = boundary) do
+  defp boundary_info(boundary) do
     """
     #{inspect(boundary.name)}
-      deps: #{deps(boundary)}
       exports: #{exports(boundary)}
-      externals: #{boundary.externals |> Enum.map(&inspect/1) |> Enum.join(", ")}
+      deps: #{deps(boundary)}
     """
   end
 
-  defp boundary_info(%{ignore?: true} = boundary) do
-    """
-    #{inspect(boundary.name)} (ignored)
-    """
-  end
+  defp deps(%{check: %{out: false}}), do: "not checked"
 
   defp deps(boundary) do
     boundary.deps
@@ -49,21 +44,13 @@ defmodule Mix.Tasks.Boundary.Spec do
     |> Enum.join(", ")
   end
 
+  defp exports(%{check: %{in: false}}), do: "not checked"
+
   defp exports(boundary) do
     boundary.exports
-    |> Stream.map(&normalize_export(boundary.name, &1))
-    |> Stream.reject(&is_nil/1)
+    |> Stream.map(&inspect/1)
     |> Enum.sort()
     |> Enum.join(", ")
+    |> String.replace("#{inspect(boundary.name)}.", "")
   end
-
-  defp normalize_export(boundary_name, boundary_name), do: nil
-
-  defp normalize_export(boundary_name, exported_module) do
-    parts = relative_to(Module.split(exported_module), Module.split(boundary_name))
-    inspect(Module.concat(parts))
-  end
-
-  defp relative_to([head | tail1], [head | tail2]), do: relative_to(tail1, tail2)
-  defp relative_to(list, _), do: list
 end

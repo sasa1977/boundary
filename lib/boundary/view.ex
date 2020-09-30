@@ -3,16 +3,15 @@ defmodule Boundary.View do
   alias Boundary.Classifier
 
   @type t :: %{
+          version: String.t(),
           main_app: app,
           classifier: Classifier.t(),
           unclassified_modules: MapSet.t(module),
           module_to_app: %{module => app},
-          externals: MapSet.t(app)
+          external_deps: MapSet.t(module)
         }
 
   @type app :: atom
-
-  @type opts :: [classified_externals: Classifier.t()]
 
   @spec build(app) :: t
   def build(main_app) do
@@ -26,20 +25,27 @@ defmodule Boundary.View do
     main_app_boundaries = classifier.boundaries |> Map.values() |> Enum.filter(&(&1.app == main_app))
 
     %{
+      version: unquote(Mix.Project.config()[:version]),
       main_app: main_app,
       classifier: classifier,
       unclassified_modules: unclassified_modules(main_app, classifier.modules),
       module_to_app: module_to_app,
-      externals: all_externals(main_app_boundaries)
+      external_deps: all_external_deps(main_app, main_app_boundaries, module_to_app)
     }
   end
 
   @spec refresh(t) :: t | nil
-  def refresh(view) do
+  def refresh(%{version: unquote(Mix.Project.config()[:version])} = view) do
+    module_to_app =
+      for {app, _description, _vsn} <- Application.loaded_applications(),
+          module <- app_modules(app),
+          into: %{},
+          do: {module, app}
+
     main_app_modules = app_modules(view.main_app)
     main_app_boundaries = load_app_boundaries(view.main_app, main_app_modules, view.module_to_app)
 
-    if MapSet.equal?(view.externals, all_externals(main_app_boundaries)) do
+    if MapSet.equal?(view.external_deps, all_external_deps(view.main_app, main_app_boundaries, module_to_app)) do
       module_to_app = for module <- main_app_modules, into: view.module_to_app, do: {module, view.main_app}
       classifier = Classifier.classify(view.classifier, main_app_modules, main_app_boundaries)
       unclassified_modules = unclassified_modules(view.main_app, classifier.modules)
@@ -48,6 +54,8 @@ defmodule Boundary.View do
       nil
     end
   end
+
+  def refresh(_), do: nil
 
   @spec drop_main_app(t) :: t
   def drop_main_app(view) do
@@ -62,11 +70,11 @@ defmodule Boundary.View do
     main_app_modules = app_modules(main_app)
     main_app_boundaries = load_app_boundaries(main_app, main_app_modules, module_to_app)
 
-    classifier = classify_externals(main_app_boundaries, module_to_app)
+    classifier = classify_external_deps(main_app_boundaries, module_to_app)
     Classifier.classify(classifier, main_app_modules, main_app_boundaries)
   end
 
-  defp classify_externals(main_app_boundaries, module_to_app) do
+  defp classify_external_deps(main_app_boundaries, module_to_app) do
     Enum.reduce(
       load_external_boundaries(main_app_boundaries, module_to_app),
       Classifier.new(),
@@ -74,44 +82,30 @@ defmodule Boundary.View do
     )
   end
 
-  defp all_externals(main_app_boundaries) do
+  defp all_external_deps(main_app, main_app_boundaries, module_to_app) do
     for boundary <- main_app_boundaries,
-        external <- boundary.externals,
+        {dep, _} <- boundary.deps,
+        Map.get(module_to_app, dep) != main_app,
         into: MapSet.new(),
-        do: external
+        do: dep
   end
 
   defp load_app_boundaries(app_name, modules, module_to_app) do
     for module <- modules, boundary = Boundary.Definition.get(module) do
-      exports = Enum.flat_map(boundary.exports, &expand_export(&1, modules))
+      check_apps =
+        for {dep_name, _mode} <- boundary.deps,
+            app = Map.get(module_to_app, dep_name),
+            app not in [nil, app_name],
+            reduce: boundary.check.apps do
+          check_apps -> [{app, :compile}, {app, :runtime} | check_apps]
+        end
 
-      externals =
-        boundary.deps
-        |> Enum.map(fn {dep, _} -> Map.get(module_to_app, dep) end)
-        |> Stream.reject(&is_nil/1)
-        |> Stream.reject(&(&1 == app_name))
-        |> Stream.concat(boundary.extra_externals)
-        |> Enum.uniq()
-
-      Map.merge(boundary, %{name: module, implicit?: false, modules: [], exports: exports, externals: externals})
-    end
-  end
-
-  defp expand_export({module, opts}, modules) do
-    case Keyword.fetch(opts, :except) do
-      :error ->
-        [module]
-
-      {:ok, except} ->
-        prefix = Module.split(module)
-        except = Enum.into(except, MapSet.new(), &Module.concat(module, &1))
-
-        modules
-        |> Stream.reject(&MapSet.member?(except, &1))
-        |> Enum.filter(fn candidate ->
-          candidate = Module.split(candidate)
-          List.starts_with?(candidate, prefix)
-        end)
+      Map.merge(boundary, %{
+        name: module,
+        implicit?: false,
+        modules: [],
+        check: %{boundary.check | apps: Enum.sort(Enum.uniq(check_apps))}
+      })
     end
   end
 
@@ -132,7 +126,7 @@ defmodule Boundary.View do
       end
 
     Enum.map(
-      for(boundary <- main_app_boundaries, app <- boundary.externals, into: MapSet.new(), do: app),
+      for(boundary <- main_app_boundaries, {app, _} <- boundary.check.apps, into: MapSet.new(), do: app),
       fn app ->
         modules = app_modules(app)
 
@@ -164,7 +158,7 @@ defmodule Boundary.View do
   end
 
   @doc false
-  @spec app_modules(Application.app()) :: list(Module.t())
+  @spec app_modules(Application.app()) :: [module]
   def app_modules(app),
     # we're currently supporting only Elixir modules
     do: Enum.filter(Application.spec(app, :modules) || [], &String.starts_with?(Atom.to_string(&1), "Elixir."))

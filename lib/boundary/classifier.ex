@@ -69,19 +69,16 @@ defmodule Boundary.Classifier do
   defp find_boundary(trie, module) when is_atom(module) do
     case Boundary.Definition.classified_to(module) do
       nil ->
+        # protocol implementation is ignored
         if Boundary.protocol_impl?(module),
           do: nil,
           else: find_boundary(trie, Module.split(module))
 
       classified_to ->
-        boundary = find_boundary(trie, classified_to.boundary)
-
-        unless boundary do
-          message = "invalid boundary #{inspect(classified_to.boundary)}"
-          raise Boundary.Error, message: message, file: classified_to.file, line: classified_to.line
-        end
-
-        boundary
+        # If we can't find `classified_to`, it's an error in definition (like e.g. classifying to a reclassified
+        # boundary). This error has already been reported (see `Boundary.Definition.get/1`), and here we treat the
+        # boundary as if it was not reclassified.
+        find_boundary(trie, Module.split(classified_to.boundary)) || find_boundary(trie, Module.split(module))
     end
   end
 
