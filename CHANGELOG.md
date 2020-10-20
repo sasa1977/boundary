@@ -1,3 +1,7 @@
+# 0.6.1
+
+- relax Elixir requirement
+
 # 0.6.0
 
 ## Breaking

@@ -1,13 +1,13 @@
 defmodule Boundary.MixProject do
   use Mix.Project
 
-  @version "0.6.0"
+  @version "0.6.1"
 
   def project do
     [
       app: :boundary,
       version: @version,
-      elixir: "~> 1.10.0",
+      elixir: "~> 1.10",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       compilers: Mix.compilers(),
