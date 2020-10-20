@@ -468,7 +468,7 @@ defmodule Boundary do
 
   This demonstrates the main purpose of sub-boundaries. They are a mechanism which allows you to control the
   dependencies within the parent boundary. The parent boundary still gets to decide which of these sub-modules will it
-  exports. In this example, `Articles` and `Accounts` are exported, while `Repo` isn't. The sub-boundaries decide what
+  export. In this example, `Articles` and `Accounts` are exported, while `Repo` isn't. The sub-boundaries decide what
   will they depend on themselves.
 
   ### Dependencies
