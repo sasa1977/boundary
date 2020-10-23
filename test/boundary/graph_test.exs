@@ -1,4 +1,4 @@
-defmodule GraphTest do
+defmodule Boundary.GraphTest do
   use ExUnit.Case, async: true
 
   alias Graph
