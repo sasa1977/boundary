@@ -1,12 +1,15 @@
 defmodule Boundary.Graph do
   @moduledoc false
 
-  @spec new(String.t()) :: Map.t()
+  @opaque t :: %{connections: %{node => node}, name: String.t(), nodes: MapSet.t(node)}
+  @type node_name :: String.t()
+
+  @spec new(node_name) :: t()
   def new(name) do
     %{connections: %{}, name: name, nodes: MapSet.new()}
   end
 
-  @spec add_dependency(Map.t(), String.t(), String.t()) :: Map.t()
+  @spec add_dependency(t(), node_name, node_name) :: t()
   def add_dependency(graph, from, to) do
     %{connections: connections, name: name, nodes: nodes} = graph
     nodes = nodes |> MapSet.put(from) |> MapSet.put(to)
@@ -15,12 +18,13 @@ defmodule Boundary.Graph do
     %{connections: connections, name: name, nodes: nodes}
   end
 
-  @spec dot(Map.t()) :: String.t()
-  def dot(graph) do
+  @spec dot(t(), List.t()) :: node_name
+  def dot(graph, opts \\ []) do
     """
     digraph {
       label=\"#{graph.name}\";
       labelloc=top;
+    #{make_opts(opts)}
     #{nodes(graph)}
 
     #{connections(graph)}
@@ -30,6 +34,13 @@ defmodule Boundary.Graph do
 
   defp nodes(graph), do: Enum.map(graph.nodes, fn node -> "  #{node} [shape=\"box\"];\n" end)
 
+  defp make_opts(options) do
+    case options do
+      [] -> ""
+      _ -> opt_string(options)
+    end
+  end
+
   defp connections(graph) do
     for(
       {from, tos} <- graph.connections,
@@ -37,5 +48,9 @@ defmodule Boundary.Graph do
       do: "  \"#{from}\" -> \"#{to}\";\n"
     )
     |> to_string()
+  end
+
+  defp opt_string(options) do
+    Enum.map(options, fn {k, v} -> "  #{k}=#{v};\n" end)
   end
 end

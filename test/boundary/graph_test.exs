@@ -1,7 +1,7 @@
 defmodule Boundary.GraphTest do
   use ExUnit.Case, async: true
 
-  alias Graph
+  alias Boundary.Graph
 
   describe "dot/1" do
     test "generate dot output" do
@@ -17,6 +17,7 @@ defmodule Boundary.GraphTest do
                digraph {
                  label="test";
                  labelloc=top;
+
                  A [shape="box"];
                  B [shape="box"];
                  C [shape="box"];
@@ -30,6 +31,57 @@ defmodule Boundary.GraphTest do
                """
     end
 
+    test "generate dot output with options" do
+      dot =
+        Graph.new("test")
+        |> Graph.add_dependency("A", "B")
+        |> Graph.add_dependency("A", "C")
+        |> Graph.add_dependency("B", "C")
+        |> Graph.dot([rankdir: "LR",test: "test"])
+
+      assert dot ==
+               """
+               digraph {
+                 label="test";
+                 labelloc=top;
+                 rankdir=LR;
+                 test=test;
+
+                 A [shape="box"];
+                 B [shape="box"];
+                 C [shape="box"];
+
+
+                 "A" -> "B";
+                 "A" -> "C";
+                 "B" -> "C";
+
+               }
+               """
+    end
+
+    test "generate dot output without options" do
+      dot =
+        Graph.new("test")
+        |> Graph.add_dependency("A", "B")
+        |> Graph.dot()
+
+      assert dot ==
+               """
+               digraph {
+                 label="test";
+                 labelloc=top;
+
+                 A [shape="box"];
+                 B [shape="box"];
+
+
+                 "A" -> "B";
+
+               }
+               """
+    end
+
     test "succeeds for an empty graph" do
       dot = Graph.dot(Graph.new("test"))
 
@@ -38,6 +90,7 @@ defmodule Boundary.GraphTest do
                digraph {
                  label="test";
                  labelloc=top;
+
 
 
 
@@ -57,6 +110,7 @@ defmodule Boundary.GraphTest do
                digraph {
                  label="test";
                  labelloc=top;
+
                  A [shape="box"];
                  B [shape="box"];
 
