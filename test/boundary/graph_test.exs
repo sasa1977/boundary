@@ -34,10 +34,9 @@ defmodule Boundary.GraphTest do
     test "generate dot output with options" do
       dot =
         Graph.new("test")
-        |> Graph.add_dependency("A", "B")
-        |> Graph.add_dependency("A", "C")
-        |> Graph.add_dependency("B", "C")
-        |> Graph.dot([rankdir: "LR",test: "test"])
+        |> Graph.add_dependency("A", "B", label: "compile")
+        |> Graph.add_dependency("A", "C", label: "compile")
+        |> Graph.dot(rankdir: "LR", test: "test")
 
       assert dot ==
                """
@@ -52,9 +51,8 @@ defmodule Boundary.GraphTest do
                  C [shape="box"];
 
 
-                 "A" -> "B";
-                 "A" -> "C";
-                 "B" -> "C";
+                 "A" -> "B" label=compile;
+                 "A" -> "C" label=compile;
 
                }
                """
