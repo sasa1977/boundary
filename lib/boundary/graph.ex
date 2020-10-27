@@ -9,18 +9,18 @@ defmodule Boundary.Graph do
     %{connections: %{}, name: name, nodes: MapSet.new()}
   end
 
-  @spec add_dependency(t(), node_name, node_name, List.t()) :: t()
-  def add_dependency(graph, from, to, label \\ []) do
+  @spec add_dependency(t(), node_name, node_name, Keyword.t()) :: t()
+  def add_dependency(graph, from, to, attributes \\ []) do
     %{connections: connections, name: name, nodes: nodes} = graph
     nodes = nodes |> MapSet.put(from) |> MapSet.put(to)
-    connections = Map.update(connections, from, %{to => label}, &Map.merge(&1, %{to => label}))
+    connections = Map.update(connections, from, %{to => attributes}, &Map.merge(&1, %{to => attributes}))
 
     %{connections: connections, name: name, nodes: nodes}
   end
 
-  @spec dot(t(), List.t()) :: node_name
+  @spec dot(t(), Keyword.t()) :: node_name
   def dot(graph, opts \\ []) do
-    """
+    dot_string = """
     digraph {
       label=\"#{graph.name}\";
       labelloc=top;
@@ -30,9 +30,11 @@ defmodule Boundary.Graph do
     #{connections(graph)}
     }
     """
+
+    format_dot(dot_string)
   end
 
-  defp nodes(graph), do: Enum.map(graph.nodes, fn node -> "  #{node} [shape=\"box\"];\n" end)
+  defp nodes(graph), do: Enum.map(graph.nodes, fn node -> ~s/  #{node} [shape="box"];\n/ end)
 
   defp make_opts(options) do
     case options do
@@ -45,11 +47,7 @@ defmodule Boundary.Graph do
     for(
       {from, connections} <- graph.connections,
       {to, attributes} <- connections,
-      do:
-        case attributes do
-          [] -> "  \"#{from}\" -> \"#{to}\";\n"
-          _ -> "  \"#{from}\" -> \"#{to}\" #{connection_attributes(attributes)};\n"
-        end
+      do: ~s/  "#{from}" -> "#{to}"#{connection_attributes(attributes)};\n/
     )
     |> to_string()
   end
@@ -58,5 +56,24 @@ defmodule Boundary.Graph do
     Enum.map(options, fn {k, v} -> "  #{k}=#{v};\n" end)
   end
 
-  defp connection_attributes(labels), do: Enum.map(labels, fn {k, v} -> "#{k}=#{v}" end)
+  defp connection_attributes(attributes) do
+    case attributes do
+      [] ->
+        ""
+
+      [attribute] ->
+        {k, v} = attribute
+        " [#{k}=#{v}]"
+
+      _ ->
+        attrs = Enum.join(Enum.map(attributes, fn {k, v} -> "#{k}=#{v}" end), ", ")
+        " [#{attrs}]"
+    end
+  end
+
+  defp format_dot(dot_string) do
+    dot_string
+    |> String.replace(~r/\n{3,}/, "\n\n")
+    |> String.replace(~r/\n\n$/, "\n")
+  end
 end

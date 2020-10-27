@@ -22,7 +22,6 @@ defmodule Boundary.GraphTest do
                  B [shape="box"];
                  C [shape="box"];
 
-
                  "A" -> "B";
                  "A" -> "C";
                  "B" -> "C";
@@ -34,7 +33,7 @@ defmodule Boundary.GraphTest do
     test "generate dot output with options" do
       dot =
         Graph.new("test")
-        |> Graph.add_dependency("A", "B", label: "compile")
+        |> Graph.add_dependency("A", "B", label: "compile", test: "test")
         |> Graph.add_dependency("A", "C", label: "compile")
         |> Graph.dot(rankdir: "LR", test: "test")
 
@@ -50,9 +49,8 @@ defmodule Boundary.GraphTest do
                  B [shape="box"];
                  C [shape="box"];
 
-
-                 "A" -> "B" label=compile;
-                 "A" -> "C" label=compile;
+                 "A" -> "B" [label=compile, test=test];
+                 "A" -> "C" [label=compile];
 
                }
                """
@@ -73,7 +71,6 @@ defmodule Boundary.GraphTest do
                  A [shape="box"];
                  B [shape="box"];
 
-
                  "A" -> "B";
 
                }
@@ -88,9 +85,6 @@ defmodule Boundary.GraphTest do
                digraph {
                  label="test";
                  labelloc=top;
-
-
-
 
                }
                """
@@ -111,7 +105,6 @@ defmodule Boundary.GraphTest do
 
                  A [shape="box"];
                  B [shape="box"];
-
 
                  "A" -> "B";
 
