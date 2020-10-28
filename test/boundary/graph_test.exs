@@ -15,8 +15,8 @@ defmodule Boundary.GraphTest do
       assert dot ==
                """
                digraph {
-                 label="test";
-                 labelloc=top;
+                label="test";
+                labelloc=top;
 
                  A [shape="box"];
                  B [shape="box"];
@@ -25,7 +25,6 @@ defmodule Boundary.GraphTest do
                  "A" -> "B";
                  "A" -> "C";
                  "B" -> "C";
-
                }
                """
     end
@@ -40,8 +39,8 @@ defmodule Boundary.GraphTest do
       assert dot ==
                """
                digraph {
-                 label="test";
-                 labelloc=top;
+                label="test";
+                labelloc=top;
                  rankdir=LR;
                  test=test;
 
@@ -51,7 +50,6 @@ defmodule Boundary.GraphTest do
 
                  "A" -> "B" [label=compile, test=test];
                  "A" -> "C" [label=compile];
-
                }
                """
     end
@@ -65,14 +63,13 @@ defmodule Boundary.GraphTest do
       assert dot ==
                """
                digraph {
-                 label="test";
-                 labelloc=top;
+                label="test";
+                labelloc=top;
 
                  A [shape="box"];
                  B [shape="box"];
 
                  "A" -> "B";
-
                }
                """
     end
@@ -83,9 +80,8 @@ defmodule Boundary.GraphTest do
       assert dot ==
                """
                digraph {
-                 label="test";
-                 labelloc=top;
-
+                label="test";
+                labelloc=top;
                }
                """
     end
@@ -100,14 +96,13 @@ defmodule Boundary.GraphTest do
       assert dot ==
                """
                digraph {
-                 label="test";
-                 labelloc=top;
+                label="test";
+                labelloc=top;
 
                  A [shape="box"];
                  B [shape="box"];
 
                  "A" -> "B";
-
                }
                """
     end

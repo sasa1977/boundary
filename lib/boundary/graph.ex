@@ -20,18 +20,17 @@ defmodule Boundary.Graph do
 
   @spec dot(t(), Keyword.t()) :: node_name
   def dot(graph, opts \\ []) do
-    dot_string = """
-    digraph {
-      label=\"#{graph.name}\";
-      labelloc=top;
+    graph_content = """
+     label=\"#{graph.name}\";
+     labelloc=top;
     #{make_opts(opts)}
     #{nodes(graph)}
 
     #{connections(graph)}
-    }
     """
 
-    format_dot(dot_string)
+    graph_content = format_dot(graph_content)
+    "digraph {\n#{graph_content}}\n"
   end
 
   defp nodes(graph), do: Enum.map(graph.nodes, fn node -> ~s/  #{node} [shape="box"];\n/ end)
@@ -56,13 +55,10 @@ defmodule Boundary.Graph do
     Enum.map(options, fn {k, v} -> "  #{k}=#{v};\n" end)
   end
 
-  defp connection_attributes([]) do
-    ""
-  end
+  defp connection_attributes([]), do: ""
 
-  defp connection_attributes(attributes) do
-    " [#{Enum.join(Enum.map(attributes, fn {k, v} -> "#{k}=#{v}" end), ", ")}]"
-  end
+  defp connection_attributes(attributes),
+    do: " [#{Enum.join(Enum.map(attributes, fn {k, v} -> "#{k}=#{v}" end), ", ")}]"
 
   defp format_dot(dot_string) do
     dot_string
