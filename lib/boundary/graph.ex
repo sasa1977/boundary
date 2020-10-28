@@ -56,19 +56,12 @@ defmodule Boundary.Graph do
     Enum.map(options, fn {k, v} -> "  #{k}=#{v};\n" end)
   end
 
+  defp connection_attributes([]) do
+    ""
+  end
+
   defp connection_attributes(attributes) do
-    case attributes do
-      [] ->
-        ""
-
-      [attribute] ->
-        {k, v} = attribute
-        " [#{k}=#{v}]"
-
-      _ ->
-        attrs = Enum.join(Enum.map(attributes, fn {k, v} -> "#{k}=#{v}" end), ", ")
-        " [#{attrs}]"
-    end
+    " [#{Enum.join(Enum.map(attributes, fn {k, v} -> "#{k}=#{v}" end), ", ")}]"
   end
 
   defp format_dot(dot_string) do
