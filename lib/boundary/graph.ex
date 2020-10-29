@@ -9,6 +9,8 @@ defmodule Boundary.Graph do
     %{connections: %{}, name: name, nodes: MapSet.new()}
   end
 
+  def add_node(graph, node), do: update_in(graph.nodes, &MapSet.put(&1, node))
+
   @spec add_dependency(t(), node_name, node_name, Keyword.t()) :: t()
   def add_dependency(graph, from, to, attributes \\ []) do
     %{connections: connections, name: name, nodes: nodes} = graph
@@ -21,8 +23,9 @@ defmodule Boundary.Graph do
   @spec dot(t(), Keyword.t()) :: node_name
   def dot(graph, opts \\ []) do
     graph_content = """
-     label=\"#{graph.name}\";
-     labelloc=top;
+      label=\"#{graph.name}\";
+      labelloc=top;
+      rankdir=LR;
     #{make_opts(opts)}
     #{nodes(graph)}
 
@@ -33,7 +36,7 @@ defmodule Boundary.Graph do
     "digraph {\n#{graph_content}}\n"
   end
 
-  defp nodes(graph), do: Enum.map(graph.nodes, fn node -> ~s/  #{node} [shape="box"];\n/ end)
+  defp nodes(graph), do: Enum.map(graph.nodes, fn node -> ~s/  "#{node}" [shape="box"];\n/ end)
 
   defp make_opts(options) do
     case options do

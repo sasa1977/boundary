@@ -5,6 +5,8 @@ defmodule Mix.Tasks.Boundary.Visualize do
   use Boundary, classify_to: Boundary.Mix
   use Mix.Task
 
+  alias Boundary.Graph
+
   @output_folder "boundary"
 
   @impl Mix.Task
@@ -62,39 +64,27 @@ defmodule Mix.Tasks.Boundary.Visualize do
   defp title(boundary), do: "#{inspect(boundary.name)} boundary"
 
   defp graph(main_boundary, title, nodes, edges) do
-    """
-    digraph {
-      label="#{title}";
-      labelloc=top;
-      rankdir=LR;
+    graph = Graph.new(title)
+    new_nodes = Enum.map(nodes, fn module -> node_name(main_boundary, module) end)
 
-    #{node_clauses(main_boundary, nodes) |> Enum.map(&"  #{&1};") |> Enum.intersperse(?\n)}
+    new_edges =
+      Enum.map(edges, fn {from, to, opts} ->
+        {node_name(main_boundary, from), node_name(main_boundary, to), edge_attributes(opts)}
+      end)
 
-    #{edge_clauses(main_boundary, edges) |> Enum.map(&"  #{&1};") |> Enum.intersperse(?\n)}
-    }
-    """
+    graph = Enum.reduce(new_nodes, graph, fn node, graph -> Graph.add_node(graph, node) end)
+
+    graph =
+      Enum.reduce(new_edges, graph, fn {from, to, attributes}, graph ->
+        Graph.add_dependency(graph, from, to, attributes)
+      end)
+
+    Graph.dot(graph)
   end
-
-  defp node_clauses(main_boundary, nodes) do
-    nodes
-    |> Enum.sort()
-    |> Enum.map(&node_clause(main_boundary, &1))
-  end
-
-  defp node_clause(main_boundary, module), do: ~s/"#{node_name(main_boundary, module)}" [shape="box"]/
-
-  defp edge_clauses(main_boundary, edges) do
-    edges
-    |> Enum.sort()
-    |> Enum.map(&edge_clause(main_boundary, &1))
-  end
-
-  defp edge_clause(main_boundary, {module1, module2, _} = edge),
-    do: ~s/"#{node_name(main_boundary, module1)}" -> "#{node_name(main_boundary, module2)}"#{edge_attributes(edge)}/
 
   defp node_name(nil, module), do: inspect(module)
   defp node_name(main_boundary, module), do: String.replace(inspect(module), ~r/^#{inspect(main_boundary.name)}\./, "")
 
-  defp edge_attributes({_, _, :runtime}), do: ""
-  defp edge_attributes({_, _, :compile}), do: ~s/ [label = "compile"]/
+  defp edge_attributes(:runtime), do: []
+  defp edge_attributes(:compile), do: [label: "compile"]
 end

@@ -34,7 +34,7 @@ defmodule Boundary.GraphTest do
         Graph.new("test")
         |> Graph.add_dependency("A", "B", label: "compile", test: "test")
         |> Graph.add_dependency("A", "C", label: "compile")
-        |> Graph.dot(rankdir: "LR", test: "test")
+        |> Graph.dot(test: "test")
 
       assert dot ==
                """
@@ -101,6 +101,28 @@ defmodule Boundary.GraphTest do
 
                  A [shape="box"];
                  B [shape="box"];
+
+                 "A" -> "B";
+               }
+               """
+    end
+
+    test "add single node with no connections" do
+      dot =
+        Graph.new("test")
+        |> Graph.add_node("C")
+        |> Graph.add_dependency("A", "B")
+        |> Graph.dot()
+
+      assert dot ==
+               """
+               digraph {
+                label="test";
+                labelloc=top;
+
+                 A [shape="box"];
+                 B [shape="box"];
+                 C [shape="box"];
 
                  "A" -> "B";
                }
