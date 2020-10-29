@@ -65,18 +65,17 @@ defmodule Mix.Tasks.Boundary.Visualize do
 
   defp graph(main_boundary, title, nodes, edges) do
     graph = Graph.new(title)
-    new_nodes = Enum.map(nodes, fn module -> node_name(main_boundary, module) end)
 
-    new_edges =
-      Enum.map(edges, fn {from, to, opts} ->
-        {node_name(main_boundary, from), node_name(main_boundary, to), edge_attributes(opts)}
-      end)
-
-    graph = Enum.reduce(new_nodes, graph, fn node, graph -> Graph.add_node(graph, node) end)
+    graph = Enum.reduce(nodes, graph, fn node, graph -> Graph.add_node(graph, node_name(main_boundary, node)) end)
 
     graph =
-      Enum.reduce(new_edges, graph, fn {from, to, attributes}, graph ->
-        Graph.add_dependency(graph, from, to, attributes)
+      Enum.reduce(edges, graph, fn {from, to, attributes}, graph ->
+        Graph.add_dependency(
+          graph,
+          node_name(main_boundary, from),
+          node_name(main_boundary, to),
+          edge_attributes(attributes)
+        )
       end)
 
     Graph.dot(graph)

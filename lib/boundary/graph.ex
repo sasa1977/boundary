@@ -24,7 +24,7 @@ defmodule Boundary.Graph do
   @spec dot(t(), Keyword.t()) :: node_name
   def dot(graph, opts \\ []) do
     graph_content = """
-      label=\"#{graph.name}\";
+      label="#{graph.name}";
       labelloc=top;
       rankdir=LR;
     #{make_opts(opts)}
