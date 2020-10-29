@@ -1,7 +1,7 @@
 defmodule Boundary.Graph do
   @moduledoc false
 
-  @opaque t :: %{connections: %{node => node}, name: String.t(), nodes: MapSet.t(node)}
+  @opaque t :: %{connections: %{node => Keyword.t()}, name: String.t(), nodes: MapSet.t(node)}
   @type node_name :: String.t()
 
   @spec new(node_name) :: t()
