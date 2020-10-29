@@ -9,6 +9,7 @@ defmodule Boundary.Graph do
     %{connections: %{}, name: name, nodes: MapSet.new()}
   end
 
+  @spec add_node(t(), node_name()) :: t()
   def add_node(graph, node), do: update_in(graph.nodes, &MapSet.put(&1, node))
 
   @spec add_dependency(t(), node_name, node_name, Keyword.t()) :: t()

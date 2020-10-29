@@ -15,12 +15,13 @@ defmodule Boundary.GraphTest do
       assert dot ==
                """
                digraph {
-                label="test";
-                labelloc=top;
+                 label="test";
+                 labelloc=top;
+                 rankdir=LR;
 
-                 A [shape="box"];
-                 B [shape="box"];
-                 C [shape="box"];
+                 "A" [shape="box"];
+                 "B" [shape="box"];
+                 "C" [shape="box"];
 
                  "A" -> "B";
                  "A" -> "C";
@@ -39,14 +40,14 @@ defmodule Boundary.GraphTest do
       assert dot ==
                """
                digraph {
-                label="test";
-                labelloc=top;
+                 label="test";
+                 labelloc=top;
                  rankdir=LR;
                  test=test;
 
-                 A [shape="box"];
-                 B [shape="box"];
-                 C [shape="box"];
+                 "A" [shape="box"];
+                 "B" [shape="box"];
+                 "C" [shape="box"];
 
                  "A" -> "B" [label=compile, test=test];
                  "A" -> "C" [label=compile];
@@ -63,11 +64,12 @@ defmodule Boundary.GraphTest do
       assert dot ==
                """
                digraph {
-                label="test";
-                labelloc=top;
+                 label="test";
+                 labelloc=top;
+                 rankdir=LR;
 
-                 A [shape="box"];
-                 B [shape="box"];
+                 "A" [shape="box"];
+                 "B" [shape="box"];
 
                  "A" -> "B";
                }
@@ -80,8 +82,9 @@ defmodule Boundary.GraphTest do
       assert dot ==
                """
                digraph {
-                label="test";
-                labelloc=top;
+                 label="test";
+                 labelloc=top;
+                 rankdir=LR;
                }
                """
     end
@@ -96,11 +99,12 @@ defmodule Boundary.GraphTest do
       assert dot ==
                """
                digraph {
-                label="test";
-                labelloc=top;
+                 label="test";
+                 labelloc=top;
+                 rankdir=LR;
 
-                 A [shape="box"];
-                 B [shape="box"];
+                 "A" [shape="box"];
+                 "B" [shape="box"];
 
                  "A" -> "B";
                }
@@ -117,12 +121,13 @@ defmodule Boundary.GraphTest do
       assert dot ==
                """
                digraph {
-                label="test";
-                labelloc=top;
+                 label="test";
+                 labelloc=top;
+                 rankdir=LR;
 
-                 A [shape="box"];
-                 B [shape="box"];
-                 C [shape="box"];
+                 "A" [shape="box"];
+                 "B" [shape="box"];
+                 "C" [shape="box"];
 
                  "A" -> "B";
                }
