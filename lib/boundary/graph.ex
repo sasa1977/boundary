@@ -5,9 +5,7 @@ defmodule Boundary.Graph do
   @type node_name :: String.t()
 
   @spec new(node_name) :: t()
-  def new(name) do
-    %{connections: %{}, name: name, nodes: MapSet.new()}
-  end
+  def new(name), do: %{connections: %{}, name: name, nodes: MapSet.new()}
 
   @spec add_node(t(), node_name()) :: t()
   def add_node(graph, node), do: update_in(graph.nodes, &MapSet.put(&1, node))
@@ -39,24 +37,14 @@ defmodule Boundary.Graph do
 
   defp nodes(graph), do: Enum.map(graph.nodes, fn node -> ~s/  "#{node}" [shape="box"];\n/ end)
 
-  defp make_opts(options) do
-    case options do
-      [] -> ""
-      _ -> opt_string(options)
-    end
-  end
+  defp make_opts([]), do: ""
+  defp make_opts(options), do: Enum.map(options, fn {k, v} -> "  #{k}=#{v};\n" end)
 
   defp connections(graph) do
-    for(
-      {from, connections} <- graph.connections,
-      {to, attributes} <- connections,
-      do: ~s/  "#{from}" -> "#{to}"#{connection_attributes(attributes)};\n/
-    )
-    |> to_string()
-  end
-
-  defp opt_string(options) do
-    Enum.map(options, fn {k, v} -> "  #{k}=#{v};\n" end)
+    for {from, connections} <- graph.connections,
+        {to, attributes} <- connections,
+        into: "",
+        do: ~s/  "#{from}" -> "#{to}"#{connection_attributes(attributes)};\n/
   end
 
   defp connection_attributes([]), do: ""

@@ -64,21 +64,24 @@ defmodule Mix.Tasks.Boundary.Visualize do
   defp title(boundary), do: "#{inspect(boundary.name)} boundary"
 
   defp graph(main_boundary, title, nodes, edges) do
-    graph = Graph.new(title)
+    Graph.new(title)
+    |> add_nodes(main_boundary, nodes)
+    |> add_edges(main_boundary, edges)
+    |> Graph.dot()
+  end
 
-    graph = Enum.reduce(nodes, graph, fn node, graph -> Graph.add_node(graph, node_name(main_boundary, node)) end)
+  defp add_nodes(graph, main_boundary, nodes),
+    do: Enum.reduce(nodes, graph, &Graph.add_node(&2, node_name(main_boundary, &1)))
 
-    graph =
-      Enum.reduce(edges, graph, fn {from, to, attributes}, graph ->
-        Graph.add_dependency(
-          graph,
-          node_name(main_boundary, from),
-          node_name(main_boundary, to),
-          edge_attributes(attributes)
-        )
-      end)
-
-    Graph.dot(graph)
+  defp add_edges(graph, main_boundary, edges) do
+    Enum.reduce(edges, graph, fn {from, to, attributes}, graph ->
+      Graph.add_dependency(
+        graph,
+        node_name(main_boundary, from),
+        node_name(main_boundary, to),
+        edge_attributes(attributes)
+      )
+    end)
   end
 
   defp node_name(nil, module), do: inspect(module)
