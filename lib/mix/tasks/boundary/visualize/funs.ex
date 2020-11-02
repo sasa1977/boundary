@@ -42,9 +42,10 @@ defmodule Mix.Tasks.Boundary.Visualize.Funs do
 
     graph =
       Enum.reduce(list, graph, fn {k, v}, graph ->
-        Graph.add_node(graph, k)
-        Graph.add_node(graph, v)
-        Graph.add_dependency(graph, k, v)
+        graph
+        |> Graph.add_node(k)
+        |> Graph.add_node(v)
+        |> Graph.add_dependency(k, v)
       end)
 
     graph = Graph.dot(graph)

@@ -11,7 +11,6 @@ defmodule Mix.Tasks.Boundary.Visualize.FunsTest do
         Path.join([project.path, "lib", "source.ex"]),
         """
         defmodule MyMod do
-
           def foo do
             bar()
             baz()
