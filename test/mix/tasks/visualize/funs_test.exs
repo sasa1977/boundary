@@ -13,16 +13,15 @@ defmodule Mix.Tasks.Boundary.Visualize.FunsTest do
         defmodule MyMod do
           def foo do
             bar()
-            baz()
+            bar()
+
+            baz(1)
           end
 
-          def bar do
-            baz
-          end
+          def bar, do: baz()
 
-          def baz do
-            :ok
-          end
+          def baz, do: :ok
+          def baz(_), do: :ok
         end
         """
       )
