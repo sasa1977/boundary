@@ -62,7 +62,8 @@ defmodule Boundary.MixProject do
 
   defp dialyzer() do
     [
-      plt_add_apps: [:mix]
+      plt_add_apps: [:mix],
+      ignore_warnings: ".dialyzer_ignore"
     ]
   end
 
