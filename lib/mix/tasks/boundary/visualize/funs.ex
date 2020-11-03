@@ -11,11 +11,15 @@ defmodule Mix.Tasks.Boundary.Visualize.Funs do
 
     tracers = Code.get_compiler_option(:tracers)
     Code.put_compiler_option(:tracers, [__MODULE__ | tracers])
+
     :ets.new(__MODULE__, [:named_table, :public, :duplicate_bag, write_concurrency: true])
     :persistent_term.put({__MODULE__, :module}, hd(argv))
+
     previous_shell = Mix.shell()
     Mix.shell(Mix.Shell.Quiet)
     :persistent_term.put({__MODULE__, :shell}, previous_shell)
+
+    # need to force recompile the project so we can collect traces
     Mix.Task.Compiler.after_compiler(:app, &after_compiler/1)
     Mix.Task.reenable("compile")
     Mix.Task.run("compile", ["--force"])
@@ -48,9 +52,7 @@ defmodule Mix.Tasks.Boundary.Visualize.Funs do
         |> Graph.add_dependency(k, v)
       end)
 
-    graph = Graph.dot(graph)
-
-    Mix.shell().info(graph)
+    Mix.shell().info(Graph.dot(graph))
     status
   end
 end
