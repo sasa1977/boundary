@@ -1,4 +1,8 @@
+# credo:disable-for-this-file Credo.Check.Readability.Specs
+
 defmodule Mix.Tasks.Boundary.Visualize.Funs do
+  @moduledoc false
+
   use Boundary, classify_to: Boundary.Mix
   use Mix.Task
 
@@ -56,5 +60,5 @@ defmodule Mix.Tasks.Boundary.Visualize.Funs do
     |> Graph.dot()
   end
 
-  defp calls(), do: :ets.tab2list(__MODULE__)
+  defp calls, do: :ets.tab2list(__MODULE__)
 end
