@@ -39,20 +39,22 @@ defmodule Mix.Tasks.Boundary.Visualize.Funs do
 
   defp after_compiler(status) do
     Mix.shell(:persistent_term.get({__MODULE__, :shell}))
-    name = "function calls inside #{:persistent_term.get({__MODULE__, :module})}"
-
-    list = :ets.tab2list(__MODULE__)
-    graph = Graph.new(name)
-
-    graph =
-      Enum.reduce(list, graph, fn {k, v}, graph ->
-        graph
-        |> Graph.add_node(k)
-        |> Graph.add_node(v)
-        |> Graph.add_dependency(k, v)
-      end)
-
-    Mix.shell().info(Graph.dot(graph))
+    Mix.shell().info(build_graph())
     status
   end
+
+  defp build_graph do
+    name = "function calls inside #{:persistent_term.get({__MODULE__, :module})}"
+
+    calls()
+    |> Enum.reduce(Graph.new(name), fn {from, to}, graph ->
+      graph
+      |> Graph.add_node(from)
+      |> Graph.add_node(to)
+      |> Graph.add_dependency(from, to)
+    end)
+    |> Graph.dot()
+  end
+
+  defp calls(), do: :ets.tab2list(__MODULE__)
 end
