@@ -32,7 +32,7 @@ defmodule Mix.Tasks.Boundary.Visualize.FunsTest do
 
       assert output == """
              digraph {
-               label="function calls inside "MyMod"";
+               label="function calls inside MyMod";
                labelloc=top;
                rankdir=LR;
 

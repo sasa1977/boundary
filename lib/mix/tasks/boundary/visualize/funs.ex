@@ -39,7 +39,7 @@ defmodule Mix.Tasks.Boundary.Visualize.Funs do
 
   defp after_compiler(status) do
     Mix.shell(:persistent_term.get({__MODULE__, :shell}))
-    name = "function calls inside #{inspect(:persistent_term.get({__MODULE__, :module}))}"
+    name = "function calls inside #{:persistent_term.get({__MODULE__, :module})}"
 
     list = :ets.tab2list(__MODULE__)
     graph = Graph.new(name)
