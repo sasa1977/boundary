@@ -1,0 +1,3 @@
+# dialyxir bug: https://github.com/jeremyjh/dialyxir/issues/369
+Unknown function persistent_term:get/1
+Unknown function persistent_term:put/2
