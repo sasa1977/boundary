@@ -30,12 +30,17 @@ defmodule Boundary.GraphTest do
                """
     end
 
-    test "generate dot output with options" do
+    test "generate dot output with options and one subgraph" do
+      subgraph =
+        Graph.new("subgraph_cluster_1")
+        |> Graph.add_dependency("C", "D")
+
       dot =
         Graph.new("test")
         |> Graph.add_dependency("A", "B", label: "compile", test: "test")
         |> Graph.add_dependency("A", "C", label: "compile")
-        |> Graph.dot(test: "test")
+        |> Graph.add_subgraph(subgraph)
+        |> Graph.dot(indent: 0, test: "test")
 
       assert dot ==
                """
@@ -51,6 +56,74 @@ defmodule Boundary.GraphTest do
 
                  "A" -> "B" [label=compile, test=test];
                  "A" -> "C" [label=compile];
+
+                 subgraph {
+                   label="subgraph_cluster_1";
+                   labelloc=top;
+                   rankdir=LR;
+
+                   "C" [shape="box"];
+                   "D" [shape="box"];
+
+                   "C" -> "D";
+                 }
+               }
+               """
+    end
+
+    test "generate dot output with options and 2 subgraphs" do
+      subgraph1 =
+        Graph.new("subgraph_cluster_1")
+        |> Graph.add_dependency("D", "E")
+
+      subgraph =
+        Graph.new("subgraph_cluster_1")
+        |> Graph.add_dependency("C", "D")
+        |> Graph.add_subgraph(subgraph1)
+
+      dot =
+        Graph.new("test")
+        |> Graph.add_dependency("A", "B", label: "compile", test: "test")
+        |> Graph.add_dependency("A", "C", label: "compile")
+        |> Graph.add_subgraph(subgraph)
+        |> Graph.dot(indent: 0, test: "test")
+
+      assert dot ==
+               """
+               digraph {
+                 label="test";
+                 labelloc=top;
+                 rankdir=LR;
+                 test=test;
+
+                 "A" [shape="box"];
+                 "B" [shape="box"];
+                 "C" [shape="box"];
+
+                 "A" -> "B" [label=compile, test=test];
+                 "A" -> "C" [label=compile];
+
+                 subgraph {
+                   label="subgraph_cluster_1";
+                   labelloc=top;
+                   rankdir=LR;
+
+                   "C" [shape="box"];
+                   "D" [shape="box"];
+
+                   "C" -> "D";
+
+                   subgraph {
+                     label="subgraph_cluster_1";
+                     labelloc=top;
+                     rankdir=LR;
+
+                     "D" [shape="box"];
+                     "E" [shape="box"];
+
+                     "D" -> "E";
+                   }
+                 }
                }
                """
     end
