@@ -1,13 +1,11 @@
 defmodule Boundary.Graph do
   @moduledoc false
 
-  @opaque t :: %{connections: %{node => node}, name: String.t(), nodes: MapSet.t(node), subgraph: [t]}
+  @opaque t :: %{connections: %{node => Keyword.t()}, name: String.t(), nodes: MapSet.t(node), subgraph: [t]}
   @type node_name :: String.t()
 
   @spec new(node_name) :: t()
-  def new(name) do
-    %{connections: %{}, name: name, nodes: MapSet.new(), subgraphs: []}
-  end
+  def new(name), do: %{connections: %{}, name: name, nodes: MapSet.new(), subgraphs: []}
 
   @spec add_node(t(), node_name()) :: t()
   def add_node(graph, node), do: update_in(graph.nodes, &MapSet.put(&1, node))
@@ -81,9 +79,7 @@ defmodule Boundary.Graph do
     |> to_string()
   end
 
-  defp opt_string(options, indent) do
-    Enum.map(options, fn {k, v} -> "#{indent}  #{k}=#{v};\n" end)
-  end
+  defp opt_string(options, indent), do: Enum.map(options, fn {k, v} -> "#{indent}  #{k}=#{v};\n" end)
 
   defp connection_attributes([]), do: ""
 
