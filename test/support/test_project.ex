@@ -99,7 +99,7 @@ defmodule Boundary.TestProject do
       end
 
       defp deps do
-        #{inspect(Keyword.get(opts, :deps, [{:boundary, path: unquote(Path.absname("."))}]))}
+        #{inspect([{:boundary, path: unquote(Path.absname("."))} | Keyword.get(opts, :deps, [])])}
       end
     end
     """
