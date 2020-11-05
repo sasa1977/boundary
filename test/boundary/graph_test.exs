@@ -40,7 +40,7 @@ defmodule Boundary.GraphTest do
         |> Graph.add_dependency("A", "B", label: "compile", test: "test")
         |> Graph.add_dependency("A", "C", label: "compile")
         |> Graph.add_subgraph(subgraph)
-        |> Graph.dot(indent: 0, test: "test")
+        |> Graph.dot(indent: 0, type: :digraph)
 
       assert dot ==
                """
@@ -48,7 +48,6 @@ defmodule Boundary.GraphTest do
                  label="test";
                  labelloc=top;
                  rankdir=LR;
-                 test=test;
 
                  "A" [shape="box"];
                  "B" [shape="box"];
@@ -57,7 +56,7 @@ defmodule Boundary.GraphTest do
                  "A" -> "B" [label=compile, test=test];
                  "A" -> "C" [label=compile];
 
-                 subgraph {
+                 subgraph cluster_0 {
                    label="subgraph_cluster_1";
                    labelloc=top;
                    rankdir=LR;
@@ -86,7 +85,7 @@ defmodule Boundary.GraphTest do
         |> Graph.add_dependency("A", "B", label: "compile", test: "test")
         |> Graph.add_dependency("A", "C", label: "compile")
         |> Graph.add_subgraph(subgraph)
-        |> Graph.dot(indent: 0, test: "test")
+        |> Graph.dot(indent: 0)
 
       assert dot ==
                """
@@ -94,7 +93,6 @@ defmodule Boundary.GraphTest do
                  label="test";
                  labelloc=top;
                  rankdir=LR;
-                 test=test;
 
                  "A" [shape="box"];
                  "B" [shape="box"];
@@ -103,7 +101,7 @@ defmodule Boundary.GraphTest do
                  "A" -> "B" [label=compile, test=test];
                  "A" -> "C" [label=compile];
 
-                 subgraph {
+                 subgraph cluster_0 {
                    label="subgraph_cluster_1";
                    labelloc=top;
                    rankdir=LR;
@@ -113,7 +111,7 @@ defmodule Boundary.GraphTest do
 
                    "C" -> "D";
 
-                   subgraph {
+                   subgraph cluster_1 {
                      label="subgraph_cluster_1";
                      labelloc=top;
                      rankdir=LR;

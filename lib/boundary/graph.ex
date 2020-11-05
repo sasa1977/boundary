@@ -1,7 +1,7 @@
 defmodule Boundary.Graph do
   @moduledoc false
 
-  @opaque t :: %{connections: %{node => Keyword.t()}, name: String.t(), nodes: MapSet.t(node), subgraph: [t]}
+  @opaque t :: %{connections: %{node => Keyword.t()}, name: String.t(), nodes: MapSet.t(node), subgraphs: [t]}
   @type node_name :: String.t()
 
   @spec new(node_name) :: t()
@@ -12,24 +12,24 @@ defmodule Boundary.Graph do
 
   @spec add_dependency(t(), node_name, node_name, Keyword.t()) :: t()
   def add_dependency(graph, from, to, attributes \\ []) do
-    %{connections: connections, name: name, nodes: nodes, subgraphs: subgraph} = graph
+    %{connections: connections, name: _name, nodes: nodes, subgraphs: _subgraph} = graph
     nodes = nodes |> MapSet.put(from) |> MapSet.put(to)
     connections = Map.update(connections, from, %{to => attributes}, &Map.merge(&1, %{to => attributes}))
 
-    %{connections: connections, name: name, nodes: nodes, subgraphs: subgraph}
+    %{graph | nodes: nodes, connections: connections}
   end
 
   @spec add_subgraph(t(), t()) :: t()
   def add_subgraph(graph, subgraph) do
-    %{connections: connections, name: name, nodes: nodes, subgraphs: subgraphs} = graph
-    %{connections: connections, name: name, nodes: nodes, subgraphs: subgraphs ++ [subgraph]}
+    %{connections: _connections, name: _name, nodes: _nodes, subgraphs: subgraphs} = graph
+    %{graph | subgraphs: [subgraph] ++ subgraphs}
   end
 
   @spec dot(t(), Keyword.t()) :: node_name
   def dot(graph, opts \\ []) do
-    spaces = Keyword.get(opts, :indent, 0)
-    opts = Keyword.pop(opts, :indent) |> elem(1)
+    {spaces, opts} = Keyword.pop(opts, :indent, 0)
     indent = String.duplicate(" ", spaces)
+    {type, opts} = Keyword.pop(opts, :type, :digraph)
 
     graph_content = """
     #{indent}  label="#{graph.name}";
@@ -40,28 +40,18 @@ defmodule Boundary.Graph do
 
     #{connections(graph, indent)}
 
-    #{subgraphs(graph, spaces)}
+    #{Enum.map(graph.subgraphs, &dot(&1, indent: spaces + 2, type: :subgraph))}
     """
 
     graph_content = format_dot(graph_content)
 
-    case indent do
-      "" ->
-        "#{indent}digraph {\n#{graph_content}#{indent}}\n"
-
-      _ ->
-        "#{indent}subgraph {\n#{graph_content}#{indent}}"
+    case type do
+      :subgraph -> "#{indent}#{type} cluster_#{div(spaces, 2) - 1} {\n#{graph_content}#{indent}}\n"
+      _ -> "#{indent}#{type} {\n#{graph_content}#{indent}}\n"
     end
   end
 
   defp nodes(graph, tab), do: Enum.map(graph.nodes, fn node -> ~s/#{tab}  "#{node}" [shape="box"];\n/ end)
-
-  defp subgraphs(graph, spaces) do
-    case graph.subgraphs do
-      [] -> ""
-      _ -> Enum.map(graph.subgraphs, &dot(&1, indent: spaces + 2))
-    end
-  end
 
   defp make_opts(options, indent) do
     case options do
