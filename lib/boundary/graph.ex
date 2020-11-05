@@ -31,7 +31,7 @@ defmodule Boundary.Graph do
     #{indent}  label="#{graph.name}";
     #{indent}  labelloc=top;
     #{indent}  rankdir=LR;
-    #{make_opts(opts, indent)}
+    #{opts_string(opts, indent)}
     #{nodes(graph, indent)}
 
     #{connections(graph, indent)}
@@ -60,13 +60,6 @@ defmodule Boundary.Graph do
 
   defp nodes(graph, tab), do: Enum.map(graph.nodes, fn node -> ~s/#{tab}  "#{node}" [shape="box"];\n/ end)
 
-  defp make_opts(options, indent) do
-    case options do
-      [] -> ""
-      _ -> opt_string(options, indent)
-    end
-  end
-
   defp connections(graph, tab) do
     for(
       {from, connections} <- graph.connections,
@@ -76,7 +69,7 @@ defmodule Boundary.Graph do
     |> to_string()
   end
 
-  defp opt_string(options, indent), do: Enum.map(options, fn {k, v} -> "#{indent}  #{k}=#{v};\n" end)
+  defp opts_string(options, indent), do: Enum.map(options, fn {k, v} -> "#{indent}  #{k}=#{v};\n" end)
 
   defp connection_attributes([]), do: ""
 
