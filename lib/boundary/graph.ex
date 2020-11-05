@@ -36,15 +36,23 @@ defmodule Boundary.Graph do
 
     #{connections(graph, indent)}
 
-    #{Enum.map(graph.subgraphs, &dot(&1, indent: spaces + 2, type: :subgraph))}
+    #{subgraphs(graph, spaces)}
     """
 
     graph_content = format_dot(graph_content)
 
     case type do
-      :subgraph -> "#{indent}#{type} cluster_#{div(spaces, 2) - 1} {\n#{graph_content}#{indent}}\n"
+      {:subgraph, index} -> "#{indent}subgraph cluster_#{index} {\n#{graph_content}#{indent}}\n"
       _ -> "#{indent}#{type} {\n#{graph_content}#{indent}}\n"
     end
+  end
+
+  defp subgraphs(graph, spaces) do
+    graph.subgraphs
+    |> Enum.reverse()
+    |> Enum.with_index()
+    |> Enum.map(fn {subgraph, index} -> dot(subgraph, indent: spaces + 2, type: {:subgraph, index}) end)
+    |> Enum.join("\n")
   end
 
   defp nodes(graph, tab), do: Enum.map(graph.nodes, fn node -> ~s/#{tab}  "#{node}" [shape="box"];\n/ end)

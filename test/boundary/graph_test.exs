@@ -31,15 +31,18 @@ defmodule Boundary.GraphTest do
     end
 
     test "generate dot output with options and one subgraph" do
-      subgraph =
+      subgraph1 =
         Graph.new("subgraph_cluster_1")
         |> Graph.add_dependency("C", "D")
+
+      subgraph2 = Graph.new("subgraph_cluster_2")
 
       dot =
         Graph.new("test")
         |> Graph.add_dependency("A", "B", label: "compile", test: "test")
         |> Graph.add_dependency("A", "C", label: "compile")
-        |> Graph.add_subgraph(subgraph)
+        |> Graph.add_subgraph(subgraph1)
+        |> Graph.add_subgraph(subgraph2)
         |> Graph.dot(indent: 0, type: :digraph)
 
       assert dot ==
@@ -65,6 +68,12 @@ defmodule Boundary.GraphTest do
                    "D" [shape="box"];
 
                    "C" -> "D";
+                 }
+
+                 subgraph cluster_1 {
+                   label="subgraph_cluster_2";
+                   labelloc=top;
+                   rankdir=LR;
                  }
                }
                """
@@ -111,7 +120,7 @@ defmodule Boundary.GraphTest do
 
                    "C" -> "D";
 
-                   subgraph cluster_1 {
+                   subgraph cluster_0 {
                      label="subgraph_cluster_1";
                      labelloc=top;
                      rankdir=LR;
