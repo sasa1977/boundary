@@ -12,9 +12,8 @@ defmodule Boundary.Graph do
 
   @spec add_dependency(t(), node_name, node_name, Keyword.t()) :: t()
   def add_dependency(graph, from, to, attributes \\ []) do
-    nodes = graph.nodes |> MapSet.put(from) |> MapSet.put(to)
     connections = Map.update(graph.connections, from, %{to => attributes}, &Map.merge(&1, %{to => attributes}))
-    %{graph | nodes: nodes, connections: connections}
+    %{graph | connections: connections}
   end
 
   @spec add_subgraph(t(), t()) :: t()
