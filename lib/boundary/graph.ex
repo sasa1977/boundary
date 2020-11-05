@@ -12,24 +12,20 @@ defmodule Boundary.Graph do
 
   @spec add_dependency(t(), node_name, node_name, Keyword.t()) :: t()
   def add_dependency(graph, from, to, attributes \\ []) do
-    %{connections: connections, name: _name, nodes: nodes, subgraphs: _subgraph} = graph
-    nodes = nodes |> MapSet.put(from) |> MapSet.put(to)
-    connections = Map.update(connections, from, %{to => attributes}, &Map.merge(&1, %{to => attributes}))
-
+    nodes = graph.nodes |> MapSet.put(from) |> MapSet.put(to)
+    connections = Map.update(graph.connections, from, %{to => attributes}, &Map.merge(&1, %{to => attributes}))
     %{graph | nodes: nodes, connections: connections}
   end
 
   @spec add_subgraph(t(), t()) :: t()
-  def add_subgraph(graph, subgraph) do
-    %{connections: _connections, name: _name, nodes: _nodes, subgraphs: subgraphs} = graph
-    %{graph | subgraphs: [subgraph] ++ subgraphs}
-  end
+  def add_subgraph(graph, subgraph),
+    do: %{graph | subgraphs: [subgraph | graph.subgraphs]}
 
   @spec dot(t(), Keyword.t()) :: node_name
   def dot(graph, opts \\ []) do
+    {type, opts} = Keyword.pop(opts, :type, :digraph)
     {spaces, opts} = Keyword.pop(opts, :indent, 0)
     indent = String.duplicate(" ", spaces)
-    {type, opts} = Keyword.pop(opts, :type, :digraph)
 
     graph_content = """
     #{indent}  label="#{graph.name}";
