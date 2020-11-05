@@ -41,10 +41,13 @@ defmodule Boundary.Graph do
 
     graph_content = format_dot(graph_content)
 
-    case type do
-      {:subgraph, index} -> "#{indent}subgraph cluster_#{index} {\n#{graph_content}#{indent}}\n"
-      _ -> "#{indent}#{type} {\n#{graph_content}#{indent}}\n"
-    end
+    header =
+      case type do
+        {:subgraph, index} -> "subgraph cluster_#{index}"
+        _ -> to_string(type)
+      end
+
+    "#{indent}#{header} {\n#{graph_content}#{indent}}\n"
   end
 
   defp subgraphs(graph, spaces) do
