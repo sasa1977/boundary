@@ -5,6 +5,8 @@ defmodule Mix.Tasks.Boundary.Visualize do
   use Boundary, classify_to: Boundary.Mix
   use Mix.Task
 
+  alias Boundary.Graph
+
   @output_folder "boundary"
 
   @impl Mix.Task
@@ -62,39 +64,29 @@ defmodule Mix.Tasks.Boundary.Visualize do
   defp title(boundary), do: "#{inspect(boundary.name)} boundary"
 
   defp graph(main_boundary, title, nodes, edges) do
-    """
-    digraph {
-      label="#{title}";
-      labelloc=top;
-      rankdir=LR;
-
-    #{node_clauses(main_boundary, nodes) |> Enum.map(&"  #{&1};") |> Enum.intersperse(?\n)}
-
-    #{edge_clauses(main_boundary, edges) |> Enum.map(&"  #{&1};") |> Enum.intersperse(?\n)}
-    }
-    """
+    Graph.new(title)
+    |> add_nodes(main_boundary, nodes)
+    |> add_edges(main_boundary, edges)
+    |> Graph.dot()
   end
 
-  defp node_clauses(main_boundary, nodes) do
-    nodes
-    |> Enum.sort()
-    |> Enum.map(&node_clause(main_boundary, &1))
+  defp add_nodes(graph, main_boundary, nodes),
+    do: Enum.reduce(nodes, graph, &Graph.add_node(&2, node_name(main_boundary, &1)))
+
+  defp add_edges(graph, main_boundary, edges) do
+    Enum.reduce(edges, graph, fn {from, to, attributes}, graph ->
+      Graph.add_dependency(
+        graph,
+        node_name(main_boundary, from),
+        node_name(main_boundary, to),
+        edge_attributes(attributes)
+      )
+    end)
   end
-
-  defp node_clause(main_boundary, module), do: ~s/"#{node_name(main_boundary, module)}" [shape="box"]/
-
-  defp edge_clauses(main_boundary, edges) do
-    edges
-    |> Enum.sort()
-    |> Enum.map(&edge_clause(main_boundary, &1))
-  end
-
-  defp edge_clause(main_boundary, {module1, module2, _} = edge),
-    do: ~s/"#{node_name(main_boundary, module1)}" -> "#{node_name(main_boundary, module2)}"#{edge_attributes(edge)}/
 
   defp node_name(nil, module), do: inspect(module)
   defp node_name(main_boundary, module), do: String.replace(inspect(module), ~r/^#{inspect(main_boundary.name)}\./, "")
 
-  defp edge_attributes({_, _, :runtime}), do: ""
-  defp edge_attributes({_, _, :compile}), do: ~s/ [label = "compile"]/
+  defp edge_attributes(:runtime), do: []
+  defp edge_attributes(:compile), do: [label: "compile"]
 end
