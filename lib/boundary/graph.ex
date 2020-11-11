@@ -1,14 +1,20 @@
 defmodule Boundary.Graph do
   @moduledoc false
 
-  @opaque t :: %{connections: %{node => Keyword.t()}, name: String.t(), nodes: MapSet.t(node), subgraphs: [t]}
+  @opaque t :: %{connections: %{node => Keyword.t()}, name: String.t(), nodes: %{node => Keyword.t()}, subgraphs: [t]}
   @type node_name :: String.t()
 
   @spec new(node_name) :: t()
-  def new(name), do: %{connections: %{}, name: name, nodes: MapSet.new(), subgraphs: []}
+  def new(name), do: %{connections: %{}, name: name, nodes: %{}, subgraphs: []}
 
-  @spec add_node(t(), node_name()) :: t()
-  def add_node(graph, node), do: update_in(graph.nodes, &MapSet.put(&1, node))
+  @spec add_node(t(), node_name(), Keyword.t()) :: t()
+  def add_node(graph, node, opts \\ []) do
+    Map.update!(
+      graph,
+      :nodes,
+      fn nodes -> Map.update(nodes, node, opts, &Keyword.merge(&1, opts)) end
+    )
+  end
 
   @spec add_dependency(t(), node_name, node_name, Keyword.t()) :: t()
   def add_dependency(graph, from, to, attributes \\ []) do
@@ -57,22 +63,30 @@ defmodule Boundary.Graph do
     |> Enum.join("\n")
   end
 
-  defp nodes(graph, tab), do: Enum.map(graph.nodes, fn node -> ~s/#{tab}  "#{node}" [shape="box"];\n/ end)
+  defp nodes(graph, tab) do
+    Enum.map(
+      graph.nodes,
+      fn {node, opts} ->
+        opts = Keyword.merge([shape: "box"], opts)
+        ~s/#{tab}  "#{node}"#{attributes(opts)};\n/
+      end
+    )
+  end
 
   defp connections(graph, tab) do
     for(
       {from, connections} <- graph.connections,
       {to, attributes} <- connections,
-      do: ~s/#{tab}  "#{from}" -> "#{to}"#{connection_attributes(attributes)};\n/
+      do: ~s/#{tab}  "#{from}" -> "#{to}"#{attributes(attributes)};\n/
     )
     |> to_string()
   end
 
   defp opts_string(options, indent), do: Enum.map(options, fn {k, v} -> "#{indent}  #{k}=#{v};\n" end)
 
-  defp connection_attributes([]), do: ""
+  defp attributes([]), do: ""
 
-  defp connection_attributes(attributes),
+  defp attributes(attributes),
     do: " [#{Enum.join(Enum.map(attributes, fn {k, v} -> "#{k}=#{v}" end), ", ")}]"
 
   defp format_dot(dot_string) do

@@ -35,9 +35,9 @@ defmodule Mix.Tasks.Boundary.Visualize.FunsTest do
                labelloc=top;
                rankdir=LR;
 
-               "bar" [shape="box"];
-               "baz" [shape="box"];
-               "foo" [shape="box"];
+               "bar" [shape=box];
+               "baz" [shape=box];
+               "foo" [shape=box];
 
                "bar" -> "baz";
                "foo" -> "bar";

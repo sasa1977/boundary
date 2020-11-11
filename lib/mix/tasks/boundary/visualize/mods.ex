@@ -44,7 +44,7 @@ defmodule Mix.Tasks.Boundary.Visualize.Mods do
     subgraph =
       state.subgraphs
       |> Map.get_lazy(subgraph_name, fn -> Graph.new("Boundary #{inspect(subgraph_name)}") end)
-      |> Graph.add_node(inspect(node))
+      |> Graph.add_node(inspect(node), label: List.last(Module.split(node)))
 
     Map.update!(state, :subgraphs, &Map.put(&1, subgraph_name, subgraph))
   end

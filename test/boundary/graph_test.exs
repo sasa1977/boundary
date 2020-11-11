@@ -22,9 +22,9 @@ defmodule Boundary.GraphTest do
                  labelloc=top;
                  rankdir=LR;
 
-                 "A" [shape="box"];
-                 "B" [shape="box"];
-                 "C" [shape="box"];
+                 "A" [shape=box];
+                 "B" [shape=box];
+                 "C" [shape=box];
 
                  "A" -> "B";
                  "A" -> "C";
@@ -59,8 +59,8 @@ defmodule Boundary.GraphTest do
                  labelloc=top;
                  rankdir=LR;
 
-                 "A" [shape="box"];
-                 "B" [shape="box"];
+                 "A" [shape=box];
+                 "B" [shape=box];
 
                  "A" -> "B" [label=compile, test=test];
                  "A" -> "C" [label=compile];
@@ -70,8 +70,8 @@ defmodule Boundary.GraphTest do
                    labelloc=top;
                    rankdir=LR;
 
-                   "C" [shape="box"];
-                   "D" [shape="box"];
+                   "C" [shape=box];
+                   "D" [shape=box];
 
                    "C" -> "D";
                  }
@@ -114,8 +114,8 @@ defmodule Boundary.GraphTest do
                  labelloc=top;
                  rankdir=LR;
 
-                 "A" [shape="box"];
-                 "B" [shape="box"];
+                 "A" [shape=box];
+                 "B" [shape=box];
 
                  "A" -> "B" [label=compile, test=test];
                  "A" -> "C" [label=compile];
@@ -125,7 +125,7 @@ defmodule Boundary.GraphTest do
                    labelloc=top;
                    rankdir=LR;
 
-                   "C" [shape="box"];
+                   "C" [shape=box];
 
                    "C" -> "D";
 
@@ -134,8 +134,8 @@ defmodule Boundary.GraphTest do
                      labelloc=top;
                      rankdir=LR;
 
-                     "D" [shape="box"];
-                     "E" [shape="box"];
+                     "D" [shape=box];
+                     "E" [shape=box];
 
                      "D" -> "E";
                    }
@@ -159,8 +159,8 @@ defmodule Boundary.GraphTest do
                  labelloc=top;
                  rankdir=LR;
 
-                 "A" [shape="box"];
-                 "B" [shape="box"];
+                 "A" [shape=box];
+                 "B" [shape=box];
 
                  "A" -> "B";
                }
@@ -196,8 +196,8 @@ defmodule Boundary.GraphTest do
                  labelloc=top;
                  rankdir=LR;
 
-                 "A" [shape="box"];
-                 "B" [shape="box"];
+                 "A" [shape=box];
+                 "B" [shape=box];
 
                  "A" -> "B";
                }
@@ -220,9 +220,9 @@ defmodule Boundary.GraphTest do
                  labelloc=top;
                  rankdir=LR;
 
-                 "A" [shape="box"];
-                 "B" [shape="box"];
-                 "C" [shape="box"];
+                 "A" [shape=box];
+                 "B" [shape=box];
+                 "C" [shape=box];
 
                  "A" -> "B";
                }

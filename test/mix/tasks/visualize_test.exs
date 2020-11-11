@@ -46,9 +46,9 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
           labelloc=top;
           rankdir=LR;
 
-          "BlogEngine" [shape="box"];
-          "BlogEngineApp" [shape="box"];
-          "BlogEngineWeb" [shape="box"];
+          "BlogEngine" [shape=box];
+          "BlogEngineApp" [shape=box];
+          "BlogEngineWeb" [shape=box];
 
           "BlogEngineApp" -> "BlogEngine";
           "BlogEngineApp" -> "BlogEngineWeb";
@@ -65,9 +65,9 @@ defmodule Mix.Tasks.Boundary.VisualizeTest do
           labelloc=top;
           rankdir=LR;
 
-          "Accounts" [shape="box"];
-          "Articles" [shape="box"];
-          "Repo" [shape="box"];
+          "Accounts" [shape=box];
+          "Articles" [shape=box];
+          "Repo" [shape=box];
 
           "Accounts" -> "Repo";
           "Articles" -> "Accounts";

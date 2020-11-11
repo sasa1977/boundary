@@ -53,7 +53,7 @@ defmodule Mix.Tasks.Boundary.Visualize.ModsTest do
                    labelloc=top;
                    rankdir=LR;
 
-                   "Bar.Mod" [shape="box"];
+                   "Bar.Mod" [shape=box, label=Mod];
                  }
 
                  subgraph cluster_1 {
@@ -61,7 +61,7 @@ defmodule Mix.Tasks.Boundary.Visualize.ModsTest do
                    labelloc=top;
                    rankdir=LR;
 
-                   "Foo" [shape="box"];
+                   "Foo" [shape=box, label=Foo];
                  }
                }
                """
