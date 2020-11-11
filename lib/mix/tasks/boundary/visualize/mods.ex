@@ -1,5 +1,15 @@
 defmodule Mix.Tasks.Boundary.Visualize.Mods do
-  @moduledoc false
+  @shortdoc "Visualizes cross-module dependencies in one or more boundaries."
+
+  @moduledoc """
+  #{@shortdoc}
+
+  Usage:
+
+      mix boundary.visualize.mods Boundary1 Boundary2 ...
+
+  The graph is printed to the standard output using the [graphviz dot language](https://graphviz.org/doc/info/lang.html).
+  """
 
   use Boundary, classify_to: Boundary.Mix
   use Mix.Task

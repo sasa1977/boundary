@@ -1,7 +1,17 @@
 # credo:disable-for-this-file Credo.Check.Readability.Specs
 
 defmodule Mix.Tasks.Boundary.Visualize.Funs do
-  @moduledoc false
+  @shortdoc "Visualizes cross-function dependencies in a single module."
+
+  @moduledoc """
+  #{@shortdoc}
+
+  Usage:
+
+      mix boundary.visualize.funs SomeModule
+
+  The graph is printed to the standard output using the [graphviz dot language](https://graphviz.org/doc/info/lang.html).
+  """
 
   use Boundary, classify_to: Boundary.Mix
   use Mix.Task
