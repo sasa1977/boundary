@@ -7,6 +7,9 @@ defmodule Boundary.GraphTest do
     test "generate dot output" do
       dot =
         Graph.new("test")
+        |> Graph.add_node("A")
+        |> Graph.add_node("B")
+        |> Graph.add_node("C")
         |> Graph.add_dependency("A", "B")
         |> Graph.add_dependency("A", "C")
         |> Graph.add_dependency("B", "C")
@@ -30,12 +33,24 @@ defmodule Boundary.GraphTest do
                """
     end
 
-    test "generate dot output with options" do
+    test "generate dot output with options and one subgraph" do
+      subgraph1 =
+        Graph.new("subgraph_cluster_1")
+        |> Graph.add_node("C")
+        |> Graph.add_node("D")
+        |> Graph.add_dependency("C", "D")
+
+      subgraph2 = Graph.new("subgraph_cluster_2")
+
       dot =
         Graph.new("test")
+        |> Graph.add_node("A")
+        |> Graph.add_node("B")
         |> Graph.add_dependency("A", "B", label: "compile", test: "test")
         |> Graph.add_dependency("A", "C", label: "compile")
-        |> Graph.dot(test: "test")
+        |> Graph.add_subgraph(subgraph1)
+        |> Graph.add_subgraph(subgraph2)
+        |> Graph.dot(indent: 0, type: :digraph)
 
       assert dot ==
                """
@@ -43,14 +58,88 @@ defmodule Boundary.GraphTest do
                  label="test";
                  labelloc=top;
                  rankdir=LR;
-                 test=test;
 
                  "A" [shape="box"];
                  "B" [shape="box"];
-                 "C" [shape="box"];
 
                  "A" -> "B" [label=compile, test=test];
                  "A" -> "C" [label=compile];
+
+                 subgraph cluster_0 {
+                   label="subgraph_cluster_1";
+                   labelloc=top;
+                   rankdir=LR;
+
+                   "C" [shape="box"];
+                   "D" [shape="box"];
+
+                   "C" -> "D";
+                 }
+
+                 subgraph cluster_1 {
+                   label="subgraph_cluster_2";
+                   labelloc=top;
+                   rankdir=LR;
+                 }
+               }
+               """
+    end
+
+    test "generate dot output with options and 2 subgraphs" do
+      subgraph1 =
+        Graph.new("subgraph_cluster_1")
+        |> Graph.add_node("D")
+        |> Graph.add_node("E")
+        |> Graph.add_dependency("D", "E")
+
+      subgraph =
+        Graph.new("subgraph_cluster_1")
+        |> Graph.add_node("C")
+        |> Graph.add_dependency("C", "D")
+        |> Graph.add_subgraph(subgraph1)
+
+      dot =
+        Graph.new("test")
+        |> Graph.add_node("A")
+        |> Graph.add_node("B")
+        |> Graph.add_dependency("A", "B", label: "compile", test: "test")
+        |> Graph.add_dependency("A", "C", label: "compile")
+        |> Graph.add_subgraph(subgraph)
+        |> Graph.dot(indent: 0)
+
+      assert dot ==
+               """
+               digraph {
+                 label="test";
+                 labelloc=top;
+                 rankdir=LR;
+
+                 "A" [shape="box"];
+                 "B" [shape="box"];
+
+                 "A" -> "B" [label=compile, test=test];
+                 "A" -> "C" [label=compile];
+
+                 subgraph cluster_0 {
+                   label="subgraph_cluster_1";
+                   labelloc=top;
+                   rankdir=LR;
+
+                   "C" [shape="box"];
+
+                   "C" -> "D";
+
+                   subgraph cluster_0 {
+                     label="subgraph_cluster_1";
+                     labelloc=top;
+                     rankdir=LR;
+
+                     "D" [shape="box"];
+                     "E" [shape="box"];
+
+                     "D" -> "E";
+                   }
+                 }
                }
                """
     end
@@ -58,6 +147,8 @@ defmodule Boundary.GraphTest do
     test "generate dot output without options" do
       dot =
         Graph.new("test")
+        |> Graph.add_node("A")
+        |> Graph.add_node("B")
         |> Graph.add_dependency("A", "B")
         |> Graph.dot()
 
@@ -92,6 +183,8 @@ defmodule Boundary.GraphTest do
     test "deduplicated dependencies" do
       dot =
         Graph.new("test")
+        |> Graph.add_node("A")
+        |> Graph.add_node("B")
         |> Graph.add_dependency("A", "B")
         |> Graph.add_dependency("A", "B")
         |> Graph.dot()
@@ -114,6 +207,8 @@ defmodule Boundary.GraphTest do
     test "add single node with no connections" do
       dot =
         Graph.new("test")
+        |> Graph.add_node("A")
+        |> Graph.add_node("B")
         |> Graph.add_node("C")
         |> Graph.add_dependency("A", "B")
         |> Graph.dot()
