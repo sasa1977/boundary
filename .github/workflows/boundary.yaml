@@ -1,0 +1,50 @@
+name: "boundary"
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      CACHE_VERSION: v2
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-elixir@v1
+        with:
+          otp-version: 23.1
+          elixir-version: 1.11.2
+
+      - name: Restore cached deps
+        uses: actions/cache@v1
+        with:
+          path: deps
+          key: deps-${{ env.CACHE_VERSION }}-${{ github.ref }}-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
+          restore-keys: |
+            deps-${{ env.CACHE_VERSION }}-${{ github.ref }}-
+            deps-${{ env.CACHE_VERSION }}-
+
+      - name: Restore cached build
+        uses: actions/cache@v1
+        with:
+          path: _build
+          key: build-${{ env.CACHE_VERSION }}-${{ github.ref }}-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
+          restore-keys: |
+            build-${{ env.CACHE_VERSION }}-${{ github.ref }}-
+            build-${{ env.CACHE_VERSION }}-
+
+      - run: mix deps.get
+
+      - name: Compile project
+        run: |
+          MIX_ENV=test mix compile --warnings-as-errors
+          MIX_ENV=dev mix compile --warnings-as-errors
+          MIX_ENV=prod mix compile --warnings-as-error
+
+      - run: mix format --check-formatted
+      - run: mix test
+      - run: mix docs
+      - run: MIX_ENV=test mix credo list
+      - run: mix dialyzer
