@@ -1,3 +1,9 @@
+# 0.7.0
+
+## New
+
+- added two mix task `boundary.visualize.mods` and `boundary.visualize.funs` that can help visualizing cross-module and in-module dependencies.
+
 # 0.6.1
 
 - relax Elixir requirement
