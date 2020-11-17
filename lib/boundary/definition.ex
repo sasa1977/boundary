@@ -79,6 +79,10 @@ defmodule Boundary.Definition do
   defp decode(boundary) do
     with true <- :code.get_object_code(boundary) != :error,
          [definition] <- Keyword.get(boundary.__info__(:attributes), Boundary) do
+      # taking only a relevant subset of compile-time env, because otherwise `eval_quoted` may crash if it's running
+      # on a different node than the one used for compilation
+      env = definition.env |> Map.take(~w/aliases file line macro_aliases macros requires/a) |> Map.to_list()
+
       Map.update!(
         definition,
         :opts,
@@ -93,7 +97,7 @@ defmodule Boundary.Definition do
               other ->
                 other
             end)
-            |> Code.eval_quoted([], definition.env)
+            |> Code.eval_quoted([], env)
 
           decoded
         end
