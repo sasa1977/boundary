@@ -1,3 +1,7 @@
+# 0.7.1
+
+- fixes a bug which prevented the project from compiling on a named node
+
 # 0.7.0
 
 ## New
