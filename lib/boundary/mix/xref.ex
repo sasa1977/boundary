@@ -42,20 +42,12 @@ defmodule Boundary.Mix.Xref do
     :ets.tab2file(@calls_table, to_charlist(Boundary.Mix.manifest_path("boundary")))
   end
 
-  @doc "Returns a lazy stream where each element is of type `Boundary.call()`"
+  @doc "Returns a lazy stream where each element is of type `Boundary.Call.t()`"
   @spec calls :: Enumerable.t()
   def calls do
     Enum.map(
       :ets.tab2list(@calls_table),
-      fn {caller_module, %{callee: {callee, _fun, _arity}} = meta} ->
-        caller =
-          case meta.caller_function do
-            {name, arity} -> {caller_module, name, arity}
-            _ -> nil
-          end
-
-        Map.merge(meta, %{caller: caller, caller_module: caller_module, callee_module: callee})
-      end
+      fn {caller_module, call_info} -> Boundary.Call.new(caller_module, call_info) end
     )
   end
 

@@ -543,22 +543,12 @@ defmodule Boundary do
   @type export :: module | {module, [except: [module]]}
   @type mode :: :compile | :runtime
 
-  @type call :: %{
-          callee: mfa,
-          callee_module: module,
-          caller: mfa,
-          caller_module: module,
-          file: String.t(),
-          line: pos_integer,
-          mode: mode
-        }
-
   @type error ::
           {:empty_boundary, dep_error}
           | {:ignored_dep, dep_error}
-          | {:cycle, [Boundary.name()]}
+          | {:cycle, [name()]}
           | {:unclassified_module, [module]}
-          | {:invalid_call, [Boundary.call()]}
+          | {:invalid_call, [Boundary.Call.t()]}
 
   @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
 
