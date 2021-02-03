@@ -258,8 +258,6 @@ defmodule Mix.Tasks.Compile.Boundary do
   end
 
   defp to_diagnostic_error({:invalid_call, error}) do
-    {m, f, a} = error.call.callee
-
     reason =
       case error.type do
         :call ->
@@ -269,13 +267,14 @@ defmodule Mix.Tasks.Compile.Boundary do
           "(runtime calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
 
         :not_exported ->
-          "(module #{inspect(m)} is not exported by its owner boundary #{inspect(error.to_boundary)})"
+          module = inspect(Boundary.Call.callee_module(error.call))
+          "(module #{module} is not exported by its owner boundary #{inspect(error.to_boundary)})"
 
         :invalid_external_dep_call ->
           "(calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
       end
 
-    message = "forbidden call to #{Exception.format_mfa(m, f, a)}\n  #{reason}"
+    message = "forbidden call to #{Boundary.Call.callee_display(error.call)}\n  #{reason}"
 
     diagnostic(message, file: Path.relative_to_cwd(error.call.file), position: error.call.line)
   end

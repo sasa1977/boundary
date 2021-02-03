@@ -22,7 +22,9 @@ defmodule Boundary.Call do
   end
 
   def caller_module(%__MODULE__{caller: module}) when is_atom(module), do: module
-  def caller_module(%__MODULE__{caller: {module, _fun, _arg}}), do: module
+  def caller_module(%__MODULE__{caller: {module, _fun, _arity}}), do: module
 
-  def callee_module(%__MODULE__{callee: {module, _fun, _arg}}), do: module
+  def callee_module(%__MODULE__{callee: {module, _fun, _arity}}), do: module
+
+  def callee_display(%__MODULE__{callee: {module, fun, arity}}), do: Exception.format_mfa(module, fun, arity)
 end
