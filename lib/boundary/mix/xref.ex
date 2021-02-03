@@ -26,7 +26,7 @@ defmodule Boundary.Mix.Xref do
   @spec add_call(module, call) :: :ok
   def add_call(caller, call) do
     if :ets.insert_new(@seen_table, {caller}), do: :ets.delete(@calls_table, caller)
-    unless match?({^caller, _fun, _arg}, call.callee), do: :ets.insert(@calls_table, {caller, call})
+    :ets.insert(@calls_table, {caller, call})
     :ok
   end
 
