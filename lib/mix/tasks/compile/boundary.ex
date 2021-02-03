@@ -275,10 +275,7 @@ defmodule Mix.Tasks.Compile.Boundary do
           "(calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
       end
 
-    message =
-      "forbidden call to #{Exception.format_mfa(m, f, a)}\n" <>
-        "  #{reason}\n" <>
-        "  (call originated from #{inspect(Boundary.Call.caller_module(error.call))})"
+    message = "forbidden call to #{Exception.format_mfa(m, f, a)}\n  #{reason}"
 
     diagnostic(message, file: Path.relative_to_cwd(error.call.file), position: error.call.line)
   end

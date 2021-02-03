@@ -244,10 +244,11 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               """ do
     assert [warning] = warnings
 
-    assert warning.message =~ """
-           forbidden call to #{unquote(module1)}.fun/0
-             (calls from #{unquote(module2)} to #{unquote(module1)} are not allowed)
-           """
+    assert warning.message =~
+             String.trim("""
+             forbidden call to #{unquote(module1)}.fun/0
+               (calls from #{unquote(module2)} to #{unquote(module1)} are not allowed)
+             """)
   end
 
   module1 = unique_module_name()
@@ -409,10 +410,11 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               """ do
     assert [warning] = warnings
 
-    assert warning.message =~ """
-           forbidden call to #{unquote(module2)}.fun/0
-             (calls from #{unquote(module1)} to #{unquote(module2)} are not allowed)
-           """
+    assert warning.message =~
+             String.trim("""
+             forbidden call to #{unquote(module2)}.fun/0
+               (calls from #{unquote(module1)} to #{unquote(module2)} are not allowed)
+             """)
   end
 
   module1 = unique_module_name()
@@ -432,10 +434,11 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               """ do
     assert [warning] = warnings
 
-    assert warning.message =~ """
-           forbidden call to #{unquote(module2)}.Inner.fun/0
-             (module #{unquote(module2)}.Inner is not exported by its owner boundary #{unquote(module2)})
-           """
+    assert warning.message =~
+             String.trim("""
+             forbidden call to #{unquote(module2)}.Inner.fun/0
+               (module #{unquote(module2)}.Inner is not exported by its owner boundary #{unquote(module2)})
+             """)
   end
 
   module1 = unique_module_name()
@@ -454,10 +457,11 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               """ do
     assert [warning] = warnings
 
-    assert warning.message =~ """
-           forbidden call to #{unquote(module1)}.Inner.fun/0
-             (calls from #{unquote(module1)} to #{unquote(module1)}.Inner are not allowed)
-           """
+    assert warning.message =~
+             String.trim("""
+             forbidden call to #{unquote(module1)}.Inner.fun/0
+               (calls from #{unquote(module1)} to #{unquote(module1)}.Inner are not allowed)
+             """)
   end
 
   module1 = unique_module_name()
@@ -486,16 +490,16 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     assert [warning1, warning2] = warnings
 
     assert warning1.message =~
-             """
+             String.trim("""
              forbidden call to LibWithBoundaries.Boundary1.fun/0
                (calls from #{unquote(module1)} to LibWithBoundaries.Boundary1 are not allowed)
-             """
+             """)
 
     assert warning2.message =~
-             """
+             String.trim("""
              forbidden call to LibWithoutBoundaries.Module1.fun/0
                (calls from #{unquote(module1)} to LibWithoutBoundaries.Module1 are not allowed)
-             """
+             """)
   end
 
   module1 = unique_module_name()
@@ -537,16 +541,17 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               """ do
     assert [warning1, warning2] = warnings
 
-    assert warning1.message =~ """
-           forbidden call to LibWithBoundaries.Boundary2.fun/0
-             (calls from #{unquote(module1)} to LibWithBoundaries.Boundary2 are not allowed)
-           """
+    assert warning1.message =~
+             String.trim("""
+             forbidden call to LibWithBoundaries.Boundary2.fun/0
+               (calls from #{unquote(module1)} to LibWithBoundaries.Boundary2 are not allowed)
+             """)
 
     assert warning2.message =~
-             """
+             String.trim("""
              forbidden call to LibWithoutBoundaries.Module4.fun/0
                (calls from #{unquote(module1)} to LibWithoutBoundaries.Module4 are not allowed)
-             """
+             """)
   end
 
   module1 = unique_module_name()
@@ -566,10 +571,10 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     assert [warning] = warnings
 
     assert warning.message =~
-             """
+             String.trim("""
              forbidden call to LibWithoutBoundaries.Module1.Module2.Module3.fun/0
                (calls from #{unquote(module1)} to LibWithoutBoundaries.Module1.Module2.Module3 are not allowed)
-             """
+             """)
   end
 
   module1 = unique_module_name()
@@ -594,10 +599,11 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               """ do
     assert [warning] = warnings
 
-    assert warning.message =~ """
-           forbidden call to LibWithBoundaries.Boundary2.fun/0
-             (runtime calls from #{unquote(module1)} to LibWithBoundaries.Boundary2 are not allowed)
-           """
+    assert warning.message =~
+             String.trim("""
+             forbidden call to LibWithBoundaries.Boundary2.fun/0
+               (runtime calls from #{unquote(module1)} to LibWithBoundaries.Boundary2 are not allowed)
+             """)
 
     assert warning.position == 8
   end
@@ -1087,10 +1093,10 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
             assert [warning] = TestProject.compile().warnings
 
             assert warning.message =~
-                     """
+                     String.trim("""
                      forbidden call to LibWithBoundaries.Boundary1.Submodule.fun/0
                        (module LibWithBoundaries.Boundary1.Submodule is not exported by its owner boundary LibWithBoundaries.Boundary1)
-                     """
+                     """)
           end
         )
       end)
