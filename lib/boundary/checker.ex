@@ -152,11 +152,11 @@ defmodule Boundary.Checker do
   end
 
   defp to_boundaries(view, call) do
-    to_boundary = Boundary.for_module(view, call.callee_module)
+    to_boundary = Boundary.for_module(view, Call.callee_module(call))
 
     # main sub-boundary module may also be exported by its parent
     parent_boundary =
-      if not is_nil(to_boundary) and call.callee_module == to_boundary.name,
+      if not is_nil(to_boundary) and Call.callee_module(call) == to_boundary.name,
         do: Boundary.parent(view, to_boundary)
 
     Enum.reject([to_boundary, parent_boundary], &is_nil/1)
@@ -169,7 +169,7 @@ defmodule Boundary.Checker do
     # to an unclassified boundary. In the former case we'll report an error if the type is strict. In the
     # latter case, we won't report an error.
     if cross_app_call?(view, call) and check_external_dep?(view, call, from_boundary),
-      do: {:invalid_external_dep_call, call.callee_module},
+      do: {:invalid_external_dep_call, Call.callee_module(call)},
       else: nil
   end
 
@@ -191,7 +191,7 @@ defmodule Boundary.Checker do
       not cross_call_allowed?(view, from_boundary, to_boundary, call) ->
         invalid_cross_call_error(call, from_boundary, to_boundary)
 
-      not exported?(to_boundary, call.callee_module) ->
+      not exported?(to_boundary, Call.callee_module(call)) ->
         {:not_exported, to_boundary.name}
 
       true ->
@@ -200,11 +200,11 @@ defmodule Boundary.Checker do
   end
 
   defp check_external_dep?(view, call, from_boundary) do
-    Boundary.app(view, call.callee_module) != :boundary and
+    Boundary.app(view, Call.callee_module(call)) != :boundary and
       (from_boundary.type == :strict or
          MapSet.member?(
            with_ancestors(view, from_boundary, & &1.check.apps),
-           {Boundary.app(view, call.callee_module), call.mode}
+           {Boundary.app(view, Call.callee_module(call)), call.mode}
          ))
   end
 
@@ -265,7 +265,7 @@ defmodule Boundary.Checker do
   end
 
   defp cross_app_call?(view, call),
-    do: Boundary.app(view, Call.caller_module(call)) != Boundary.app(view, call.callee_module)
+    do: Boundary.app(view, Call.caller_module(call)) != Boundary.app(view, Call.callee_module(call))
 
   defp exported?(boundary, module),
     do: boundary.implicit? or module == boundary.name or Enum.any?(boundary.exports, &export_matches?(&1, module))

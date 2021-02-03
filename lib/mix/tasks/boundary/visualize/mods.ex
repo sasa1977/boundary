@@ -34,15 +34,15 @@ defmodule Mix.Tasks.Boundary.Visualize.Mods do
           boundary_from = Boundary.for_module(view, Call.caller_module(call)),
           not is_nil(boundary_from),
           boundary_from.name in boundaries,
-          boundary_to = Boundary.for_module(view, call.callee_module),
+          boundary_to = Boundary.for_module(view, Call.callee_module(call)),
           not is_nil(boundary_to),
           boundary_to.name in boundaries,
           reduce: %{main: Graph.new(""), subgraphs: %{}} do
         state ->
           state
           |> add_node(boundary_from.name, Call.caller_module(call))
-          |> add_node(boundary_to.name, call.callee_module)
-          |> add_dependency(Call.caller_module(call), call.callee_module)
+          |> add_node(boundary_to.name, Call.callee_module(call))
+          |> add_dependency(Call.caller_module(call), Call.callee_module(call))
       end
 
     Enum.reduce(Map.values(state.subgraphs), state.main, &Graph.add_subgraph(&2, &1))
