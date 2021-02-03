@@ -143,10 +143,7 @@ defmodule Boundary.Checker do
          type: type,
          from_boundary: from_boundary.name,
          to_boundary: to_boundary_name,
-         callee: call.callee,
-         caller: Call.caller_module(call),
-         file: call.file,
-         line: call.line
+         call: call
        }}
     end
   end

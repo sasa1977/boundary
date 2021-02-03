@@ -257,43 +257,30 @@ defmodule Mix.Tasks.Compile.Boundary do
     )
   end
 
-  defp to_diagnostic_error({:invalid_call, %{type: type} = error}) when type in ~w/runtime call/a do
-    {m, f, a} = error.callee
+  defp to_diagnostic_error({:invalid_call, error}) do
+    {m, f, a} = error.call.callee
 
-    call_display =
-      case type do
-        :runtime -> "runtime call"
-        :call -> "call"
+    reason =
+      case error.type do
+        :call ->
+          "(calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
+
+        :runtime ->
+          "(runtime calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
+
+        :not_exported ->
+          "(module #{inspect(m)} is not exported by its owner boundary #{inspect(error.to_boundary)})"
+
+        :invalid_external_dep_call ->
+          "(calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
       end
 
     message =
-      "forbidden #{call_display} to #{Exception.format_mfa(m, f, a)}\n" <>
-        "  (#{call_display}s from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)\n" <>
-        "  (call originated from #{inspect(error.caller)})"
-
-    diagnostic(message, file: Path.relative_to_cwd(error.file), position: error.line)
-  end
-
-  defp to_diagnostic_error({:invalid_call, %{type: :not_exported} = error}) do
-    {m, f, a} = error.callee
-
-    message =
       "forbidden call to #{Exception.format_mfa(m, f, a)}\n" <>
-        "  (module #{inspect(m)} is not exported by its owner boundary #{inspect(error.to_boundary)})\n" <>
-        "  (call originated from #{inspect(error.caller)})"
+        "  #{reason}\n" <>
+        "  (call originated from #{inspect(Boundary.Call.caller_module(error.call))})"
 
-    diagnostic(message, file: Path.relative_to_cwd(error.file), position: error.line)
-  end
-
-  defp to_diagnostic_error({:invalid_call, %{type: :invalid_external_dep_call} = error}) do
-    {m, f, a} = error.callee
-
-    message =
-      "forbidden call to #{Exception.format_mfa(m, f, a)}\n" <>
-        "  (calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)\n" <>
-        "  (call originated from #{inspect(error.caller)})"
-
-    diagnostic(message, file: Path.relative_to_cwd(error.file), position: error.line)
+    diagnostic(message, file: Path.relative_to_cwd(error.call.file), position: error.call.line)
   end
 
   defp to_diagnostic_error({:unknown_option, %{name: :ignore?, value: value} = data}) do

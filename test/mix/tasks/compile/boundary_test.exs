@@ -595,7 +595,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     assert [warning] = warnings
 
     assert warning.message =~ """
-           forbidden runtime call to LibWithBoundaries.Boundary2.fun/0
+           forbidden call to LibWithBoundaries.Boundary2.fun/0
              (runtime calls from #{unquote(module1)} to LibWithBoundaries.Boundary2 are not allowed)
            """
 
