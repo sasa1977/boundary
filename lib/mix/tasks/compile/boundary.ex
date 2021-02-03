@@ -99,46 +99,32 @@ defmodule Mix.Tasks.Compile.Boundary do
   @doc false
   def trace({remote, meta, callee_module, name, arity}, env)
       when remote in ~w/remote_function imported_function remote_macro imported_macro/a do
-    unless env.module in [nil, callee_module] or system_module?(callee_module) or
-             not String.starts_with?(Atom.to_string(callee_module), "Elixir.") do
-      Xref.add_call(
-        env.module,
-        %{
-          callee: {callee_module, name, arity},
-          caller_function: env.function,
-          file: Path.relative_to_cwd(env.file),
-          line: Keyword.get(meta, :line, env.line),
-          mode:
-            if(is_nil(env.function) or remote in ~w/remote_macro imported_macro/a,
-              do: :compile,
-              else: :runtime
-            )
-        }
-      )
-    end
-
-    :ok
+    mode = if is_nil(env.function) or remote in ~w/remote_macro imported_macro/a, do: :compile, else: :runtime
+    add_call(callee_module, meta, env, mode, {callee_module, name, arity})
   end
 
-  def trace({:struct_expansion, meta, callee_module, _keys}, env) do
-    unless env.module in [nil, callee_module] or system_module?(callee_module) or
-             not String.starts_with?(Atom.to_string(callee_module), "Elixir.") do
-      Xref.add_call(
-        env.module,
-        %{
-          callee: {:struct, callee_module},
-          caller_function: env.function,
-          file: Path.relative_to_cwd(env.file),
-          line: Keyword.get(meta, :line, env.line),
-          mode: :compile
-        }
-      )
-    end
-
-    :ok
-  end
+  def trace({:struct_expansion, meta, callee_module, _keys}, env),
+    do: add_call(callee_module, meta, env, :compile, {:struct, callee_module})
 
   def trace(_event, _env), do: :ok
+
+  defp add_call(callee_module, meta, env, mode, callee) do
+    unless env.module in [nil, callee_module] or system_module?(callee_module) or
+             not String.starts_with?(Atom.to_string(callee_module), "Elixir.") do
+      Xref.add_call(
+        env.module,
+        %{
+          callee: callee,
+          caller_function: env.function,
+          file: Path.relative_to_cwd(env.file),
+          line: Keyword.get(meta, :line, env.line),
+          mode: mode
+        }
+      )
+    end
+
+    :ok
+  end
 
   system_apps = ~w/elixir stdlib kernel/a
 
