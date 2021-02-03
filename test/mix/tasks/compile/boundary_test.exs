@@ -1020,6 +1020,26 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     assert warning2.message =~ "sub-boundary inside a boundary with disabled checks (#{unquote(module2)})"
   end
 
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
+  module_test "detects invalid struct call",
+              """
+              defmodule #{module1} do
+                use Boundary
+                defstruct [:foo]
+              end
+
+              defmodule #{module2} do
+                use Boundary
+
+                def fun, do: %#{module1}{}
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "forbidden call to %#{unquote(module1)}{}"
+  end
+
   describe "recompilation tests" do
     setup do
       Mix.shell(Mix.Shell.Process)

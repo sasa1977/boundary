@@ -120,6 +120,24 @@ defmodule Mix.Tasks.Compile.Boundary do
     :ok
   end
 
+  def trace({:struct_expansion, meta, callee_module, _keys}, env) do
+    unless env.module in [nil, callee_module] or system_module?(callee_module) or
+             not String.starts_with?(Atom.to_string(callee_module), "Elixir.") do
+      Xref.add_call(
+        env.module,
+        %{
+          callee: {:struct, callee_module},
+          caller_function: env.function,
+          file: Path.relative_to_cwd(env.file),
+          line: Keyword.get(meta, :line, env.line),
+          mode: :compile
+        }
+      )
+    end
+
+    :ok
+  end
+
   def trace(_event, _env), do: :ok
 
   system_apps = ~w/elixir stdlib kernel/a

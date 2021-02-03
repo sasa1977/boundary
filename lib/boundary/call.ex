@@ -2,7 +2,7 @@ defmodule Boundary.Call do
   defstruct [:callee, :caller, :file, :line, :mode]
 
   @type t :: %__MODULE__{
-          callee: mfa,
+          callee: mfa | {:struct, module},
           caller: mfa | module,
           file: String.t(),
           line: pos_integer,
@@ -25,6 +25,8 @@ defmodule Boundary.Call do
   def caller_module(%__MODULE__{caller: {module, _fun, _arity}}), do: module
 
   def callee_module(%__MODULE__{callee: {module, _fun, _arity}}), do: module
+  def callee_module(%__MODULE__{callee: {:struct, module}}), do: module
 
   def callee_display(%__MODULE__{callee: {module, fun, arity}}), do: Exception.format_mfa(module, fun, arity)
+  def callee_display(%__MODULE__{callee: {:struct, module}}), do: "%#{inspect(module)}{}"
 end

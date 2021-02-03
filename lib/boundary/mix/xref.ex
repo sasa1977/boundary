@@ -6,7 +6,7 @@ defmodule Boundary.Mix.Xref do
   @seen_table __MODULE__.Seen
 
   @type call :: %{
-          callee: mfa,
+          callee: mfa | {:struct, module},
           caller_function: {atom, non_neg_integer} | nil,
           file: String.t(),
           line: non_neg_integer,
