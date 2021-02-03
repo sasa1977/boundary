@@ -548,9 +548,16 @@ defmodule Boundary do
           | {:ignored_dep, dep_error}
           | {:cycle, [name()]}
           | {:unclassified_module, [module]}
-          | {:invalid_call, [Boundary.Call.t()]}
+          | {:invalid_call, call_error}
 
   @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
+
+  @type call_error :: %{
+          type: :call | :runtime | :not_exported | :invalid_external_dep_call,
+          from_boundary: name,
+          to_boundary: name,
+          call: Boundary.Call.t()
+        }
 
   @doc false
   defmacro __using__(opts), do: Definition.generate(opts)
