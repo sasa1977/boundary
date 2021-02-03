@@ -14,7 +14,7 @@ defmodule Mix.Tasks.Boundary.Visualize.Mods do
   use Boundary, classify_to: Boundary.Mix
   use Mix.Task
 
-  alias Boundary.Graph
+  alias Boundary.{Call, Graph}
   alias Boundary.Mix.Xref
 
   @impl Mix.Task
@@ -31,7 +31,7 @@ defmodule Mix.Tasks.Boundary.Visualize.Mods do
 
     state =
       for call <- Xref.calls(),
-          boundary_from = Boundary.for_module(view, call.caller_module),
+          boundary_from = Boundary.for_module(view, Call.caller_module(call)),
           not is_nil(boundary_from),
           boundary_from.name in boundaries,
           boundary_to = Boundary.for_module(view, call.callee_module),
@@ -40,9 +40,9 @@ defmodule Mix.Tasks.Boundary.Visualize.Mods do
           reduce: %{main: Graph.new(""), subgraphs: %{}} do
         state ->
           state
-          |> add_node(boundary_from.name, call.caller_module)
+          |> add_node(boundary_from.name, Call.caller_module(call))
           |> add_node(boundary_to.name, call.callee_module)
-          |> add_dependency(call.caller_module, call.callee_module)
+          |> add_dependency(Call.caller_module(call), call.callee_module)
       end
 
     Enum.reduce(Map.values(state.subgraphs), state.main, &Graph.add_subgraph(&2, &1))

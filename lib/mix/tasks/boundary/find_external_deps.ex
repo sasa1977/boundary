@@ -48,7 +48,7 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
     Xref.start_link()
 
     for call <- Xref.calls(),
-        boundary = Boundary.for_module(boundary_view, call.caller_module),
+        boundary = Boundary.for_module(boundary_view, Boundary.Call.caller_module(call)),
         boundary.check.out,
         app = Boundary.app(boundary_view, call.callee_module),
         app not in [:boundary, Boundary.Mix.app_name(), nil],

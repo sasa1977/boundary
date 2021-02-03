@@ -1,11 +1,10 @@
 defmodule Boundary.Call do
-  defstruct [:callee, :callee_module, :caller, :caller_module, :file, :line, :mode]
+  defstruct [:callee, :callee_module, :caller, :file, :line, :mode]
 
   @type t :: %__MODULE__{
           callee: mfa,
           callee_module: module,
-          caller: mfa,
-          caller_module: module,
+          caller: mfa | module,
           file: String.t(),
           line: pos_integer,
           mode: Boundary.mode()
@@ -19,14 +18,17 @@ defmodule Boundary.Call do
     caller =
       case call_info.caller_function do
         {name, arity} -> {caller_module, name, arity}
-        _ -> nil
+        _ -> caller_module
       end
 
     struct!(
       __MODULE__,
       call_info
-      |> Map.merge(%{caller: caller, caller_module: caller_module, callee_module: callee_module})
+      |> Map.merge(%{caller: caller, callee_module: callee_module})
       |> Map.delete(:caller_function)
     )
   end
+
+  def caller_module(%__MODULE__{caller: module}) when is_atom(module), do: module
+  def caller_module(%__MODULE__{caller: {module, _fun, _arg}}), do: module
 end

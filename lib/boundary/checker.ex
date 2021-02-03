@@ -1,7 +1,8 @@
+# credo:disable-for-this-file Credo.Check.Readability.Specs
 defmodule Boundary.Checker do
   @moduledoc false
 
-  # credo:disable-for-this-file Credo.Check.Readability.Specs
+  alias Boundary.Call
 
   def errors(view, calls) do
     Enum.concat([
@@ -134,7 +135,7 @@ defmodule Boundary.Checker do
 
   defp invalid_calls(view, calls) do
     for call <- calls,
-        from_boundary = Boundary.for_module(view, call.caller_module),
+        from_boundary = Boundary.for_module(view, Call.caller_module(call)),
         to_boundaries = to_boundaries(view, call),
         {type, to_boundary_name} <- [call_error(view, call, from_boundary, to_boundaries)] do
       {:invalid_call,
@@ -143,7 +144,7 @@ defmodule Boundary.Checker do
          from_boundary: from_boundary.name,
          to_boundary: to_boundary_name,
          callee: call.callee,
-         caller: call.caller_module,
+         caller: Call.caller_module(call),
          file: call.file,
          line: call.line
        }}
@@ -264,7 +265,7 @@ defmodule Boundary.Checker do
   end
 
   defp cross_app_call?(view, call),
-    do: Boundary.app(view, call.caller_module) != Boundary.app(view, call.callee_module)
+    do: Boundary.app(view, Call.caller_module(call)) != Boundary.app(view, call.callee_module)
 
   defp exported?(boundary, module),
     do: boundary.implicit? or module == boundary.name or Enum.any?(boundary.exports, &export_matches?(&1, module))
