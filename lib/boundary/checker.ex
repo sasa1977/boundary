@@ -186,7 +186,8 @@ defmodule Boundary.Checker do
         nil
 
       not cross_call_allowed?(view, from_boundary, to_boundary, call) ->
-        invalid_cross_call_error(call, from_boundary, to_boundary)
+        tag = if Enum.member?(from_boundary.deps, {to_boundary.name, :compile}), do: :runtime, else: :call
+        {tag, to_boundary.name}
 
       not exported?(to_boundary, Call.callee_module(call)) ->
         {:not_exported, to_boundary.name}
@@ -251,15 +252,6 @@ defmodule Boundary.Checker do
   defp compile_time_call?(%{mode: :compile}), do: true
   defp compile_time_call?(%{caller: {module, name, arity}}), do: macro_exported?(module, name, arity)
   defp compile_time_call?(_), do: false
-
-  defp invalid_cross_call_error(call, from_boundary, to_boundary) do
-    tag =
-      if call.mode == :runtime and Enum.member?(from_boundary.deps, {to_boundary.name, :compile}),
-        do: :runtime,
-        else: :call
-
-    {tag, to_boundary.name}
-  end
 
   defp cross_app_call?(view, call),
     do: Boundary.app(view, Call.caller_module(call)) != Boundary.app(view, Call.callee_module(call))
