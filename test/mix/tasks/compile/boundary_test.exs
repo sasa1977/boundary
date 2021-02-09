@@ -1040,6 +1040,30 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     assert warning.message =~ "forbidden call to %#{unquote(module1)}{}"
   end
 
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
+  module_test "detects invalid alias reference",
+              """
+              defmodule #{module1} do
+                use Boundary
+              end
+
+              defmodule #{module2} do
+                use Boundary
+                alias #{module1}, as: Foo
+
+                def fun do
+                  #{module1}
+                  Foo
+                end
+              end
+              """ do
+    assert [warning1, warning2] = warnings
+    assert warning1.message =~ "forbidden call to #{unquote(module1)}"
+    assert warning2.message =~ "forbidden call to #{unquote(module1)}"
+  end
+
   describe "recompilation tests" do
     setup do
       Mix.shell(Mix.Shell.Process)

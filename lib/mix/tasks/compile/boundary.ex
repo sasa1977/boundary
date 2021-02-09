@@ -106,6 +106,15 @@ defmodule Mix.Tasks.Compile.Boundary do
   def trace({:struct_expansion, meta, callee_module, _keys}, env),
     do: add_call(callee_module, meta, env, :compile, {:struct, callee_module})
 
+  def trace({:alias_reference, meta, callee_module}, env) do
+    unless env.function == {:boundary, 1} do
+      mode = if is_nil(env.function), do: :compile, else: :runtime
+      add_call(callee_module, meta, env, mode, {:alias_reference, callee_module})
+    end
+
+    :ok
+  end
+
   def trace(_event, _env), do: :ok
 
   defp add_call(callee_module, meta, env, mode, callee) do

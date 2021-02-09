@@ -185,6 +185,12 @@ defmodule Boundary.Checker do
       to_boundary == from_boundary ->
         nil
 
+      Boundary.protocol_impl?(Call.callee_module(call)) ->
+        # We can enter here when there's `defimpl SomeProtocol, for: Type`. In this case, the caller
+        # is `SomeProtocol`, while the callee is `SomeProtocol.Type`. This is never an error, so
+        # we're ignoring this case.
+        nil
+
       not cross_call_allowed?(view, from_boundary, to_boundary, call) ->
         tag = if Enum.member?(from_boundary.deps, {to_boundary.name, :compile}), do: :runtime, else: :call
         {tag, to_boundary.name}

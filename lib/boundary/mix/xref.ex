@@ -1,12 +1,13 @@
 defmodule Boundary.Mix.Xref do
   @moduledoc false
   use GenServer
+  alias Boundary.Call
 
   @calls_table __MODULE__.Calls
   @seen_table __MODULE__.Seen
 
   @type call :: %{
-          callee: mfa | {:struct, module},
+          callee: mfa | {:struct, module} | {:alias_reference, module},
           caller_function: {atom, non_neg_integer} | nil,
           file: String.t(),
           line: non_neg_integer,
@@ -42,13 +43,12 @@ defmodule Boundary.Mix.Xref do
     :ets.tab2file(@calls_table, to_charlist(Boundary.Mix.manifest_path("boundary")))
   end
 
-  @doc "Returns a lazy stream where each element is of type `Boundary.Call.t()`"
+  @doc "Returns a lazy stream where each element is of type `t:Call.t()`"
   @spec calls :: Enumerable.t()
   def calls do
-    Enum.map(
-      :ets.tab2list(@calls_table),
-      fn {caller_module, call_info} -> Boundary.Call.new(caller_module, call_info) end
-    )
+    :ets.tab2list(@calls_table)
+    |> Enum.map(fn {caller_module, call_info} -> Call.new(caller_module, call_info) end)
+    |> dedup_calls()
   end
 
   @impl GenServer
@@ -77,5 +77,28 @@ defmodule Boundary.Mix.Xref do
         key -> {key, :ets.next(@calls_table, key)}
       end
     )
+  end
+
+  # Removes consecutive references to the same module in the same line.
+  # This is needed because `Foo.bar` will generate two references: one from alias `Foo`, another from call `Foo.bar`.
+  # In this case we want to keep the the call reference, because we can determine if it is a macro.
+
+  defp dedup_calls([]), do: []
+  defp dedup_calls([call | rest]), do: dedup_calls(rest, call)
+
+  defp dedup_calls([], last_call), do: [last_call]
+
+  defp dedup_calls([next_call | rest], pushed_call) do
+    cond do
+      pushed_call.file != next_call.file or pushed_call.line != next_call.line or
+          Call.callee_module(pushed_call) != Call.callee_module(next_call) ->
+        [pushed_call | dedup_calls(rest, next_call)]
+
+      match?({_m, _f, _a}, pushed_call.callee) or match?({:struct, _module}, pushed_call.callee) ->
+        dedup_calls(rest, pushed_call)
+
+      true ->
+        dedup_calls(rest, next_call)
+    end
   end
 end
