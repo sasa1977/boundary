@@ -54,7 +54,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   ## Warnings
 
-  Every invalid cross-boundary call is reported as a compiler warning. Consider the following example:
+  Every invalid cross-boundary usage is reported as a compiler warning. Consider the following example:
 
   ```
   defmodule MySystem.User do
@@ -69,9 +69,8 @@ defmodule Mix.Tasks.Compile.Boundary do
   ```
   $ mix compile
 
-  warning: forbidden call to MySystemWeb.Endpoint.url/0
-    (calls from MySystem to MySystemWeb are not allowed)
-    (call originated from MySystem.User)
+  warning: forbidden reference to MySystemWeb
+    (references from MySystem to MySystemWeb are not allowed)
     lib/my_system/user.ex:3
   ```
 

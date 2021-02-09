@@ -345,8 +345,8 @@ defmodule Boundary do
   You can use the `:check` option to control the checks performed by the boundary compiler. The default value is `check:
   [in: true, out: true]`, which means that all incoming and outgoing calls will be checked.
 
-  The `in: false` setting will allow any boundary to call functions from this boundary. The `out: false` setting will
-  allow this boundary to call any boundary. If both options are set to false, boundary becomes ignored. These settings
+  The `in: false` setting will allow any boundary to use modules from this boundary. The `out: false` setting will allow
+  this boundary to use any other boundary. If both options are set to false, boundary becomes ignored. These settings
   can only be provided for top-level boundaries. If a boundary has some check disabled, it may not contain
   sub-boundaries.
 
@@ -395,6 +395,12 @@ defmodule Boundary do
     use Boundary, exports: [Endpoint], deps: [...]
   end
   ```
+
+  ## Alias references
+
+  Boundary can also check plain alias references (`Foo.Bar`). This check is by default disabled. To enable it, you can
+  include `check: [aliases: true]` in global or boundary options. An alias reference is only checked if it corresponds
+  to an existing module.
 
   ## Nested boundaries
 
