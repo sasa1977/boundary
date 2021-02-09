@@ -10,16 +10,8 @@ defmodule Boundary.Reference do
         }
 
   @doc false
-  @spec new(module, map) :: t
-  def new(from_module, info) do
-    struct!(
-      __MODULE__,
-      Map.update!(info, :from, fn
-        {name, arity} -> {from_module, name, arity}
-        nil -> from_module
-      end)
-    )
-  end
+  @spec new(map) :: t
+  def new(info), do: struct!(__MODULE__, info)
 
   def from_module(%__MODULE__{from: module}) when is_atom(module), do: module
   def from_module(%__MODULE__{from: {module, _fun, _arity}}), do: module

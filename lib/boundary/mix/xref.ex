@@ -47,7 +47,14 @@ defmodule Boundary.Mix.Xref do
   @spec entries :: Enumerable.t()
   def entries do
     :ets.tab2list(@entries_table)
-    |> Enum.map(fn {from_module, info} -> Reference.new(from_module, info) end)
+    |> Enum.map(fn {from_module, info} ->
+      info
+      |> Map.update!(:from, fn
+        {name, arity} -> {from_module, name, arity}
+        nil -> from_module
+      end)
+      |> Reference.new()
+    end)
     |> dedup_entries()
   end
 
