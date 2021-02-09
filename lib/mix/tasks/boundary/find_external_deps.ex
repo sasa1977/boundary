@@ -12,8 +12,8 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
   use Boundary, classify_to: Boundary.Mix
   use Mix.Task
 
-  alias Boundary.Reference
   alias Boundary.Mix.Xref
+  alias Boundary.Reference
 
   @impl Mix.Task
   def run(_argv) do

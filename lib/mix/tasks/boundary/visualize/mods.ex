@@ -14,7 +14,7 @@ defmodule Mix.Tasks.Boundary.Visualize.Mods do
   use Boundary, classify_to: Boundary.Mix
   use Mix.Task
 
-  alias Boundary.{Reference, Graph}
+  alias Boundary.{Graph, Reference}
   alias Boundary.Mix.Xref
 
   @impl Mix.Task
