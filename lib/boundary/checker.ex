@@ -177,6 +177,7 @@ defmodule Boundary.Checker do
     unless Enum.any?(errors, &is_nil/1), do: Enum.find(errors, &(not is_nil(&1)))
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defp reference_error(view, reference, from_boundary, to_boundary) do
     cond do
       not to_boundary.check.in ->
