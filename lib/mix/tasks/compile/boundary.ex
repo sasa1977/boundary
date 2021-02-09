@@ -274,20 +274,20 @@ defmodule Mix.Tasks.Compile.Boundary do
     reason =
       case error.type do
         :call ->
-          "(calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
+          "(references from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
 
         :runtime ->
-          "(runtime calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
+          "(runtime references from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
 
         :not_exported ->
           module = inspect(Boundary.Call.callee_module(error.call))
           "(module #{module} is not exported by its owner boundary #{inspect(error.to_boundary)})"
 
         :invalid_external_dep_call ->
-          "(calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
+          "(references from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
       end
 
-    message = "forbidden call to #{Boundary.Call.callee_display(error.call)}\n  #{reason}"
+    message = "forbidden reference to #{inspect(Boundary.Call.callee_module(error.call))}\n  #{reason}"
 
     diagnostic(message, file: Path.relative_to_cwd(error.call.file), position: error.call.line)
   end
