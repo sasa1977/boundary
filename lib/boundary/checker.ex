@@ -2,9 +2,9 @@
 defmodule Boundary.Checker do
   @moduledoc false
 
-  alias Boundary.Call
+  alias Boundary.Reference
 
-  def errors(view, calls) do
+  def errors(view, references) do
     Enum.concat([
       invalid_config(view),
       invalid_ignores(view),
@@ -13,7 +13,7 @@ defmodule Boundary.Checker do
       invalid_exports(view),
       cycles(view),
       unclassified_modules(view),
-      invalid_calls(view, calls)
+      invalid_references(view, references)
     ])
   end
 
@@ -133,72 +133,72 @@ defmodule Boundary.Checker do
 
   defp unclassified_modules(view), do: Enum.map(Boundary.unclassified_modules(view), &{:unclassified_module, &1})
 
-  defp invalid_calls(view, calls) do
-    for call <- calls,
-        from_boundary = Boundary.for_module(view, Call.caller_module(call)),
-        to_boundaries = to_boundaries(view, call),
-        {type, to_boundary_name} <- [call_error(view, call, from_boundary, to_boundaries)] do
-      {:invalid_call,
+  defp invalid_references(view, references) do
+    for reference <- references,
+        from_boundary = Boundary.for_module(view, Reference.from_module(reference)),
+        to_boundaries = to_boundaries(view, reference),
+        {type, to_boundary_name} <- [reference_error(view, reference, from_boundary, to_boundaries)] do
+      {:invalid_reference,
        %{
          type: type,
          from_boundary: from_boundary.name,
          to_boundary: to_boundary_name,
-         call: call
+         reference: reference
        }}
     end
   end
 
-  defp to_boundaries(view, call) do
-    to_boundary = Boundary.for_module(view, Call.callee_module(call))
+  defp to_boundaries(view, reference) do
+    to_boundary = Boundary.for_module(view, Reference.to_module(reference))
 
     # main sub-boundary module may also be exported by its parent
     parent_boundary =
-      if not is_nil(to_boundary) and Call.callee_module(call) == to_boundary.name,
+      if not is_nil(to_boundary) and Reference.to_module(reference) == to_boundary.name,
         do: Boundary.parent(view, to_boundary)
 
     Enum.reject([to_boundary, parent_boundary], &is_nil/1)
   end
 
-  defp call_error(_view, _call, %{check: %{out: false}}, _to_boundaries), do: nil
+  defp reference_error(_view, _reference, %{check: %{out: false}}, _to_boundaries), do: nil
 
-  defp call_error(view, call, from_boundary, []) do
-    # If we end up here, we couldn't determine a target boundary, so this is either a cross-app call, or a call
+  defp reference_error(view, reference, from_boundary, []) do
+    # If we end up here, we couldn't determine a target boundary, so this is either a cross-app ref, or a ref
     # to an unclassified boundary. In the former case we'll report an error if the type is strict. In the
     # latter case, we won't report an error.
-    if cross_app_call?(view, call) and check_external_dep?(view, call, from_boundary),
-      do: {:invalid_external_dep_call, Call.callee_module(call)},
+    if cross_app_ref?(view, reference) and check_external_dep?(view, reference, from_boundary),
+      do: {:invalid_external_dep_call, Reference.to_module(reference)},
       else: nil
   end
 
-  defp call_error(view, call, from_boundary, [_ | _] = to_boundaries) do
-    errors = Enum.map(to_boundaries, &call_error(view, call, from_boundary, &1))
+  defp reference_error(view, reference, from_boundary, [_ | _] = to_boundaries) do
+    errors = Enum.map(to_boundaries, &reference_error(view, reference, from_boundary, &1))
 
-    # if call to at least one candidate to_boundary is allowed, this succeeds
+    # if reference to at least one candidate to_boundary is allowed, this succeeds
     unless Enum.any?(errors, &is_nil/1), do: Enum.find(errors, &(not is_nil(&1)))
   end
 
-  defp call_error(view, call, from_boundary, to_boundary) do
+  defp reference_error(view, reference, from_boundary, to_boundary) do
     cond do
       not to_boundary.check.in ->
         nil
 
-      Call.type(call) == :alias_reference and not from_boundary.check.aliases ->
+      Reference.type(reference) == :alias_reference and not from_boundary.check.aliases ->
         nil
 
       to_boundary == from_boundary ->
         nil
 
-      Boundary.protocol_impl?(Call.callee_module(call)) ->
+      Boundary.protocol_impl?(Reference.to_module(reference)) ->
         # We can enter here when there's `defimpl SomeProtocol, for: Type`. In this case, the caller
         # is `SomeProtocol`, while the callee is `SomeProtocol.Type`. This is never an error, so
         # we're ignoring this case.
         nil
 
-      not cross_call_allowed?(view, from_boundary, to_boundary, call) ->
-        tag = if Enum.member?(from_boundary.deps, {to_boundary.name, :compile}), do: :runtime, else: :call
+      not cross_ref_allowed?(view, from_boundary, to_boundary, reference) ->
+        tag = if Enum.member?(from_boundary.deps, {to_boundary.name, :compile}), do: :runtime, else: :normal
         {tag, to_boundary.name}
 
-      not exported?(to_boundary, Call.callee_module(call)) ->
+      not exported?(to_boundary, Reference.to_module(reference)) ->
         {:not_exported, to_boundary.name}
 
       true ->
@@ -206,12 +206,12 @@ defmodule Boundary.Checker do
     end
   end
 
-  defp check_external_dep?(view, call, from_boundary) do
-    Boundary.app(view, Call.callee_module(call)) != :boundary and
+  defp check_external_dep?(view, reference, from_boundary) do
+    Boundary.app(view, Reference.to_module(reference)) != :boundary and
       (from_boundary.type == :strict or
          MapSet.member?(
            with_ancestors(view, from_boundary, & &1.check.apps),
-           {Boundary.app(view, Call.callee_module(call)), call.mode}
+           {Boundary.app(view, Reference.to_module(reference)), reference.mode}
          ))
   end
 
@@ -223,47 +223,47 @@ defmodule Boundary.Checker do
     |> MapSet.new()
   end
 
-  defp cross_call_allowed?(view, from_boundary, to_boundary, call) do
+  defp cross_ref_allowed?(view, from_boundary, to_boundary, reference) do
     cond do
-      # call to a child is always allowed
+      # reference to a child is always allowed
       from_boundary == Boundary.parent(view, to_boundary) ->
         true
 
-      # call to a sibling or the parent is allowed if target boundary is listed in deps
+      # reference to a sibling or the parent is allowed if target boundary is listed in deps
       Boundary.siblings?(from_boundary, to_boundary) or Boundary.parent(view, from_boundary) == to_boundary ->
-        in_deps?(to_boundary, from_boundary.deps, call)
+        in_deps?(to_boundary, from_boundary.deps, reference)
 
-      # call to another app's boundary is implicitly allowed unless strict checking is required
-      cross_app_call?(view, call) and not check_external_dep?(view, call, from_boundary) ->
+      # reference to another app's boundary is implicitly allowed unless strict checking is required
+      cross_app_ref?(view, reference) and not check_external_dep?(view, reference, from_boundary) ->
         true
 
-      # call to a non-sibling (either in-app or cross-app) is allowed if it is a dep of myself or any ancestor
-      in_deps?(to_boundary, with_ancestors(view, from_boundary, & &1.deps), call) ->
+      # reference to a non-sibling (either in-app or cross-app) is allowed if it is a dep of myself or any ancestor
+      in_deps?(to_boundary, with_ancestors(view, from_boundary, & &1.deps), reference) ->
         true
 
-      # no other call is allowed
+      # no other reference is allowed
       true ->
         false
     end
   end
 
-  defp in_deps?(%{name: name}, deps, call) do
+  defp in_deps?(%{name: name}, deps, reference) do
     Enum.any?(
       deps,
       fn
         {^name, :runtime} -> true
-        {^name, :compile} -> compile_time_call?(call)
+        {^name, :compile} -> compile_time_reference?(reference)
         _ -> false
       end
     )
   end
 
-  defp compile_time_call?(%{mode: :compile}), do: true
-  defp compile_time_call?(%{caller: {module, name, arity}}), do: macro_exported?(module, name, arity)
-  defp compile_time_call?(_), do: false
+  defp compile_time_reference?(%{mode: :compile}), do: true
+  defp compile_time_reference?(%{from: {module, name, arity}}), do: macro_exported?(module, name, arity)
+  defp compile_time_reference?(_), do: false
 
-  defp cross_app_call?(view, call),
-    do: Boundary.app(view, Call.caller_module(call)) != Boundary.app(view, Call.callee_module(call))
+  defp cross_app_ref?(view, reference),
+    do: Boundary.app(view, Reference.from_module(reference)) != Boundary.app(view, Reference.to_module(reference))
 
   defp exported?(boundary, module),
     do: boundary.implicit? or module == boundary.name or Enum.any?(boundary.exports, &export_matches?(&1, module))

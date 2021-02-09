@@ -12,7 +12,7 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
   use Boundary, classify_to: Boundary.Mix
   use Mix.Task
 
-  alias Boundary.Call
+  alias Boundary.Reference
   alias Boundary.Mix.Xref
 
   @impl Mix.Task
@@ -49,10 +49,10 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
   defp find_external_deps(boundary_view) do
     Xref.start_link()
 
-    for call <- Xref.calls(),
-        boundary = Boundary.for_module(boundary_view, Call.caller_module(call)),
+    for reference <- Xref.entries(),
+        boundary = Boundary.for_module(boundary_view, Reference.from_module(reference)),
         boundary.check.out,
-        app = Boundary.app(boundary_view, Call.callee_module(call)),
+        app = Boundary.app(boundary_view, Reference.to_module(reference)),
         app not in [:boundary, Boundary.Mix.app_name(), nil],
         reduce: Enum.into(Boundary.all_names(boundary_view), %{}, &{&1, MapSet.new()}) do
       acc ->

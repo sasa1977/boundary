@@ -548,15 +548,15 @@ defmodule Boundary do
           | {:ignored_dep, dep_error}
           | {:cycle, [name()]}
           | {:unclassified_module, [module]}
-          | {:invalid_call, call_error}
+          | {:invalid_reference, reference_error}
 
   @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
 
-  @type call_error :: %{
-          type: :call | :runtime | :not_exported | :invalid_external_dep_call,
+  @type reference_error :: %{
+          type: :normal | :runtime | :not_exported | :invalid_external_dep_call,
           from_boundary: name,
           to_boundary: name,
-          call: Boundary.Call.t()
+          reference: Boundary.Reference.t()
         }
 
   @doc false
@@ -609,7 +609,7 @@ defmodule Boundary do
 
   @doc "Returns all boundary errors."
   @spec errors(view, Enumerable.t()) :: [error]
-  def errors(view, calls), do: Boundary.Checker.errors(view, calls)
+  def errors(view, references), do: Boundary.Checker.errors(view, references)
 
   @doc "Returns the application of the given module."
   @spec app(view, module) :: atom | nil

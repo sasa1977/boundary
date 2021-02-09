@@ -97,19 +97,19 @@ defmodule Mix.Tasks.Compile.Boundary do
   end
 
   @doc false
-  def trace({remote, meta, callee_module, name, arity}, env)
+  def trace({remote, meta, to_module, name, arity}, env)
       when remote in ~w/remote_function imported_function remote_macro imported_macro/a do
     mode = if is_nil(env.function) or remote in ~w/remote_macro imported_macro/a, do: :compile, else: :runtime
-    add_call(callee_module, meta, env, mode, {callee_module, name, arity})
+    record(to_module, meta, env, mode, {to_module, name, arity})
   end
 
-  def trace({:struct_expansion, meta, callee_module, _keys}, env),
-    do: add_call(callee_module, meta, env, :compile, {:struct, callee_module})
+  def trace({:struct_expansion, meta, to_module, _keys}, env),
+    do: record(to_module, meta, env, :compile, {:struct_expansion, to_module})
 
-  def trace({:alias_reference, meta, callee_module}, env) do
+  def trace({:alias_reference, meta, to_module}, env) do
     unless env.function == {:boundary, 1} do
       mode = if is_nil(env.function), do: :compile, else: :runtime
-      add_call(callee_module, meta, env, mode, {:alias_reference, callee_module})
+      record(to_module, meta, env, mode, {:alias_reference, to_module})
     end
 
     :ok
@@ -117,14 +117,14 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   def trace(_event, _env), do: :ok
 
-  defp add_call(callee_module, meta, env, mode, callee) do
-    unless env.module in [nil, callee_module] or system_module?(callee_module) or
-             not String.starts_with?(Atom.to_string(callee_module), "Elixir.") do
-      Xref.add_call(
+  defp record(to_module, meta, env, mode, to) do
+    unless env.module in [nil, to_module] or system_module?(to_module) or
+             not String.starts_with?(Atom.to_string(to_module), "Elixir.") do
+      Xref.record(
         env.module,
         %{
-          callee: callee,
-          caller_function: env.function,
+          to: to,
+          from: env.function,
           file: Path.relative_to_cwd(env.file),
           line: Keyword.get(meta, :line, env.line),
           mode: mode
@@ -163,7 +163,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
     Boundary.Mix.write_manifest("boundary_view", Boundary.View.drop_main_app(view))
 
-    errors = check(view, Xref.calls())
+    errors = check(view, Xref.entries())
     print_diagnostic_errors(errors)
     {status(errors, argv), diagnostics ++ errors}
   end
@@ -203,8 +203,8 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp color(:error), do: :red
   defp color(:warning), do: :yellow
 
-  defp check(application, calls) do
-    Boundary.errors(application, calls)
+  defp check(application, entries) do
+    Boundary.errors(application, entries)
     |> Stream.map(&to_diagnostic_error/1)
     |> Enum.sort_by(&{&1.file, &1.position})
   rescue
@@ -270,26 +270,26 @@ defmodule Mix.Tasks.Compile.Boundary do
     )
   end
 
-  defp to_diagnostic_error({:invalid_call, error}) do
+  defp to_diagnostic_error({:invalid_reference, error}) do
     reason =
       case error.type do
-        :call ->
+        :normal ->
           "(references from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
 
         :runtime ->
           "(runtime references from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
 
         :not_exported ->
-          module = inspect(Boundary.Call.callee_module(error.call))
+          module = inspect(Boundary.Reference.to_module(error.reference))
           "(module #{module} is not exported by its owner boundary #{inspect(error.to_boundary)})"
 
         :invalid_external_dep_call ->
           "(references from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
       end
 
-    message = "forbidden reference to #{inspect(Boundary.Call.callee_module(error.call))}\n  #{reason}"
+    message = "forbidden reference to #{inspect(Boundary.Reference.to_module(error.reference))}\n  #{reason}"
 
-    diagnostic(message, file: Path.relative_to_cwd(error.call.file), position: error.call.line)
+    diagnostic(message, file: Path.relative_to_cwd(error.reference.file), position: error.reference.line)
   end
 
   defp to_diagnostic_error({:unknown_option, %{name: :ignore?, value: value} = data}) do

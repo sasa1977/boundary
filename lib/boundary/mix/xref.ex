@@ -1,14 +1,14 @@
 defmodule Boundary.Mix.Xref do
   @moduledoc false
   use GenServer
-  alias Boundary.Call
+  alias Boundary.Reference
 
-  @calls_table __MODULE__.Calls
+  @entries_table __MODULE__.Entries
   @seen_table __MODULE__.Seen
 
-  @type call :: %{
-          callee: mfa | {:struct, module} | {:alias_reference, module},
-          caller_function: {atom, non_neg_integer} | nil,
+  @type entry :: %{
+          to: mfa | {:struct_expansion, module} | {:alias_reference, module},
+          from: {atom, non_neg_integer} | nil,
           file: String.t(),
           line: non_neg_integer,
           mode: :compile | :runtime
@@ -24,10 +24,10 @@ defmodule Boundary.Mix.Xref do
     result
   end
 
-  @spec add_call(module, call) :: :ok
-  def add_call(caller, call) do
-    if :ets.insert_new(@seen_table, {caller}), do: :ets.delete(@calls_table, caller)
-    :ets.insert(@calls_table, {caller, call})
+  @spec record(module, entry) :: :ok
+  def record(from, entry) do
+    if :ets.insert_new(@seen_table, {from}), do: :ets.delete(@entries_table, from)
+    :ets.insert(@entries_table, {from, entry})
     :ok
   end
 
@@ -37,18 +37,18 @@ defmodule Boundary.Mix.Xref do
 
     stored_modules()
     |> Stream.reject(&MapSet.member?(app_modules, &1))
-    |> Enum.each(&:ets.delete(@calls_table, &1))
+    |> Enum.each(&:ets.delete(@entries_table, &1))
 
     :ets.delete_all_objects(@seen_table)
-    :ets.tab2file(@calls_table, to_charlist(Boundary.Mix.manifest_path("boundary")))
+    :ets.tab2file(@entries_table, to_charlist(Boundary.Mix.manifest_path("boundary")))
   end
 
-  @doc "Returns a lazy stream where each element is of type `t:Call.t()`"
-  @spec calls :: Enumerable.t()
-  def calls do
-    :ets.tab2list(@calls_table)
-    |> Enum.map(fn {caller_module, call_info} -> Call.new(caller_module, call_info) end)
-    |> dedup_calls()
+  @doc "Returns a lazy stream where each element is of type `t:Reference.t()`"
+  @spec entries :: Enumerable.t()
+  def entries do
+    :ets.tab2list(@entries_table)
+    |> Enum.map(fn {from_module, info} -> Reference.new(from_module, info) end)
+    |> dedup_entries()
   end
 
   @impl GenServer
@@ -58,7 +58,7 @@ defmodule Boundary.Mix.Xref do
     {:ok, %{}}
   end
 
-  defp build_manifest, do: :ets.new(@calls_table, [:named_table, :public, :duplicate_bag, write_concurrency: true])
+  defp build_manifest, do: :ets.new(@entries_table, [:named_table, :public, :duplicate_bag, write_concurrency: true])
 
   defp read_manifest do
     unless Boundary.Mix.stale_manifest?("boundary") do
@@ -71,34 +71,34 @@ defmodule Boundary.Mix.Xref do
 
   defp stored_modules do
     Stream.unfold(
-      :ets.first(@calls_table),
+      :ets.first(@entries_table),
       fn
         :"$end_of_table" -> nil
-        key -> {key, :ets.next(@calls_table, key)}
+        key -> {key, :ets.next(@entries_table, key)}
       end
     )
   end
 
   # Removes consecutive references to the same module in the same line.
   # This is needed because `Foo.bar` will generate two references: one from alias `Foo`, another from call `Foo.bar`.
-  # In this case we want to keep the the call reference, because we can determine if it is a macro.
+  # In this case we want to keep the the entry, because we can determine if it is a macro.
 
-  defp dedup_calls([]), do: []
-  defp dedup_calls([call | rest]), do: dedup_calls(rest, call)
+  defp dedup_entries([]), do: []
+  defp dedup_entries([entry | rest]), do: dedup_entries(rest, entry)
 
-  defp dedup_calls([], last_call), do: [last_call]
+  defp dedup_entries([], last_entry), do: [last_entry]
 
-  defp dedup_calls([next_call | rest], pushed_call) do
+  defp dedup_entries([next_entry | rest], pushed_entry) do
     cond do
-      pushed_call.file != next_call.file or pushed_call.line != next_call.line or
-          Call.callee_module(pushed_call) != Call.callee_module(next_call) ->
-        [pushed_call | dedup_calls(rest, next_call)]
+      pushed_entry.file != next_entry.file or pushed_entry.line != next_entry.line or
+          Reference.to_module(pushed_entry) != Reference.to_module(next_entry) ->
+        [pushed_entry | dedup_entries(rest, next_entry)]
 
-      match?({_m, _f, _a}, pushed_call.callee) or match?({:struct, _module}, pushed_call.callee) ->
-        dedup_calls(rest, pushed_call)
+      Reference.type(pushed_entry) in [:call, :struct_expansion] ->
+        dedup_entries(rest, pushed_entry)
 
       true ->
-        dedup_calls(rest, next_call)
+        dedup_entries(rest, next_entry)
     end
   end
 end
