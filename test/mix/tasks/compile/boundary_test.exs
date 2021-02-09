@@ -1050,7 +1050,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               end
 
               defmodule #{module2} do
-                use Boundary
+                use Boundary, check: [aliases: true]
                 alias #{module1}, as: Foo
 
                 def fun do

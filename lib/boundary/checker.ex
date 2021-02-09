@@ -182,6 +182,9 @@ defmodule Boundary.Checker do
       not to_boundary.check.in ->
         nil
 
+      Call.type(call) == :alias_reference and not from_boundary.check.aliases ->
+        nil
+
       to_boundary == from_boundary ->
         nil
 

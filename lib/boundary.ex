@@ -528,7 +528,7 @@ defmodule Boundary do
           ancestors: [name],
           deps: [{name, mode}],
           exports: [export],
-          check: %{apps: [{atom, mode}], in: boolean, out: boolean},
+          check: %{apps: [{atom, mode}], in: boolean, out: boolean, aliases: boolean},
           type: :strict | :regular,
           file: String.t(),
           line: pos_integer,

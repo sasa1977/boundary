@@ -27,4 +27,8 @@ defmodule Boundary.Call do
   def callee_module(%__MODULE__{callee: {module, _fun, _arity}}), do: module
   def callee_module(%__MODULE__{callee: {:struct, module}}), do: module
   def callee_module(%__MODULE__{callee: {:alias_reference, module}}), do: module
+
+  def type(%__MODULE__{callee: {_module, _fun, _arity}}), do: :call
+  def type(%__MODULE__{callee: {:struct, _module}}), do: :struct_expansion
+  def type(%__MODULE__{callee: {:alias_reference, _module}}), do: :alias_reference
 end
