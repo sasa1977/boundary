@@ -40,6 +40,10 @@ defmodule Boundary.Mix.Xref do
     |> Stream.reject(&MapSet.member?(app_modules, &1))
     |> Enum.each(&:ets.delete(@entries_table, &1))
 
+    app_modules
+    |> Enum.map(&Task.async(fn -> compress_entries(&1) end))
+    |> Enum.each(&Task.await(&1, :infinity))
+
     :ets.delete_all_objects(@seen_table)
     :ets.tab2file(@entries_table, to_charlist(Boundary.Mix.manifest_path("boundary")))
   end
@@ -49,7 +53,6 @@ defmodule Boundary.Mix.Xref do
   def entries do
     :ets.tab2list(@entries_table)
     |> Enum.map(fn {from_module, info} -> Map.put(info, :from, from_module) end)
-    |> dedup_entries()
   end
 
   @impl GenServer
@@ -80,25 +83,37 @@ defmodule Boundary.Mix.Xref do
     )
   end
 
-  # Removes consecutive references to the same module in the same line.
-  # This is needed because `Foo.bar` will generate two references: one from alias `Foo`, another from call `Foo.bar`.
-  # In this case we want to keep the the entry, because we can determine if it is a macro.
+  defp compress_entries(module) do
+    :ets.take(@entries_table, module)
+    |> Enum.map(fn {^module, entry} -> entry end)
+    |> drop_leading_aliases()
+    |> dedup_entries()
+    |> Enum.each(&:ets.insert(@entries_table, {module, &1}))
+  end
 
-  defp dedup_entries([]), do: []
-  defp dedup_entries([entry | rest]), do: dedup_entries(rest, entry)
+  defp drop_leading_aliases([entry, next_entry | rest]) do
+    # For the same file/line/to combo remove leading alias reference. This is needed because `Foo.bar()` and `%Foo{}` will
+    # generate two entries: alias reference to `Foo`, followed by the function call or the struct expansion. In this
+    # case we want to keep only the second entry.
+    if entry.type == :alias_reference and
+         entry.to == next_entry.to and
+         entry.file == next_entry.file and
+         entry.line == next_entry.line,
+       do: drop_leading_aliases([next_entry | rest]),
+       else: [entry | drop_leading_aliases([next_entry | rest])]
+  end
 
-  defp dedup_entries([], last_entry), do: [last_entry]
+  defp drop_leading_aliases(other), do: other
 
-  defp dedup_entries([next_entry | rest], pushed_entry) do
-    cond do
-      pushed_entry.file != next_entry.file or pushed_entry.line != next_entry.line or pushed_entry.to != next_entry.to ->
-        [pushed_entry | dedup_entries(rest, next_entry)]
+  # Keep only one entry per file/line/to/mode combo
+  defp dedup_entries(entries) do
+    # Alias ref has lower prio because this check is optional. Therefore, if we have any call or struct expansion, we'll
+    # prefer that.
+    prios = %{call: 1, struct_expansion: 1, alias_reference: 2}
 
-      pushed_entry.type in [:call, :struct_expansion] ->
-        dedup_entries(rest, pushed_entry)
-
-      true ->
-        dedup_entries(rest, next_entry)
-    end
+    entries
+    |> Enum.group_by(&{&1.file, &1.line, &1.to, &1.mode})
+    |> Enum.map(fn {_key, entries} -> Enum.min_by(entries, &Map.fetch!(prios, &1.type)) end)
+    |> Enum.sort_by(&{&1.file, &1.line})
   end
 end

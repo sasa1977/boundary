@@ -1031,7 +1031,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               end
 
               defmodule #{module2} do
-                use Boundary
+                use Boundary, check: [aliases: true]
 
                 def fun, do: %#{module1}{}
               end
@@ -1062,6 +1062,29 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     assert [warning1, warning2] = warnings
     assert warning1.message =~ "forbidden reference to #{unquote(module1)}"
     assert warning2.message =~ "forbidden reference to #{unquote(module1)}"
+  end
+
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
+  module_test "deduplicates warning per single line",
+              """
+              defmodule #{module1} do
+                use Boundary
+                defstruct [:x]
+
+                def fun(_, _), do: :ok
+              end
+
+              defmodule #{module2} do
+                use Boundary
+
+                def fun do
+                  #{module1}.fun(%#{module1}{}, #{module1})
+                end
+              end
+              """ do
+    assert length(warnings) == 1
   end
 
   describe "recompilation tests" do

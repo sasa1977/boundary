@@ -13,6 +13,11 @@ defmodule Boundary.Checker do
       unclassified_modules(view),
       invalid_references(view, references)
     ])
+    |> Enum.uniq_by(fn
+      # deduping by reference minus type/mode, because even if those vary the error can still be the same
+      {:invalid_reference, data} -> update_in(data.reference, &Map.drop(&1, [:type, :mode]))
+      other -> other
+    end)
   end
 
   defp invalid_deps(view) do
