@@ -1,3 +1,8 @@
+# 0.8.0
+
+- Reports forbidden struct expansions (`%Foo{...}`)
+- Optionally reports alias references (e.g. `Foo`, `apply(Foo, ...)`). This check is by default disabled, but can be enabled globally or per-boundary with the option `check: [aliases: true]`.
+
 # 0.7.1
 
 - fixes a bug which prevented the project from compiling on a named node
