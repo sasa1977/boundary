@@ -13,7 +13,6 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
   use Mix.Task
 
   alias Boundary.Mix.Xref
-  alias Boundary.Reference
 
   @impl Mix.Task
   def run(_argv) do
@@ -50,9 +49,9 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
     Xref.start_link()
 
     for reference <- Xref.entries(),
-        boundary = Boundary.for_module(boundary_view, Reference.from_module(reference)),
+        boundary = Boundary.for_module(boundary_view, reference.from),
         boundary.check.out,
-        app = Boundary.app(boundary_view, Reference.to_module(reference)),
+        app = Boundary.app(boundary_view, reference.to),
         app not in [:boundary, Boundary.Mix.app_name(), nil],
         reduce: Enum.into(Boundary.all_names(boundary_view), %{}, &{&1, MapSet.new()}) do
       acc ->

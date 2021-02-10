@@ -2,8 +2,6 @@
 defmodule Boundary.Checker do
   @moduledoc false
 
-  alias Boundary.Reference
-
   def errors(view, references) do
     Enum.concat([
       invalid_config(view),
@@ -135,7 +133,7 @@ defmodule Boundary.Checker do
 
   defp invalid_references(view, references) do
     for reference <- references,
-        from_boundary = Boundary.for_module(view, Reference.from_module(reference)),
+        from_boundary = Boundary.for_module(view, reference.from),
         to_boundaries = to_boundaries(view, reference),
         {type, to_boundary_name} <- [reference_error(view, reference, from_boundary, to_boundaries)] do
       {:invalid_reference,
@@ -149,11 +147,11 @@ defmodule Boundary.Checker do
   end
 
   defp to_boundaries(view, reference) do
-    to_boundary = Boundary.for_module(view, Reference.to_module(reference))
+    to_boundary = Boundary.for_module(view, reference.to)
 
     # main sub-boundary module may also be exported by its parent
     parent_boundary =
-      if not is_nil(to_boundary) and Reference.to_module(reference) == to_boundary.name,
+      if not is_nil(to_boundary) and reference.to == to_boundary.name,
         do: Boundary.parent(view, to_boundary)
 
     Enum.reject([to_boundary, parent_boundary], &is_nil/1)
@@ -166,7 +164,7 @@ defmodule Boundary.Checker do
     # to an unclassified boundary. In the former case we'll report an error if the type is strict. In the
     # latter case, we won't report an error.
     if cross_app_ref?(view, reference) and check_external_dep?(view, reference, from_boundary),
-      do: {:invalid_external_dep_call, Reference.to_module(reference)},
+      do: {:invalid_external_dep_call, reference.to},
       else: nil
   end
 
@@ -183,13 +181,13 @@ defmodule Boundary.Checker do
       not to_boundary.check.in ->
         nil
 
-      Reference.type(reference) == :alias_reference and not from_boundary.check.aliases ->
+      reference.type == :alias_reference and not from_boundary.check.aliases ->
         nil
 
       to_boundary == from_boundary ->
         nil
 
-      Boundary.protocol_impl?(Reference.to_module(reference)) ->
+      Boundary.protocol_impl?(reference.to) ->
         # We can enter here when there's `defimpl SomeProtocol, for: Type`. In this case, the caller
         # is `SomeProtocol`, while the callee is `SomeProtocol.Type`. This is never an error, so
         # we're ignoring this case.
@@ -199,7 +197,7 @@ defmodule Boundary.Checker do
         tag = if Enum.member?(from_boundary.deps, {to_boundary.name, :compile}), do: :runtime, else: :normal
         {tag, to_boundary.name}
 
-      not exported?(to_boundary, Reference.to_module(reference)) ->
+      not exported?(to_boundary, reference.to) ->
         {:not_exported, to_boundary.name}
 
       true ->
@@ -208,11 +206,11 @@ defmodule Boundary.Checker do
   end
 
   defp check_external_dep?(view, reference, from_boundary) do
-    Boundary.app(view, Reference.to_module(reference)) != :boundary and
+    Boundary.app(view, reference.to) != :boundary and
       (from_boundary.type == :strict or
          MapSet.member?(
            with_ancestors(view, from_boundary, & &1.check.apps),
-           {Boundary.app(view, Reference.to_module(reference)), reference.mode}
+           {Boundary.app(view, reference.to), reference.mode}
          ))
   end
 
@@ -260,11 +258,11 @@ defmodule Boundary.Checker do
   end
 
   defp compile_time_reference?(%{mode: :compile}), do: true
-  defp compile_time_reference?(%{from: {module, name, arity}}), do: macro_exported?(module, name, arity)
+  defp compile_time_reference?(%{from: module, from_function: {name, arity}}), do: macro_exported?(module, name, arity)
   defp compile_time_reference?(_), do: false
 
   defp cross_app_ref?(view, reference),
-    do: Boundary.app(view, Reference.from_module(reference)) != Boundary.app(view, Reference.to_module(reference))
+    do: Boundary.app(view, reference.from) != Boundary.app(view, reference.to)
 
   defp exported?(boundary, module),
     do: boundary.implicit? or module == boundary.name or Enum.any?(boundary.exports, &export_matches?(&1, module))

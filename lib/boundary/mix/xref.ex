@@ -1,17 +1,18 @@
 defmodule Boundary.Mix.Xref do
   @moduledoc false
   use GenServer
-  alias Boundary.Reference
 
   @entries_table __MODULE__.Entries
   @seen_table __MODULE__.Seen
 
   @type entry :: %{
-          to: mfa | {:struct_expansion, module} | {:alias_reference, module},
-          from: {atom, non_neg_integer} | nil,
+          to: module,
+          from: module,
+          from_function: {function :: atom, arity :: non_neg_integer} | nil,
+          type: :call | :struct_expansion | :alias_reference,
+          mode: :compile | :runtime,
           file: String.t(),
-          line: non_neg_integer,
-          mode: :compile | :runtime
+          line: non_neg_integer
         }
 
   @spec start_link :: GenServer.on_start()
@@ -24,7 +25,7 @@ defmodule Boundary.Mix.Xref do
     result
   end
 
-  @spec record(module, entry) :: :ok
+  @spec record(module, map) :: :ok
   def record(from, entry) do
     if :ets.insert_new(@seen_table, {from}), do: :ets.delete(@entries_table, from)
     :ets.insert(@entries_table, {from, entry})
@@ -47,14 +48,7 @@ defmodule Boundary.Mix.Xref do
   @spec entries :: Enumerable.t()
   def entries do
     :ets.tab2list(@entries_table)
-    |> Enum.map(fn {from_module, info} ->
-      info
-      |> Map.update!(:from, fn
-        {name, arity} -> {from_module, name, arity}
-        nil -> from_module
-      end)
-      |> Reference.new()
-    end)
+    |> Enum.map(fn {from_module, info} -> Map.put(info, :from, from_module) end)
     |> dedup_entries()
   end
 
@@ -97,11 +91,10 @@ defmodule Boundary.Mix.Xref do
 
   defp dedup_entries([next_entry | rest], pushed_entry) do
     cond do
-      pushed_entry.file != next_entry.file or pushed_entry.line != next_entry.line or
-          Reference.to_module(pushed_entry) != Reference.to_module(next_entry) ->
+      pushed_entry.file != next_entry.file or pushed_entry.line != next_entry.line or pushed_entry.to != next_entry.to ->
         [pushed_entry | dedup_entries(rest, next_entry)]
 
-      Reference.type(pushed_entry) in [:call, :struct_expansion] ->
+      pushed_entry.type in [:call, :struct_expansion] ->
         dedup_entries(rest, pushed_entry)
 
       true ->

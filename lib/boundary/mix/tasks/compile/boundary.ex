@@ -96,19 +96,19 @@ defmodule Mix.Tasks.Compile.Boundary do
   end
 
   @doc false
-  def trace({remote, meta, to_module, name, arity}, env)
+  def trace({remote, meta, to_module, _name, _arity}, env)
       when remote in ~w/remote_function imported_function remote_macro imported_macro/a do
     mode = if is_nil(env.function) or remote in ~w/remote_macro imported_macro/a, do: :compile, else: :runtime
-    record(to_module, meta, env, mode, {to_module, name, arity})
+    record(to_module, meta, env, mode, :call)
   end
 
   def trace({:struct_expansion, meta, to_module, _keys}, env),
-    do: record(to_module, meta, env, :compile, {:struct_expansion, to_module})
+    do: record(to_module, meta, env, :compile, :struct_expansion)
 
   def trace({:alias_reference, meta, to_module}, env) do
     unless env.function == {:boundary, 1} do
       mode = if is_nil(env.function), do: :compile, else: :runtime
-      record(to_module, meta, env, mode, {:alias_reference, to_module})
+      record(to_module, meta, env, mode, :alias_reference)
     end
 
     :ok
@@ -116,17 +116,18 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   def trace(_event, _env), do: :ok
 
-  defp record(to_module, meta, env, mode, to) do
+  defp record(to_module, meta, env, mode, type) do
     unless env.module in [nil, to_module] or system_module?(to_module) or
              not String.starts_with?(Atom.to_string(to_module), "Elixir.") do
       Xref.record(
         env.module,
         %{
-          to: to,
-          from: env.function,
+          from_function: env.function,
+          to: to_module,
+          mode: mode,
+          type: type,
           file: Path.relative_to_cwd(env.file),
-          line: Keyword.get(meta, :line, env.line),
-          mode: mode
+          line: Keyword.get(meta, :line, env.line)
         }
       )
     end
@@ -279,14 +280,14 @@ defmodule Mix.Tasks.Compile.Boundary do
           "(runtime references from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
 
         :not_exported ->
-          module = inspect(Boundary.Reference.to_module(error.reference))
+          module = inspect(error.reference.to)
           "(module #{module} is not exported by its owner boundary #{inspect(error.to_boundary)})"
 
         :invalid_external_dep_call ->
           "(references from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
       end
 
-    message = "forbidden reference to #{inspect(Boundary.Reference.to_module(error.reference))}\n  #{reason}"
+    message = "forbidden reference to #{inspect(error.reference.to)}\n  #{reason}"
 
     diagnostic(message, file: Path.relative_to_cwd(error.reference.file), position: error.reference.line)
   end

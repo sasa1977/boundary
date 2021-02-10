@@ -527,7 +527,7 @@ defmodule Boundary do
   require Boundary.Definition
   alias Boundary.{Definition, View}
 
-  Code.eval_quoted(Definition.generate(deps: [mix: :runtime], exports: [Reference]), [], __ENV__)
+  Code.eval_quoted(Definition.generate(deps: [mix: :runtime], exports: []), [], __ENV__)
 
   @type t :: %{
           name: name,
@@ -562,7 +562,7 @@ defmodule Boundary do
           type: :normal | :runtime | :not_exported | :invalid_external_dep_call,
           from_boundary: name,
           to_boundary: name,
-          reference: Boundary.Reference.t()
+          reference: Boundary.Mix.Xref.entry()
         }
 
   @doc false
