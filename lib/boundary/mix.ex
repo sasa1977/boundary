@@ -1,7 +1,7 @@
 defmodule Boundary.Mix do
   @moduledoc false
 
-  use Boundary, deps: [Boundary]
+  use Boundary, deps: [Boundary, :mix]
 
   @spec app_name :: atom
   def app_name, do: Keyword.fetch!(Mix.Project.config(), :app)
