@@ -30,19 +30,19 @@ defmodule Mix.Tasks.Boundary.Visualize.Mods do
     boundaries = Enum.map(argv, &Module.concat([&1]))
 
     state =
-      for call <- Xref.calls(),
-          boundary_from = Boundary.for_module(view, call.caller_module),
+      for reference <- Xref.entries(),
+          boundary_from = Boundary.for_module(view, reference.from),
           not is_nil(boundary_from),
           boundary_from.name in boundaries,
-          boundary_to = Boundary.for_module(view, call.callee_module),
+          boundary_to = Boundary.for_module(view, reference.to),
           not is_nil(boundary_to),
           boundary_to.name in boundaries,
           reduce: %{main: Graph.new(""), subgraphs: %{}} do
         state ->
           state
-          |> add_node(boundary_from.name, call.caller_module)
-          |> add_node(boundary_to.name, call.callee_module)
-          |> add_dependency(call.caller_module, call.callee_module)
+          |> add_node(boundary_from.name, reference.from)
+          |> add_node(boundary_to.name, reference.to)
+          |> add_dependency(reference.from, reference.to)
       end
 
     Enum.reduce(Map.values(state.subgraphs), state.main, &Graph.add_subgraph(&2, &1))

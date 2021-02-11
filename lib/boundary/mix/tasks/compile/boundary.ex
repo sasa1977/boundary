@@ -54,7 +54,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   ## Warnings
 
-  Every invalid cross-boundary call is reported as a compiler warning. Consider the following example:
+  Every invalid cross-boundary usage is reported as a compiler warning. Consider the following example:
 
   ```
   defmodule MySystem.User do
@@ -69,9 +69,8 @@ defmodule Mix.Tasks.Compile.Boundary do
   ```
   $ mix compile
 
-  warning: forbidden call to MySystemWeb.Endpoint.url/0
-    (calls from MySystem to MySystemWeb are not allowed)
-    (call originated from MySystem.User)
+  warning: forbidden reference to MySystemWeb
+    (references from MySystem to MySystemWeb are not allowed)
     lib/my_system/user.ex:3
   ```
 
@@ -97,30 +96,44 @@ defmodule Mix.Tasks.Compile.Boundary do
   end
 
   @doc false
-  def trace({remote, meta, callee_module, name, arity}, env)
+  def trace({remote, meta, to_module, _name, _arity}, env)
       when remote in ~w/remote_function imported_function remote_macro imported_macro/a do
-    unless env.module in [nil, callee_module] or system_module?(callee_module) or
-             not String.starts_with?(Atom.to_string(callee_module), "Elixir.") do
-      Xref.add_call(
-        env.module,
-        %{
-          callee: {callee_module, name, arity},
-          caller_function: env.function,
-          file: Path.relative_to_cwd(env.file),
-          line: Keyword.get(meta, :line, env.line),
-          mode:
-            if(is_nil(env.function) or remote in ~w/remote_macro imported_macro/a,
-              do: :compile,
-              else: :runtime
-            )
-        }
-      )
+    mode = if is_nil(env.function) or remote in ~w/remote_macro imported_macro/a, do: :compile, else: :runtime
+    record(to_module, meta, env, mode, :call)
+  end
+
+  def trace({:struct_expansion, meta, to_module, _keys}, env),
+    do: record(to_module, meta, env, :compile, :struct_expansion)
+
+  def trace({:alias_reference, meta, to_module}, env) do
+    unless env.function == {:boundary, 1} do
+      mode = if is_nil(env.function), do: :compile, else: :runtime
+      record(to_module, meta, env, mode, :alias_reference)
     end
 
     :ok
   end
 
   def trace(_event, _env), do: :ok
+
+  defp record(to_module, meta, env, mode, type) do
+    unless env.module in [nil, to_module] or system_module?(to_module) or
+             not String.starts_with?(Atom.to_string(to_module), "Elixir.") do
+      Xref.record(
+        env.module,
+        %{
+          from_function: env.function,
+          to: to_module,
+          mode: mode,
+          type: type,
+          file: Path.relative_to_cwd(env.file),
+          line: Keyword.get(meta, :line, env.line)
+        }
+      )
+    end
+
+    :ok
+  end
 
   system_apps = ~w/elixir stdlib kernel/a
 
@@ -150,7 +163,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
     Boundary.Mix.write_manifest("boundary_view", Boundary.View.drop_main_app(view))
 
-    errors = check(view, Xref.calls())
+    errors = check(view, Xref.entries())
     print_diagnostic_errors(errors)
     {status(errors, argv), diagnostics ++ errors}
   end
@@ -190,8 +203,8 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp color(:error), do: :red
   defp color(:warning), do: :yellow
 
-  defp check(application, calls) do
-    Boundary.errors(application, calls)
+  defp check(application, entries) do
+    Boundary.errors(application, entries)
     |> Stream.map(&to_diagnostic_error/1)
     |> Enum.sort_by(&{&1.file, &1.position})
   rescue
@@ -257,43 +270,26 @@ defmodule Mix.Tasks.Compile.Boundary do
     )
   end
 
-  defp to_diagnostic_error({:invalid_call, %{type: type} = error}) when type in ~w/runtime call/a do
-    {m, f, a} = error.callee
+  defp to_diagnostic_error({:invalid_reference, error}) do
+    reason =
+      case error.type do
+        :normal ->
+          "(references from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
 
-    call_display =
-      case type do
-        :runtime -> "runtime call"
-        :call -> "call"
+        :runtime ->
+          "(runtime references from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
+
+        :not_exported ->
+          module = inspect(error.reference.to)
+          "(module #{module} is not exported by its owner boundary #{inspect(error.to_boundary)})"
+
+        :invalid_external_dep_call ->
+          "(references from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
       end
 
-    message =
-      "forbidden #{call_display} to #{Exception.format_mfa(m, f, a)}\n" <>
-        "  (#{call_display}s from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)\n" <>
-        "  (call originated from #{inspect(error.caller)})"
+    message = "forbidden reference to #{inspect(error.reference.to)}\n  #{reason}"
 
-    diagnostic(message, file: Path.relative_to_cwd(error.file), position: error.line)
-  end
-
-  defp to_diagnostic_error({:invalid_call, %{type: :not_exported} = error}) do
-    {m, f, a} = error.callee
-
-    message =
-      "forbidden call to #{Exception.format_mfa(m, f, a)}\n" <>
-        "  (module #{inspect(m)} is not exported by its owner boundary #{inspect(error.to_boundary)})\n" <>
-        "  (call originated from #{inspect(error.caller)})"
-
-    diagnostic(message, file: Path.relative_to_cwd(error.file), position: error.line)
-  end
-
-  defp to_diagnostic_error({:invalid_call, %{type: :invalid_external_dep_call} = error}) do
-    {m, f, a} = error.callee
-
-    message =
-      "forbidden call to #{Exception.format_mfa(m, f, a)}\n" <>
-        "  (calls from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)\n" <>
-        "  (call originated from #{inspect(error.caller)})"
-
-    diagnostic(message, file: Path.relative_to_cwd(error.file), position: error.line)
+    diagnostic(message, file: Path.relative_to_cwd(error.reference.file), position: error.reference.line)
   end
 
   defp to_diagnostic_error({:unknown_option, %{name: :ignore?, value: value} = data}) do

@@ -49,6 +49,7 @@ defmodule Boundary.CompilerTester do
           context.warnings
           |> Enum.filter(&(&1.file == "lib/#{unquote(file)}"))
           |> Enum.map(&Map.delete(&1, :file))
+          |> Enum.map(&%{&1 | message: &1.message})
 
         # dummy expression to suppress warnings if `warnings` is not used
         _ = var!(warnings)
@@ -59,28 +60,4 @@ defmodule Boundary.CompilerTester do
   end
 
   def unique_module_name, do: "Module#{:erlang.unique_integer([:positive, :monotonic])}"
-
-  @doc false
-  def warnings(output) do
-    output
-    |> String.split(~r/\n|\r/)
-    |> Stream.map(&String.trim/1)
-    |> Stream.chunk_every(4, 1)
-    |> Stream.filter(&match?("warning: " <> _, hd(&1)))
-    |> Enum.map(fn ["warning: " <> warning, line_2, line_3, line_4] ->
-      if(String.starts_with?(line_2, "("),
-        do: Map.merge(%{explanation: line_2, callee: line_3}, location(line_4)),
-        else: location(line_2)
-      )
-      |> Map.put(:message, String.trim(warning))
-    end)
-  end
-
-  defp location(location) do
-    case String.split(location, ":") do
-      [file] -> %{file: Path.basename(file), line: nil}
-      [file, line] -> %{file: Path.basename(file), line: String.to_integer(line)}
-      _ -> %{file: nil, line: nil}
-    end
-  end
 end

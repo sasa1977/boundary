@@ -345,8 +345,8 @@ defmodule Boundary do
   You can use the `:check` option to control the checks performed by the boundary compiler. The default value is `check:
   [in: true, out: true]`, which means that all incoming and outgoing calls will be checked.
 
-  The `in: false` setting will allow any boundary to call functions from this boundary. The `out: false` setting will
-  allow this boundary to call any boundary. If both options are set to false, boundary becomes ignored. These settings
+  The `in: false` setting will allow any boundary to use modules from this boundary. The `out: false` setting will allow
+  this boundary to use any other boundary. If both options are set to false, boundary becomes ignored. These settings
   can only be provided for top-level boundaries. If a boundary has some check disabled, it may not contain
   sub-boundaries.
 
@@ -395,6 +395,12 @@ defmodule Boundary do
     use Boundary, exports: [Endpoint], deps: [...]
   end
   ```
+
+  ## Alias references
+
+  Boundary can also check plain alias references (`Foo.Bar`). This check is by default disabled. To enable it, you can
+  include `check: [aliases: true]` in global or boundary options. An alias reference is only checked if it corresponds
+  to an existing module.
 
   ## Nested boundaries
 
@@ -521,14 +527,14 @@ defmodule Boundary do
   require Boundary.Definition
   alias Boundary.{Definition, View}
 
-  Code.eval_quoted(Definition.generate(deps: [], exports: []), [], __ENV__)
+  Code.eval_quoted(Definition.generate(deps: [mix: :runtime], exports: []), [], __ENV__)
 
   @type t :: %{
           name: name,
           ancestors: [name],
           deps: [{name, mode}],
           exports: [export],
-          check: %{apps: [{atom, mode}], in: boolean, out: boolean},
+          check: %{apps: [{atom, mode}], in: boolean, out: boolean, aliases: boolean},
           type: :strict | :regular,
           file: String.t(),
           line: pos_integer,
@@ -543,24 +549,21 @@ defmodule Boundary do
   @type export :: module | {module, [except: [module]]}
   @type mode :: :compile | :runtime
 
-  @type call :: %{
-          callee: mfa,
-          callee_module: module,
-          caller: mfa,
-          caller_module: module,
-          file: String.t(),
-          line: pos_integer,
-          mode: mode
-        }
-
   @type error ::
           {:empty_boundary, dep_error}
           | {:ignored_dep, dep_error}
-          | {:cycle, [Boundary.name()]}
+          | {:cycle, [name()]}
           | {:unclassified_module, [module]}
-          | {:invalid_call, [Boundary.call()]}
+          | {:invalid_reference, reference_error}
 
   @type dep_error :: %{name: Boundary.name(), file: String.t(), line: pos_integer}
+
+  @type reference_error :: %{
+          type: :normal | :runtime | :not_exported | :invalid_external_dep_call,
+          from_boundary: name,
+          to_boundary: name,
+          reference: Boundary.Mix.Xref.entry()
+        }
 
   @doc false
   defmacro __using__(opts), do: Definition.generate(opts)
@@ -612,7 +615,7 @@ defmodule Boundary do
 
   @doc "Returns all boundary errors."
   @spec errors(view, Enumerable.t()) :: [error]
-  def errors(view, calls), do: Boundary.Checker.errors(view, calls)
+  def errors(view, references), do: Boundary.Checker.errors(view, references)
 
   @doc "Returns the application of the given module."
   @spec app(view, module) :: atom | nil

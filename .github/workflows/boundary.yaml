@@ -12,10 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - uses: actions/setup-elixir@v1
+      - uses: erlef/setup-elixir@v1
         with:
           otp-version: 23.1
-          elixir-version: 1.11.2
+          elixir-version: 1.11.3
 
       - name: Restore cached deps
         uses: actions/cache@v1

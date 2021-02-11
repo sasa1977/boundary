@@ -185,7 +185,7 @@ defmodule Boundary.Definition do
 
   defp normalize_check(definition) do
     definition.check
-    |> update_in(&Map.new(Keyword.merge([in: true, out: true, apps: []], &1)))
+    |> update_in(&Map.new(Keyword.merge([in: true, out: true, aliases: false, apps: []], &1)))
     |> update_in([:check, :apps], &normalize_check_apps/1)
     |> validate(&if not &1.check.in and &1.exports != [], do: :exports_in_check_in_false)
     |> validate(&if not &1.check.out and &1.deps != [], do: :deps_in_check_out_false)

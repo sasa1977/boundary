@@ -36,7 +36,7 @@ defmodule MySystem.MixProject do
 
   defp deps do
     [
-      {:boundary, "~> 0.7.0", runtime: false},
+      {:boundary, "~> 0.8.0", runtime: false},
       # ...
     ]
   end
@@ -108,9 +108,8 @@ The compiler will emit a warning:
 ```
 $ mix compile
 
-warning: forbidden call to MySystemWeb.Endpoint.url/0
-  (calls from MySystem to MySystemWeb are not allowed)
-  (call originated from MySystem.User)
+warning: forbidden reference to MySystemWeb
+  (references from MySystem to MySystemWeb are not allowed)
   lib/my_system/user.ex:3
 ```
 

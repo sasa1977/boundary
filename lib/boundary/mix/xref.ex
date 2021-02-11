@@ -2,15 +2,17 @@ defmodule Boundary.Mix.Xref do
   @moduledoc false
   use GenServer
 
-  @calls_table __MODULE__.Calls
+  @entries_table __MODULE__.Entries
   @seen_table __MODULE__.Seen
 
-  @type call :: %{
-          callee: mfa,
-          caller_function: {atom, non_neg_integer} | nil,
+  @type entry :: %{
+          to: module,
+          from: module,
+          from_function: {function :: atom, arity :: non_neg_integer} | nil,
+          type: :call | :struct_expansion | :alias_reference,
+          mode: :compile | :runtime,
           file: String.t(),
-          line: non_neg_integer,
-          mode: :compile | :runtime
+          line: non_neg_integer
         }
 
   @spec start_link :: GenServer.on_start()
@@ -23,10 +25,10 @@ defmodule Boundary.Mix.Xref do
     result
   end
 
-  @spec add_call(module, call) :: :ok
-  def add_call(caller, call) do
-    if :ets.insert_new(@seen_table, {caller}), do: :ets.delete(@calls_table, caller)
-    unless match?({^caller, _fun, _arg}, call.callee), do: :ets.insert(@calls_table, {caller, call})
+  @spec record(module, map) :: :ok
+  def record(from, entry) do
+    if :ets.insert_new(@seen_table, {from}), do: :ets.delete(@entries_table, from)
+    :ets.insert(@entries_table, {from, entry})
     :ok
   end
 
@@ -36,27 +38,21 @@ defmodule Boundary.Mix.Xref do
 
     stored_modules()
     |> Stream.reject(&MapSet.member?(app_modules, &1))
-    |> Enum.each(&:ets.delete(@calls_table, &1))
+    |> Enum.each(&:ets.delete(@entries_table, &1))
+
+    app_modules
+    |> Enum.map(&Task.async(fn -> compress_entries(&1) end))
+    |> Enum.each(&Task.await(&1, :infinity))
 
     :ets.delete_all_objects(@seen_table)
-    :ets.tab2file(@calls_table, to_charlist(Boundary.Mix.manifest_path("boundary")))
+    :ets.tab2file(@entries_table, to_charlist(Boundary.Mix.manifest_path("boundary")))
   end
 
-  @doc "Returns a lazy stream where each element is of type `Boundary.call()`"
-  @spec calls :: Enumerable.t()
-  def calls do
-    Enum.map(
-      :ets.tab2list(@calls_table),
-      fn {caller_module, %{callee: {callee, _fun, _arity}} = meta} ->
-        caller =
-          case meta.caller_function do
-            {name, arity} -> {caller_module, name, arity}
-            _ -> nil
-          end
-
-        Map.merge(meta, %{caller: caller, caller_module: caller_module, callee_module: callee})
-      end
-    )
+  @doc "Returns a lazy stream where each element is of type `t:Reference.t()`"
+  @spec entries :: Enumerable.t()
+  def entries do
+    :ets.tab2list(@entries_table)
+    |> Enum.map(fn {from_module, info} -> Map.put(info, :from, from_module) end)
   end
 
   @impl GenServer
@@ -66,7 +62,7 @@ defmodule Boundary.Mix.Xref do
     {:ok, %{}}
   end
 
-  defp build_manifest, do: :ets.new(@calls_table, [:named_table, :public, :duplicate_bag, write_concurrency: true])
+  defp build_manifest, do: :ets.new(@entries_table, [:named_table, :public, :duplicate_bag, write_concurrency: true])
 
   defp read_manifest do
     unless Boundary.Mix.stale_manifest?("boundary") do
@@ -79,11 +75,45 @@ defmodule Boundary.Mix.Xref do
 
   defp stored_modules do
     Stream.unfold(
-      :ets.first(@calls_table),
+      :ets.first(@entries_table),
       fn
         :"$end_of_table" -> nil
-        key -> {key, :ets.next(@calls_table, key)}
+        key -> {key, :ets.next(@entries_table, key)}
       end
     )
+  end
+
+  defp compress_entries(module) do
+    :ets.take(@entries_table, module)
+    |> Enum.map(fn {^module, entry} -> entry end)
+    |> drop_leading_aliases()
+    |> dedup_entries()
+    |> Enum.each(&:ets.insert(@entries_table, {module, &1}))
+  end
+
+  defp drop_leading_aliases([entry, next_entry | rest]) do
+    # For the same file/line/to combo remove leading alias reference. This is needed because `Foo.bar()` and `%Foo{}` will
+    # generate two entries: alias reference to `Foo`, followed by the function call or the struct expansion. In this
+    # case we want to keep only the second entry.
+    if entry.type == :alias_reference and
+         entry.to == next_entry.to and
+         entry.file == next_entry.file and
+         entry.line == next_entry.line,
+       do: drop_leading_aliases([next_entry | rest]),
+       else: [entry | drop_leading_aliases([next_entry | rest])]
+  end
+
+  defp drop_leading_aliases(other), do: other
+
+  # Keep only one entry per file/line/to/mode combo
+  defp dedup_entries(entries) do
+    # Alias ref has lower prio because this check is optional. Therefore, if we have any call or struct expansion, we'll
+    # prefer that.
+    prios = %{call: 1, struct_expansion: 1, alias_reference: 2}
+
+    entries
+    |> Enum.group_by(&{&1.file, &1.line, &1.to, &1.mode})
+    |> Enum.map(fn {_key, entries} -> Enum.min_by(entries, &Map.fetch!(prios, &1.type)) end)
+    |> Enum.sort_by(&{&1.file, &1.line})
   end
 end
