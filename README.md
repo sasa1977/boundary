@@ -12,9 +12,9 @@ Boundary is a library which helps managing and restraining cross-module dependen
 - Limit usage of Ecto in the web layer to only Ecto.Changeset
 - Allow `:mix` modules to be used only at compile time
 
-## Warning
+## Status
 
-This library is experimental, untested, and unstable. Interface might change significantly in the future versions. The code is not well tested or optimized, so you might experience crashes, or significant slowdowns during compilation, especially in larger projects. In addition, be aware that Boundary loads the application and all of its dependencies (recursively) during compilation.
+This library has been used in smaller production projects for about a year. It is not tested on larger and umbreall projects. In case you experience problems, create an issue. In addition, be aware that Boundary loads the application and all of its dependencies (recursively) during compilation.
 
 ## Documentation
 
