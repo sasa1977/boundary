@@ -14,7 +14,7 @@ Boundary is a library which helps managing and restraining cross-module dependen
 
 ## Status
 
-This library has been used in smaller production projects for about a year. It is not tested on larger and umbreall projects. In case you experience problems, create an issue. In addition, be aware that Boundary loads the application and all of its dependencies (recursively) during compilation.
+This library has been used in smaller production projects for about a year. It is not tested on larger and umbrella projects. In case you experience problems, create an issue. In addition, be aware that Boundary loads the application and all of its dependencies (recursively) during compilation.
 
 ## Documentation
 
