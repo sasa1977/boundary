@@ -220,11 +220,21 @@ defmodule Boundary.Checker do
   end
 
   defp with_ancestors(view, boundary, fetch_fun) do
-    [boundary]
-    |> Stream.concat(Stream.map(boundary.ancestors, &Boundary.fetch!(view, &1)))
-    |> Stream.take_while(&(&1.type != :strict))
-    |> Stream.flat_map(&fetch_fun.(&1))
-    |> MapSet.new()
+    {result, _} =
+      [boundary]
+      |> Stream.concat(Stream.map(boundary.ancestors, &Boundary.fetch!(view, &1)))
+      |> Enum.flat_map_reduce(
+        :continue,
+        fn
+          _boundary, :halt ->
+            {:halt, nil}
+
+          boundary, :continue ->
+            {fetch_fun.(boundary), if(boundary.type == :strict, do: :halt, else: :continue)}
+        end
+      )
+
+    MapSet.new(result)
   end
 
   defp cross_ref_allowed?(view, from_boundary, to_boundary, reference) do
