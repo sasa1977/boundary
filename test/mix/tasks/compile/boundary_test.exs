@@ -1125,6 +1125,49 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
       end)
     end
 
+    test "removes warning on recompile when recompiled module has no external calls" do
+      module1 = unique_module_name()
+      module2 = unique_module_name()
+
+      TestProject.in_project(fn project ->
+        File.write!(
+          Path.join([project.path, "lib", "mod1.ex"]),
+          """
+          defmodule #{module1} do
+            use Boundary
+            def run, do: #{module2}.run()
+          end
+          """
+        )
+
+        File.write!(
+          Path.join([project.path, "lib", "mod2.ex"]),
+          """
+          defmodule #{module2} do
+            use Boundary
+            def run, do: :ok
+          end
+          """
+        )
+
+        # compile to force internal caching in compiler
+        [_] = TestProject.compile().warnings
+
+        # remove dep to boundary 2
+        File.write!(
+          Path.join([project.path, "lib", "mod1.ex"]),
+          """
+          defmodule #{module1} do
+            use Boundary
+            def run, do: :ok
+          end
+          """
+        )
+
+        assert TestProject.compile().warnings == []
+      end)
+    end
+
     test "correctly reports errors if referenced externals change" do
       module1 = unique_module_name()
 
