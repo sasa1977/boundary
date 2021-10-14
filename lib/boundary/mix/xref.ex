@@ -27,8 +27,13 @@ defmodule Boundary.Mix.Xref do
 
   @spec record(module, map) :: :ok
   def record(from, entry) do
-    if :ets.insert_new(@seen_table, {from}), do: :ets.delete(@entries_table, from)
     :ets.insert(@entries_table, {from, entry})
+    :ok
+  end
+
+  @spec initialize_module(module) :: :ok
+  def initialize_module(module) do
+    if :ets.insert_new(@seen_table, {module}), do: :ets.delete(@entries_table, module)
     :ok
   end
 

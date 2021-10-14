@@ -102,6 +102,12 @@ defmodule Mix.Tasks.Compile.Boundary do
     record(to_module, meta, env, mode, :call)
   end
 
+  def trace({local, _meta, _to_module, _name, _arity}, env)
+      when local in ~w/local_function local_macro/a,
+      # We need to initialize module although we're not going to record the call, to correctly remove previously
+      # recorded entries when the module is recompiled.
+      do: initialize_module(env.module)
+
   def trace({:struct_expansion, meta, to_module, _keys}, env),
     do: record(to_module, meta, env, :compile, :struct_expansion)
 
@@ -117,6 +123,10 @@ defmodule Mix.Tasks.Compile.Boundary do
   def trace(_event, _env), do: :ok
 
   defp record(to_module, meta, env, mode, type) do
+    # We need to initialize module even if we're not going to record the call, to correctly remove previously
+    # recorded entries when the module is recompiled.
+    initialize_module(env.module)
+
     unless env.module in [nil, to_module] or system_module?(to_module) or
              not String.starts_with?(Atom.to_string(to_module), "Elixir.") do
       Xref.record(
@@ -134,6 +144,9 @@ defmodule Mix.Tasks.Compile.Boundary do
 
     :ok
   end
+
+  defp initialize_module(module),
+    do: unless(is_nil(module), do: Xref.initialize_module(module))
 
   system_apps = ~w/elixir stdlib kernel/a
 
