@@ -178,7 +178,7 @@ defmodule Boundary do
 
   ## Dependencies
 
-  Each boundary may depend on other boundaries. These dependencies are used to defined allowed
+  Each boundary may depend on other boundaries. These dependencies are used to define allowed
   cross-boundary module usage. A module from another boundary may only be used if:
 
     - The callee boundary is a direct dependency of the caller boundary.
@@ -234,7 +234,7 @@ defmodule Boundary do
   boundary specifies `Ecto.Query` as a dependency, while another references `Ecto.Query.API`, then two boundaries are
   defined, and the latter will not be a part of the former.
 
-  In some cases you may want to completely prohibit the usage of some library. However, bare in mind that by default
+  In some cases you may want to completely prohibit the usage of some library. However, bear in mind that by default
   calls to an external application are restricted only if the client boundary references at least one dep boundary from
   that application. To force boundary to always restrict calls to some application, you can include the application in
   the check apps list:

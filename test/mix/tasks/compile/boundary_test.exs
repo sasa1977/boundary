@@ -733,6 +733,100 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   end
 
   module1 = unique_module_name()
+  module2 = unique_module_name()
+
+  module_test "boundary can export a non-root export of a sub-boundary",
+              """
+              defmodule #{module1} do
+                use Boundary, exports: [SubModule.Foo]
+
+                defmodule SubModule do
+                  use Boundary, exports: [Foo]
+
+                  defmodule Foo do def fun() do :ok end end
+                end
+              end
+
+              defmodule #{module2} do
+                use Boundary, deps: [#{module1}]
+                def fun(), do: #{module1}.SubModule.Foo.fun()
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
+  module_test "boundary can export an export of a sub-sub-boundary",
+              """
+              defmodule #{module1} do
+                use Boundary, exports: [SubBoundary.SubSubBoundary.Foo]
+
+                defmodule SubBoundary do
+                  use Boundary, exports: [SubSubBoundary.Foo]
+
+                  defmodule SubSubBoundary do
+                    use Boundary, exports: [Foo]
+
+                    defmodule Foo do def fun() do :ok end end
+                  end
+                end
+              end
+
+              defmodule #{module2} do
+                use Boundary, deps: [#{module1}]
+                def fun(), do: #{module1}.SubBoundary.SubSubBoundary.Foo.fun()
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can't export a non-exported module of a sub-boundary",
+              """
+              defmodule #{module1} do
+                use Boundary, exports: [SubModule.Foo]
+
+                defmodule SubModule do
+                  use Boundary
+
+                  defmodule Foo do end
+                end
+              end
+              """ do
+    assert [warning] = warnings
+
+    assert warning.message =~
+             "module #{unquote(module1)}.SubModule.Foo can't be exported because it's not a part of this boundary"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "boundary can't export an export of a sub-sub-boundary if not exported by the sub-boundary",
+              """
+              defmodule #{module1} do
+                use Boundary, exports: [SubBoundary, SubBoundary.SubSubBoundary.Foo]
+
+                defmodule SubBoundary do
+                  use Boundary, exports: [SubSubBoundary]
+
+                  defmodule SubSubBoundary do
+                    use Boundary, exports: [Foo]
+
+                    defmodule Foo do end
+                  end
+                end
+              end
+              """ do
+    assert [warning] = warnings
+
+    assert warning.message =~
+             "module #{unquote(module1)}.SubBoundary.SubSubBoundary.Foo can't be exported because it's not a part of this boundary"
+  end
+
+  module1 = unique_module_name()
 
   module_test "boundary is allowed to invoke exports of its direct children",
               """

@@ -98,6 +98,8 @@ defmodule Boundary.Checker do
   end
 
   defp validate_export(view, %{name: boundary_name} = boundary, export) do
+    owner_boundary = Boundary.for_module(view, export) || %{ancestors: [], name: nil}
+
     cond do
       is_nil(Boundary.app(view, export)) ->
         {:unknown_export, %{name: export, file: boundary.file, line: boundary.line}}
@@ -106,11 +108,23 @@ defmodule Boundary.Checker do
       match?(%{ancestors: [^boundary_name | _]}, Boundary.get(view, export)) ->
         nil
 
-      (Boundary.for_module(view, export) || %{name: nil}).name != boundary.name ->
+      # boundary can re-export exports of its descendants
+      export in first_child(view, owner_boundary, boundary_name).exports ->
+        nil
+
+      owner_boundary.name != boundary.name ->
         {:export_not_in_boundary, %{name: export, file: boundary.file, line: boundary.line}}
 
       true ->
         nil
+    end
+  end
+
+  defp first_child(view, boundary, boundary_name) do
+    case Boundary.parent(view, boundary) do
+      nil -> %{exports: []}
+      %{name: ^boundary_name} -> boundary
+      parent -> first_child(view, parent, boundary_name)
     end
   end
 
