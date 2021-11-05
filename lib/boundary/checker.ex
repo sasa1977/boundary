@@ -173,14 +173,10 @@ defmodule Boundary.Checker do
   end
 
   defp to_boundaries(view, reference) do
-    to_boundary = Boundary.for_module(view, reference.to)
-
-    # main sub-boundary module may also be exported by its parent
-    parent_boundary =
-      if not is_nil(to_boundary) and reference.to == to_boundary.name,
-        do: Boundary.parent(view, to_boundary)
-
-    Enum.reject([to_boundary, parent_boundary], &is_nil/1)
+    case Boundary.for_module(view, reference.to) do
+      nil -> []
+      boundary -> [boundary | Enum.map(boundary.ancestors, &Boundary.fetch!(view, &1))]
+    end
   end
 
   defp reference_error(_view, _reference, %{check: %{out: false}}, _to_boundaries), do: nil
