@@ -473,9 +473,27 @@ defmodule Boundary do
   sub-boundaries.
 
   This demonstrates the main purpose of sub-boundaries. They are a mechanism which allows you to control the
-  dependencies within the parent boundary. The parent boundary still gets to decide which of these sub-modules will it
+  dependencies within the parent boundary. The parent boundary still gets to decide which of these sub-modules it will
   export. In this example, `Articles` and `Accounts` are exported, while `Repo` isn't. The sub-boundaries decide what
   will they depend on themselves.
+
+  ### Exporting From Sub-Boundaries
+
+  The parent boundary may also re-export modules that are exported by its sub-boundaries. In the above example, if the
+  `Articles` context exports a struct (or Ecto schema) module named `Article`, then `BlogEngine` can choose to re-export
+  that module.
+
+  ```
+  defmodule BlogEngine do
+    use Boundary, exports: [Accounts, Articles, Articles.Article]
+  end
+
+  defmodule BlogEngine.Articles do
+    use Boundary, deps: [BlogEngine.{Accounts, Repo}], exports: [Article]
+  end
+  ```
+
+  The parent boundary may not export a module that isn't exported by its owner boundary.
 
   ### Dependencies
 
