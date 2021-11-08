@@ -160,7 +160,7 @@ defmodule Boundary.Checker do
   defp invalid_references(view, references) do
     for reference <- references,
         from_boundary = Boundary.for_module(view, reference.from),
-        to_boundaries = to_boundaries(view, reference),
+        to_boundaries = to_boundaries(view, from_boundary, reference),
         {type, to_boundary_name} <- [reference_error(view, reference, from_boundary, to_boundaries)] do
       {:invalid_reference,
        %{
@@ -172,10 +172,18 @@ defmodule Boundary.Checker do
     end
   end
 
-  defp to_boundaries(view, reference) do
+  defp to_boundaries(view, from_boundary, reference) do
     case Boundary.for_module(view, reference.to) do
-      nil -> []
-      boundary -> [boundary | Enum.map(boundary.ancestors, &Boundary.fetch!(view, &1))]
+      nil ->
+        []
+
+      boundary ->
+        target_boundaries =
+          boundary.ancestors
+          |> Enum.reject(&(&1 == from_boundary.name))
+          |> Enum.map(&Boundary.fetch!(view, &1))
+
+        [boundary | target_boundaries]
     end
   end
 
