@@ -97,17 +97,13 @@ defmodule Boundary.Checker do
     )
   end
 
-  defp validate_export(view, %{name: boundary_name} = boundary, export) do
+  defp validate_export(view, boundary, export) do
     cond do
       is_nil(Boundary.app(view, export)) ->
         {:unknown_export, %{name: export, file: boundary.file, line: boundary.line}}
 
-      # boundary can export top-level module of its direct child sub-boundary
-      match?(%{ancestors: [^boundary_name | _]}, Boundary.get(view, export)) ->
-        nil
-
       # boundary can re-export exports of its descendants
-      exported_by_child_subboundary?(view, boundary_name, export) ->
+      exported_by_child_subboundary?(view, boundary, export) ->
         nil
 
       (Boundary.for_module(view, export) || %{name: nil}).name != boundary.name ->
@@ -118,20 +114,21 @@ defmodule Boundary.Checker do
     end
   end
 
-  defp exported_by_child_subboundary?(view, boundary_name, export) do
-    owner_boundary = Boundary.for_module(view, export)
+  defp exported_by_child_subboundary?(view, boundary, export) do
+    case Boundary.for_module(view, export) do
+      nil ->
+        false
 
-    case first_child(view, owner_boundary, boundary_name) do
-      nil -> false
-      %{exports: exports} -> export in exports
-    end
-  end
-
-  defp first_child(view, boundary, boundary_name) do
-    case Boundary.parent(view, boundary) do
-      nil -> nil
-      %{name: ^boundary_name} -> boundary
-      parent -> first_child(view, parent, boundary_name)
+      owner_boundary ->
+        # Start with `owner_boundary`, go up the ancestors chain, and find the immediate child of `boundary`
+        owner_boundary
+        |> Stream.iterate(&Boundary.parent(view, &1))
+        |> Stream.take_while(&(not is_nil(&1)))
+        |> Enum.find(&(Enum.at(&1.ancestors, 0) == boundary.name))
+        |> case do
+          nil -> false
+          child_subboundary -> export in [child_subboundary.name | child_subboundary.exports]
+        end
     end
   end
 
