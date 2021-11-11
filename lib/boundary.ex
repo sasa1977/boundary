@@ -553,7 +553,7 @@ defmodule Boundary do
           deps: [{name, mode}],
           exports: [export],
           check: %{apps: [{atom, mode}], in: boolean, out: boolean, aliases: boolean},
-          type: :strict | :regular,
+          type: :strict | :relaxed,
           file: String.t(),
           line: pos_integer,
           implicit?: boolean,
