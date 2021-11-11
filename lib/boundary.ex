@@ -262,7 +262,7 @@ defmodule Boundary do
         # ...
         boundary: [
           default: [
-            check_apps: [{:mix, :runtime}]
+            check: [apps: [{:mix, :runtime}]]
           ]
         ]
       ]
