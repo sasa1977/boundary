@@ -97,13 +97,13 @@ defmodule Boundary.Checker do
     )
   end
 
-  defp validate_export(view, %{name: boundary_name} = boundary, export) do
+  defp validate_export(view, boundary, export) do
     cond do
       is_nil(Boundary.app(view, export)) ->
         {:unknown_export, %{name: export, file: boundary.file, line: boundary.line}}
 
-      # boundary can export top-level module of its direct child sub-boundary
-      match?(%{ancestors: [^boundary_name | _]}, Boundary.get(view, export)) ->
+      # boundary can re-export exports of its descendants
+      exported_by_child_subboundary?(view, boundary, export) ->
         nil
 
       (Boundary.for_module(view, export) || %{name: nil}).name != boundary.name ->
@@ -111,6 +111,24 @@ defmodule Boundary.Checker do
 
       true ->
         nil
+    end
+  end
+
+  defp exported_by_child_subboundary?(view, boundary, export) do
+    case Boundary.for_module(view, export) do
+      nil ->
+        false
+
+      owner_boundary ->
+        # Start with `owner_boundary`, go up the ancestors chain, and find the immediate child of `boundary`
+        owner_boundary
+        |> Stream.iterate(&Boundary.parent(view, &1))
+        |> Stream.take_while(&(not is_nil(&1)))
+        |> Enum.find(&(Enum.at(&1.ancestors, 0) == boundary.name))
+        |> case do
+          nil -> false
+          child_subboundary -> export in [child_subboundary.name | child_subboundary.exports]
+        end
     end
   end
 
@@ -139,7 +157,7 @@ defmodule Boundary.Checker do
   defp invalid_references(view, references) do
     for reference <- references,
         from_boundary = Boundary.for_module(view, reference.from),
-        to_boundaries = to_boundaries(view, reference),
+        to_boundaries = to_boundaries(view, from_boundary, reference),
         {type, to_boundary_name} <- [reference_error(view, reference, from_boundary, to_boundaries)] do
       {:invalid_reference,
        %{
@@ -151,15 +169,19 @@ defmodule Boundary.Checker do
     end
   end
 
-  defp to_boundaries(view, reference) do
-    to_boundary = Boundary.for_module(view, reference.to)
+  defp to_boundaries(view, from_boundary, reference) do
+    case Boundary.for_module(view, reference.to) do
+      nil ->
+        []
 
-    # main sub-boundary module may also be exported by its parent
-    parent_boundary =
-      if not is_nil(to_boundary) and reference.to == to_boundary.name,
-        do: Boundary.parent(view, to_boundary)
+      boundary ->
+        target_boundaries =
+          boundary.ancestors
+          |> Enum.reject(&(&1 == from_boundary.name))
+          |> Enum.map(&Boundary.fetch!(view, &1))
 
-    Enum.reject([to_boundary, parent_boundary], &is_nil/1)
+        [boundary | target_boundaries]
+    end
   end
 
   defp reference_error(_view, _reference, %{check: %{out: false}}, _to_boundaries), do: nil
