@@ -579,6 +579,19 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
   module1 = unique_module_name()
 
+  module_test "may reference a protocol implementation",
+              """
+              defmodule #{module1} do
+                use Boundary, deps: [LibWithoutBoundaries.SomeProtocol]
+                def fun(), do: LibWithoutBoundaries.SomeProtocol.Any.foo(1)
+              end
+
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+
   module_test "compile-time dependencies are allowed at compile time, but not at runtime",
               """
               defmodule #{module1} do
@@ -1452,6 +1465,15 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
           defmodule LibWithoutBoundaries.Module4 do
             def fun(), do: :ok
+          end
+
+
+          defprotocol LibWithoutBoundaries.SomeProtocol do
+            def foo(bar)
+          end
+
+          defimpl LibWithoutBoundaries.SomeProtocol, for: Any do
+            def foo(_bar), do: :ok
           end
 
           defmodule Mix.MyTask do
