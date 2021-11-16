@@ -119,12 +119,8 @@ defmodule Boundary do
   one case to another. In some cases, a protocol implementation might be a UI concern, while in
   others, it might be a domain concern.
 
-  For these reasons, protocol implementations are treated in a special way. A protocol
-  implementation is by default unclassified (it doesn't belong to any boundary). However, the
-  boundary checker will not emit a warning for unclassified protocol implementations.
-
-  However, you can manually classify the protocol implementation, as demonstrated in the following
-  example:
+  For these reasons, calls from a protocol implementation are by default not checked. However, you
+  can manually classify the protocol implementation, as follows:
 
   ```
   defimpl String.Chars, for: MySchema do
@@ -132,6 +128,10 @@ defmodule Boundary do
     # ...
   end
   ```
+
+  In this case, the protocol implementation is considered to be a part of the `MySystem` boundary,
+  and the code will be checked for cross-boundary calls.
+
 
   Note that `:classify_to` option is only allowed for protocol implementations and mix tasks.
   Other modules can't be manually classified.

@@ -156,6 +156,8 @@ defmodule Boundary.Checker do
 
   defp invalid_references(view, references) do
     for reference <- references,
+        # ignore references from unclassified protocol impls
+        not (Boundary.protocol_impl?(reference.from) and is_nil(Boundary.Definition.classified_to(reference.from))),
         from_boundary = Boundary.for_module(view, reference.from),
         to_boundaries = to_boundaries(view, from_boundary, reference),
         {type, to_boundary_name} <- [reference_error(view, reference, from_boundary, to_boundaries)] do

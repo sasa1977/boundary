@@ -69,10 +69,7 @@ defmodule Boundary.Classifier do
   defp find_boundary(trie, module) when is_atom(module) do
     case Boundary.Definition.classified_to(module) do
       nil ->
-        # protocol implementation is ignored
-        if Boundary.protocol_impl?(module),
-          do: nil,
-          else: find_boundary(trie, Module.split(module))
+        find_boundary(trie, Module.split(module))
 
       classified_to ->
         # If we can't find `classified_to`, it's an error in definition (like e.g. classifying to a reclassified
