@@ -3,10 +3,22 @@
 defmodule Boundary.Definition do
   @moduledoc false
 
-  def generate(opts) do
-    # We'll store the definition as an encoded binary. This will avoid adding any runtime or
-    # compile time dependencies to referenced modules (deps and exports).
-    opts = :erlang.term_to_binary(opts)
+  def generate(opts, env) do
+    opts =
+      opts
+      # This ensures that alias references (e.g. deps, exports) are treated by the compiler as runtime dependencies.
+      |> Macro.prewalk(fn term ->
+        with {:__aliases__, _, _} <- term,
+             # This ensures that dependency to the reference is treated by the compiler as a runtime dep.
+             # Strictly speaking this is not needed, since this function runs after the compilation.
+             # However, we'll still do it because it's not dangerous, and it might reduce compilation time
+             # in stateful compilers, such as ElixirLS.
+             do: Macro.expand(term, %{env | function: {:boundary, 1}})
+      end)
+      |> Enum.map(fn opt ->
+        with {key, references} when key in ~w/deps exports/a and is_list(references) <- opt,
+             do: {key, expand_references(references)}
+      end)
 
     quote bind_quoted: [opts: opts, app: Keyword.fetch!(Mix.Project.config(), :app)] do
       @opts opts
@@ -17,6 +29,19 @@ defmodule Boundary.Definition do
       # a protocol, which we can only do right before the module is about to be compiled.
       @before_compile Boundary.Definition
     end
+  end
+
+  defp expand_references(references) do
+    Enum.flat_map(
+      references,
+      fn
+        reference ->
+          case Macro.decompose_call(reference) do
+            {parent, :{}, children} -> Enum.map(children, &Module.concat(parent, &1))
+            _ -> [reference]
+          end
+      end
+    )
   end
 
   @doc false
@@ -42,22 +67,24 @@ defmodule Boundary.Definition do
   end
 
   def get(boundary) do
-    with decoded when not is_nil(decoded) <- decode(boundary) do
-      case Keyword.pop(decoded.opts, :classify_to, nil) do
+    with definition when not is_nil(definition) <- definition(boundary) do
+      case Keyword.pop(definition.opts, :classify_to, nil) do
         {nil, opts} ->
-          normalize(decoded.app, boundary, opts, decoded.env)
+          normalize(definition.app, boundary, opts, definition.env)
 
         {classify_to, opts} ->
-          decoded_target = decode(classify_to)
+          target_definition = definition(classify_to)
 
           cond do
-            is_nil(decoded_target) or Keyword.get(decoded_target.opts, :classify_to) != nil ->
-              normalize(decoded.app, boundary, opts, decoded.env)
-              |> add_errors([{:unknown_boundary, name: classify_to, file: decoded.env.file, line: decoded.env.line}])
+            is_nil(target_definition) or Keyword.get(target_definition.opts, :classify_to) != nil ->
+              normalize(definition.app, boundary, opts, definition.env)
+              |> add_errors([
+                {:unknown_boundary, name: classify_to, file: definition.env.file, line: definition.env.line}
+              ])
 
-            not decoded.protocol? and not decoded.mix_task? ->
-              normalize(decoded.app, boundary, opts, decoded.env)
-              |> add_errors([{:cant_reclassify, name: boundary, file: decoded.env.file, line: decoded.env.line}])
+            not definition.protocol? and not definition.mix_task? ->
+              normalize(definition.app, boundary, opts, definition.env)
+              |> add_errors([{:cant_reclassify, name: boundary, file: definition.env.file, line: definition.env.line}])
 
             true ->
               nil
@@ -67,69 +94,21 @@ defmodule Boundary.Definition do
   end
 
   def classified_to(module) do
-    with decoded when not is_nil(decoded) <- decode(module),
-         {:ok, boundary} <- Keyword.fetch(decoded.opts, :classify_to),
-         true <- decoded.protocol? or decoded.mix_task? do
-      %{boundary: boundary, file: decoded.env.file, line: decoded.env.line}
+    with definition when not is_nil(definition) <- definition(module),
+         {:ok, boundary} <- Keyword.fetch(definition.opts, :classify_to),
+         true <- definition.protocol? or definition.mix_task? do
+      %{boundary: boundary, file: definition.env.file, line: definition.env.line}
     else
       _ -> nil
     end
   end
 
-  defp decode(boundary) do
+  defp definition(boundary) do
     with true <- :code.get_object_code(boundary) != :error,
-         [definition] <- Keyword.get(boundary.__info__(:attributes), Boundary) do
-      # taking only a relevant subset of compile-time env, because otherwise `eval_quoted` may crash if it's running
-      # on a different node than the one used for compilation
-      env = definition.env |> Map.take(~w/aliases file line macro_aliases macros requires/a) |> Map.to_list()
-
-      Map.update!(
-        definition,
-        :opts,
-        fn encoded ->
-          {decoded, _} =
-            encoded
-            |> :erlang.binary_to_term()
-            |> Enum.map(fn
-              {key, references} when key in ~w/deps exports/a and is_list(references) ->
-                {key, expand_references(references, definition.env)}
-
-              other ->
-                other
-            end)
-            |> Code.eval_quoted([], env)
-
-          decoded
-        end
-      )
-    else
-      _ -> nil
-    end
+         [definition] <- Keyword.get(boundary.__info__(:attributes), Boundary),
+         do: definition,
+         else: (_ -> nil)
   end
-
-  defp expand_references(references, env) do
-    Enum.flat_map(
-      references,
-      fn
-        reference ->
-          case Macro.decompose_call(reference) do
-            {parent, :{}, children} ->
-              parent = expand_as_runtime_dep(parent, env)
-              Enum.map(children, &Module.concat(parent, expand_as_runtime_dep(&1, env)))
-
-            _ ->
-              [expand_as_runtime_dep(reference, env)]
-          end
-      end
-    )
-  end
-
-  defp expand_as_runtime_dep(reference, env),
-    # This ensures that dependency to the reference is treated by the compiler as a runtime dep.
-    # Strictly speaking this is not needed, since this function runs after the compilation.
-    # However, we'll still do it because it's not dangerous, and it might reduce compilation time
-    # in stateful compilers, such as ElixirLS.
-    do: Macro.expand(reference, %{env | function: {:boundary, 1}})
 
   @doc false
   def normalize(app, boundary, definition, env) do
