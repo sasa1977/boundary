@@ -136,9 +136,9 @@ defmodule Boundary.View do
             implicit_boundaries
             |> Map.get(app, [])
             |> Enum.map(fn
-              {dep, user_boundary} ->
+              {dep, _user_boundary} ->
                 app
-                |> Boundary.Definition.normalize(dep, [], user_boundary)
+                |> Boundary.Definition.normalize(dep, [])
                 |> Map.merge(%{name: dep, implicit?: true, top_level?: true, exports: [dep]})
             end)
           end

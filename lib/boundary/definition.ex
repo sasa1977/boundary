@@ -20,9 +20,11 @@ defmodule Boundary.Definition do
              do: {key, expand_references(references)}
       end)
 
-    quote bind_quoted: [opts: opts, app: Keyword.fetch!(Mix.Project.config(), :app)] do
+    pos = Macro.escape(%{file: env.file, line: env.line})
+
+    quote bind_quoted: [opts: opts, app: Keyword.fetch!(Mix.Project.config(), :app), pos: pos] do
       @opts opts
-      @env __ENV__
+      @pos pos
       @app app
 
       # Definition will be injected before compile, because we need to check if this module is
@@ -57,7 +59,7 @@ defmodule Boundary.Definition do
         Boundary,
         %{
           opts: @opts,
-          env: @env,
+          pos: @pos,
           app: @app,
           protocol?: protocol?,
           mix_task?: mix_task?
@@ -70,21 +72,21 @@ defmodule Boundary.Definition do
     with definition when not is_nil(definition) <- definition(boundary) do
       case Keyword.pop(definition.opts, :classify_to, nil) do
         {nil, opts} ->
-          normalize(definition.app, boundary, opts, definition.env)
+          normalize(definition.app, boundary, opts, definition.pos)
 
         {classify_to, opts} ->
           target_definition = definition(classify_to)
 
           cond do
             is_nil(target_definition) or Keyword.get(target_definition.opts, :classify_to) != nil ->
-              normalize(definition.app, boundary, opts, definition.env)
+              normalize(definition.app, boundary, opts, definition.pos)
               |> add_errors([
-                {:unknown_boundary, name: classify_to, file: definition.env.file, line: definition.env.line}
+                {:unknown_boundary, name: classify_to, file: definition.pos.file, line: definition.pos.line}
               ])
 
             not definition.protocol? and not definition.mix_task? ->
-              normalize(definition.app, boundary, opts, definition.env)
-              |> add_errors([{:cant_reclassify, name: boundary, file: definition.env.file, line: definition.env.line}])
+              normalize(definition.app, boundary, opts, definition.pos)
+              |> add_errors([{:cant_reclassify, name: boundary, file: definition.pos.file, line: definition.pos.line}])
 
             true ->
               nil
@@ -97,7 +99,7 @@ defmodule Boundary.Definition do
     with definition when not is_nil(definition) <- definition(module),
          {:ok, boundary} <- Keyword.fetch(definition.opts, :classify_to),
          true <- definition.protocol? or definition.mix_task? do
-      %{boundary: boundary, file: definition.env.file, line: definition.env.line}
+      %{boundary: boundary, file: definition.pos.file, line: definition.pos.line}
     else
       _ -> nil
     end
@@ -111,18 +113,18 @@ defmodule Boundary.Definition do
   end
 
   @doc false
-  def normalize(app, boundary, definition, env) do
+  def normalize(app, boundary, definition, pos \\ %{file: nil, line: nil}) do
     definition
-    |> normalize!(app, env)
+    |> normalize!(app, pos)
     |> normalize_check()
     |> normalize_exports(boundary)
     |> normalize_deps()
   end
 
-  defp normalize!(user_opts, app, env) do
+  defp normalize!(user_opts, app, pos) do
     defaults()
     |> Map.merge(project_defaults(user_opts))
-    |> Map.merge(%{file: env.file, line: env.line, app: app})
+    |> Map.merge(%{file: pos.file, line: pos.line, app: app})
     |> merge_user_opts(user_opts)
     |> validate(&if &1.type not in ~w/strict relaxed/a, do: :invalid_type)
   end
