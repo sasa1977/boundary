@@ -1,3 +1,14 @@
+# 0.9.0
+
+- Support exporting modules of sub-boundaries.
+
+## Bugfixes
+
+- Properly handle `:strict` scope in sub-boundaries.
+- Remove compilation warnings when the recompiled module has no external calls
+- Allow references to protocol implementations from externals
+- Fix a compilation crash
+
 # 0.8.0
 
 - Reports forbidden struct expansions (`%Foo{...}`)
