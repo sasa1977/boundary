@@ -1194,6 +1194,37 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     assert length(warnings) == 1
   end
 
+  test "references to other boundaries don't introduce compile-time deps" do
+    module1 = unique_module_name()
+    module2 = unique_module_name()
+
+    TestProject.in_project(fn project ->
+      File.write!(
+        Path.join([project.path, "lib", "mod1.ex"]),
+        """
+        defmodule #{module1} do
+          use Boundary, deps: [#{module2}]
+          def run, do: #{module2}.run()
+        end
+        """
+      )
+
+      File.write!(
+        Path.join([project.path, "lib", "mod2.ex"]),
+        """
+        defmodule #{module2} do
+          use Boundary
+          def run, do: :ok
+        end
+        """
+      )
+
+      TestProject.compile()
+
+      assert TestProject.run_task("xref", ~w[callers #{module2} --format plain]).output == "lib/mod1.ex (runtime)"
+    end)
+  end
+
   describe "recompilation tests" do
     setup do
       Mix.shell(Mix.Shell.Process)

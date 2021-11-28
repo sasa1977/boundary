@@ -545,7 +545,7 @@ defmodule Boundary do
   require Boundary.Definition
   alias Boundary.{Definition, View}
 
-  Code.eval_quoted(Definition.generate(deps: [mix: :runtime], exports: []), [], __ENV__)
+  Code.eval_quoted(Definition.generate([deps: [mix: :runtime], exports: []], __ENV__), [], __ENV__)
 
   @type t :: %{
           name: name,
@@ -584,7 +584,7 @@ defmodule Boundary do
         }
 
   @doc false
-  defmacro __using__(opts), do: Definition.generate(opts)
+  defmacro __using__(opts), do: Definition.generate(opts, __CALLER__)
 
   @spec view(atom) :: view
   def view(app), do: View.build(app)
