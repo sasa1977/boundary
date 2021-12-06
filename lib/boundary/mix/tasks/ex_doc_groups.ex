@@ -73,7 +73,7 @@ defmodule Mix.Tasks.Boundary.ExDocGroups do
   end
 
   defp file_contents(header, data) do
-    [Code.format_string!(header <> inspect(data)), "\n"]
+    [Code.format_string!(header <> inspect(data, limit: :infinity)), "\n"]
   end
 
   defp module_name_to_group_key(name) do
