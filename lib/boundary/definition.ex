@@ -6,14 +6,15 @@ defmodule Boundary.Definition do
   def generate(opts, env) do
     opts =
       opts
-      # This ensures that alias references (e.g. deps, exports) are treated by the compiler as runtime dependencies.
+      # This ensures that alias references passed to `use Boundary` (e.g. deps, exports) are not
+      # treated as dependencies (neither compile-time nor runtime) by the Elixir compiler.
+      #
+      # For example, invoking `use Boundary, deps: [MySystem]` in `MySystemWeb` won't add a
+      # dependency from `MySystemWeb` to `MySystem`. We can do this safely here since we're not
+      # injecting any calls to the modules referenced in `opts`.
       |> Macro.prewalk(fn term ->
         with {:__aliases__, _, _} <- term,
-             # This ensures that dependency to the reference is treated by the compiler as a runtime dep.
-             # Strictly speaking this is not needed, since this function runs after the compilation.
-             # However, we'll still do it because it's not dangerous, and it might reduce compilation time
-             # in stateful compilers, such as ElixirLS.
-             do: Macro.expand(term, %{env | function: {:boundary, 1}})
+             do: Macro.expand(term, %{env | function: {:boundary, 1}, lexical_tracker: nil})
       end)
       |> Enum.map(fn opt ->
         with {key, references} when key in ~w/deps exports/a and is_list(references) <- opt,

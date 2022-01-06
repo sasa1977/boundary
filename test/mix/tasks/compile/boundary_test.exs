@@ -1194,7 +1194,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     assert length(warnings) == 1
   end
 
-  test "references to other boundaries don't introduce compile-time deps" do
+  test "references to other boundaries don't introduce deps" do
     module1 = unique_module_name()
     module2 = unique_module_name()
 
@@ -1204,7 +1204,6 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
         """
         defmodule #{module1} do
           use Boundary, deps: [#{module2}]
-          def run, do: #{module2}.run()
         end
         """
       )
@@ -1221,7 +1220,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
       TestProject.compile()
 
-      assert TestProject.run_task("xref", ~w[callers #{module2} --format plain]).output == "lib/mod1.ex (runtime)"
+      assert TestProject.run_task("xref", ~w[callers #{module2} --format plain]).output == ""
     end)
   end
 
