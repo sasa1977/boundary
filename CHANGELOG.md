@@ -1,3 +1,7 @@
+# 0.9.1
+
+- Remove unwanted cross-module deps
+
 # 0.9.0
 
 - Support exporting modules of sub-boundaries.
