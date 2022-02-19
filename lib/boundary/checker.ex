@@ -226,7 +226,7 @@ defmodule Boundary.Checker do
         tag = if Enum.member?(from_boundary.deps, {to_boundary.name, :compile}), do: :runtime, else: :normal
         {tag, to_boundary.name}
 
-      not exported?(to_boundary, reference.to) ->
+      not exported?(view, to_boundary, reference.to) ->
         {:not_exported, to_boundary.name}
 
       true ->
@@ -303,15 +303,18 @@ defmodule Boundary.Checker do
   defp cross_app_ref?(view, reference),
     do: Boundary.app(view, reference.from) != Boundary.app(view, reference.to)
 
-  defp exported?(boundary, module),
-    do: boundary.implicit? or module == boundary.name or Enum.any?(boundary.exports, &export_matches?(&1, module))
+  defp exported?(view, boundary, module),
+    do:
+      boundary.implicit? or module == boundary.name or
+        Enum.any?(boundary.exports, &export_matches?(view, boundary, &1, module))
 
-  defp export_matches?(module, module), do: true
+  defp export_matches?(_view, _boundary, module, module), do: true
 
-  defp export_matches?({root, opts}, module) do
+  defp export_matches?(view, boundary, {root, opts}, module) do
     String.starts_with?(to_string(module), to_string(root)) and
-      not Enum.any?(Keyword.get(opts, :except, []), &(Module.concat(root, &1) == module))
+      not Enum.any?(Keyword.get(opts, :except, []), &(Module.concat(root, &1) == module)) and
+      (Boundary.for_module(view, module) == boundary or exported_by_child_subboundary?(view, boundary, module))
   end
 
-  defp export_matches?(_, _), do: false
+  defp export_matches?(_, _, _, _), do: false
 end

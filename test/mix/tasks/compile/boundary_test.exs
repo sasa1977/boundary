@@ -796,6 +796,32 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   end
 
   module1 = unique_module_name()
+  module2 = unique_module_name()
+
+  module_test "boundary can mass-export an export of a sub-boundary",
+              """
+              defmodule #{module1} do
+                use Boundary, exports: [{SubBoundary, []}]
+
+                defmodule SubBoundary do
+                  use Boundary, exports: [Foo]
+
+                  defmodule Foo do def bar, do: :ok end
+                end
+              end
+
+              defmodule #{module2} do
+                use Boundary, deps: [#{module1}]
+
+                def foo do
+                  #{module1}.SubBoundary.Foo.bar()
+                end
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
 
   module_test "boundary can't export a non-exported module of a sub-boundary",
               """
@@ -813,6 +839,35 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
     assert warning.message =~
              "module #{unquote(module1)}.SubModule.Foo can't be exported because it's not a part of this boundary"
+  end
+
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
+  module_test "non-exported module of a sub-boundary isn't included in a mass export list of the parent boundary",
+              """
+              defmodule #{module1} do
+                use Boundary, exports: [{SubBoundary, []}]
+
+                defmodule SubBoundary do
+                  use Boundary
+
+                  defmodule Foo do def bar, do: :ok end
+                end
+              end
+
+              defmodule #{module2} do
+                use Boundary, deps: [#{module1}]
+
+                def foo do
+                  #{module1}.SubBoundary.Foo.bar()
+                end
+              end
+              """ do
+    assert [warning] = warnings
+
+    assert warning.message =~
+             "forbidden reference to #{unquote(module1)}.SubBoundary.Foo"
   end
 
   module1 = unique_module_name()
