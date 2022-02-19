@@ -303,10 +303,10 @@ defmodule Boundary.Checker do
   defp cross_app_ref?(view, reference),
     do: Boundary.app(view, reference.from) != Boundary.app(view, reference.to)
 
-  defp exported?(view, boundary, module),
-    do:
-      boundary.implicit? or module == boundary.name or
-        Enum.any?(boundary.exports, &export_matches?(view, boundary, &1, module))
+  defp exported?(view, boundary, module) do
+    boundary.implicit? or module == boundary.name or
+      Enum.any?(boundary.exports, &export_matches?(view, boundary, &1, module))
+  end
 
   defp export_matches?(_view, _boundary, module, module), do: true
 
