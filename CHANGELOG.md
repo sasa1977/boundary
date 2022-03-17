@@ -1,3 +1,8 @@
+# 0.9.2
+
+- Properly handle sub-boundary exports on mass export
+- Improve tracer performance
+
 # 0.9.1
 
 - Remove unwanted cross-module deps
