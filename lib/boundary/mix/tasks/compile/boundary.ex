@@ -153,9 +153,10 @@ defmodule Mix.Tasks.Compile.Boundary do
   system_apps
   |> Stream.each(&Application.load/1)
   |> Stream.flat_map(&Application.spec(&1, :modules))
+  |> Stream.concat(:erlang.pre_loaded())
   |> Enum.each(fn module -> defp system_module?(unquote(module)), do: true end)
 
-  defp system_module?(module), do: :code.which(module) == :preloaded
+  defp system_module?(_module), do: false
 
   defp after_compiler({:error, _} = status, _argv), do: status
 
