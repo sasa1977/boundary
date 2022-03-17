@@ -148,11 +148,14 @@ defmodule Mix.Tasks.Compile.Boundary do
   defp initialize_module(module),
     do: unless(is_nil(module), do: Xref.initialize_module(module))
 
+  # Building the list of "system modules", which we'll exclude from the traced data, to reduce the collected data and
+  # processing time.
   system_apps = ~w/elixir stdlib kernel/a
 
   system_apps
   |> Stream.each(&Application.load/1)
   |> Stream.flat_map(&Application.spec(&1, :modules))
+  # We'll also include so called preloaded modules (e.g. `:erlang`, `:init`), which are not a part of any app.
   |> Stream.concat(:erlang.pre_loaded())
   |> Enum.each(fn module -> defp system_module?(unquote(module)), do: true end)
 
