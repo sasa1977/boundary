@@ -2,9 +2,6 @@ defmodule Boundary.Mix.Xref do
   @moduledoc false
   use GenServer
 
-  @entries_table __MODULE__.Entries
-  @seen_table __MODULE__.Seen
-
   @type entry :: %{
           to: module,
           from: module,
@@ -17,23 +14,24 @@ defmodule Boundary.Mix.Xref do
 
   @spec start_link :: GenServer.on_start()
   def start_link do
-    result = GenServer.start_link(__MODULE__, nil, name: __MODULE__)
+    # The GenServer name (and ets tables) must contain app name, to properly work in umbrellas.
+    result = GenServer.start_link(__MODULE__, nil, name: :"#{__MODULE__}.#{Boundary.Mix.app_name()}")
 
     if match?({:ok, _pid}, result) or match?({:error, {:already_started, _pid}}, result),
-      do: :ets.delete_all_objects(@seen_table)
+      do: :ets.delete_all_objects(seen_table())
 
     result
   end
 
   @spec record(module, map) :: :ok
   def record(from, entry) do
-    :ets.insert(@entries_table, {from, entry})
+    :ets.insert(entries_table(), {from, entry})
     :ok
   end
 
   @spec initialize_module(module) :: :ok
   def initialize_module(module) do
-    if :ets.insert_new(@seen_table, {module}), do: :ets.delete(@entries_table, module)
+    if :ets.insert_new(seen_table(), {module}), do: :ets.delete(entries_table(), module)
     :ok
   end
 
@@ -43,35 +41,35 @@ defmodule Boundary.Mix.Xref do
 
     stored_modules()
     |> Stream.reject(&MapSet.member?(app_modules, &1))
-    |> Enum.each(&:ets.delete(@entries_table, &1))
+    |> Enum.each(&:ets.delete(entries_table(), &1))
 
     app_modules
     |> Enum.map(&Task.async(fn -> compress_entries(&1) end))
     |> Enum.each(&Task.await(&1, :infinity))
 
-    :ets.delete_all_objects(@seen_table)
-    :ets.tab2file(@entries_table, to_charlist(Boundary.Mix.manifest_path("boundary")))
+    :ets.delete_all_objects(seen_table())
+    :ets.tab2file(entries_table(), to_charlist(Boundary.Mix.manifest_path("boundary_v2")))
   end
 
   @doc "Returns a lazy stream where each element is of type `t:Reference.t()`"
   @spec entries :: Enumerable.t()
   def entries do
-    :ets.tab2list(@entries_table)
+    :ets.tab2list(entries_table())
     |> Enum.map(fn {from_module, info} -> Map.put(info, :from, from_module) end)
   end
 
   @impl GenServer
   def init(nil) do
-    :ets.new(@seen_table, [:set, :public, :named_table, read_concurrency: true, write_concurrency: true])
+    :ets.new(seen_table(), [:set, :public, :named_table, read_concurrency: true, write_concurrency: true])
     read_manifest() || build_manifest()
     {:ok, %{}}
   end
 
-  defp build_manifest, do: :ets.new(@entries_table, [:named_table, :public, :duplicate_bag, write_concurrency: true])
+  defp build_manifest, do: :ets.new(entries_table(), [:named_table, :public, :duplicate_bag, write_concurrency: true])
 
   defp read_manifest do
-    unless Boundary.Mix.stale_manifest?("boundary") do
-      {:ok, table} = :ets.file2tab(String.to_charlist(Boundary.Mix.manifest_path("boundary")))
+    unless Boundary.Mix.stale_manifest?("boundary_v2") do
+      {:ok, table} = :ets.file2tab(String.to_charlist(Boundary.Mix.manifest_path("boundary_v2")))
       table
     end
   rescue
@@ -80,20 +78,20 @@ defmodule Boundary.Mix.Xref do
 
   defp stored_modules do
     Stream.unfold(
-      :ets.first(@entries_table),
+      :ets.first(entries_table()),
       fn
         :"$end_of_table" -> nil
-        key -> {key, :ets.next(@entries_table, key)}
+        key -> {key, :ets.next(entries_table(), key)}
       end
     )
   end
 
   defp compress_entries(module) do
-    :ets.take(@entries_table, module)
+    :ets.take(entries_table(), module)
     |> Enum.map(fn {^module, entry} -> entry end)
     |> drop_leading_aliases()
     |> dedup_entries()
-    |> Enum.each(&:ets.insert(@entries_table, {module, &1}))
+    |> Enum.each(&:ets.insert(entries_table(), {module, &1}))
   end
 
   defp drop_leading_aliases([entry, next_entry | rest]) do
@@ -121,4 +119,7 @@ defmodule Boundary.Mix.Xref do
     |> Enum.map(fn {_key, entries} -> Enum.min_by(entries, &Map.fetch!(prios, &1.type)) end)
     |> Enum.sort_by(&{&1.file, &1.line})
   end
+
+  defp seen_table, do: :"#{__MODULE__}.#{Boundary.Mix.app_name()}.Seen"
+  defp entries_table, do: :"#{__MODULE__}.#{Boundary.Mix.app_name()}.Entries"
 end
