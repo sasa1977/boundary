@@ -172,13 +172,24 @@ defmodule Mix.Tasks.Compile.Boundary do
     Code.put_compiler_option(:tracers, tracers)
     Xref.flush(Application.spec(Boundary.Mix.app_name(), :modules) || [])
 
+    # Caching of the built view for non-user apps. A user app is the main app of the project, and all local deps
+    # (in-umbrella and path deps). All other apps are library dependencies, and we're caching the boundary view of such
+    # apps, because that view isn't changing, and we want to avoid loading modules of those apps on every compilation,
+    # since that's very slow.
+    user_apps =
+      for {app, [_ | _] = opts} <- Keyword.get(Mix.Project.config(), :deps, []),
+          Enum.any?(opts, &(&1 == {:in_umbrella, true} or match?({:path, _}, &1))),
+          into: MapSet.new([Boundary.Mix.app_name()]),
+          do: app
+
     view =
       case Boundary.Mix.read_manifest("boundary_view") do
         nil -> rebuild_view()
-        view -> Boundary.View.refresh(view) || rebuild_view()
+        view -> Boundary.View.refresh(view, user_apps) || rebuild_view()
       end
 
-    Boundary.Mix.write_manifest("boundary_view", Boundary.View.drop_main_app(view))
+    stored_view = Enum.reduce(user_apps, %{view | unclassified_modules: MapSet.new()}, &Boundary.View.drop_app(&2, &1))
+    Boundary.Mix.write_manifest("boundary_view", stored_view)
 
     errors = check(view, Xref.entries())
     print_diagnostic_errors(errors)

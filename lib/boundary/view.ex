@@ -34,36 +34,46 @@ defmodule Boundary.View do
     }
   end
 
-  @spec refresh(t) :: t | nil
-  def refresh(%{version: unquote(Mix.Project.config()[:version])} = view) do
+  @spec refresh(t, [atom]) :: t | nil
+  def refresh(%{version: unquote(Mix.Project.config()[:version])} = view, apps) do
     module_to_app =
       for {app, _description, _vsn} <- Application.loaded_applications(),
           module <- app_modules(app),
-          into: %{},
+          into: view.module_to_app,
           do: {module, app}
 
     main_app_modules = app_modules(view.main_app)
-    main_app_boundaries = load_app_boundaries(view.main_app, main_app_modules, view.module_to_app)
+    main_app_boundaries = load_app_boundaries(view.main_app, main_app_modules, module_to_app)
 
     if MapSet.equal?(view.external_deps, all_external_deps(view.main_app, main_app_boundaries, module_to_app)) do
-      module_to_app = for module <- main_app_modules, into: view.module_to_app, do: {module, view.main_app}
-      classifier = Classifier.classify(view.classifier, main_app_modules, main_app_boundaries)
-      unclassified_modules = unclassified_modules(view.main_app, classifier.modules)
-      %{view | classifier: classifier, unclassified_modules: unclassified_modules, module_to_app: module_to_app}
+      view =
+        Enum.reduce(
+          apps,
+          %{view | module_to_app: module_to_app},
+          fn app, view ->
+            app_modules = app_modules(app)
+            module_to_app = for module <- app_modules, into: view.module_to_app, do: {module, app}
+            app_boundaries = load_app_boundaries(app, app_modules, module_to_app)
+            classifier = Classifier.classify(view.classifier, app_modules, app_boundaries)
+            %{view | classifier: classifier, module_to_app: module_to_app}
+          end
+        )
+
+      unclassified_modules = unclassified_modules(view.main_app, view.classifier.modules)
+      %{view | unclassified_modules: unclassified_modules}
     else
       nil
     end
   end
 
-  def refresh(_), do: nil
+  def refresh(_, _), do: nil
 
-  @spec drop_main_app(t) :: t
-  def drop_main_app(view) do
-    modules_to_delete = for {module, app} <- view.module_to_app, app == view.main_app, do: module
+  @spec drop_app(t, atom) :: t
+  def drop_app(view, app) do
+    modules_to_delete = for {module, ^app} <- view.module_to_app, do: module
     module_to_app = Map.drop(view.module_to_app, modules_to_delete)
-
-    classifier = Classifier.delete(view.classifier, view.main_app)
-    %{view | classifier: classifier, unclassified_modules: MapSet.new(), module_to_app: module_to_app}
+    classifier = Classifier.delete(view.classifier, app)
+    %{view | classifier: classifier, module_to_app: module_to_app}
   end
 
   defp classify(main_app, module_to_app) do
