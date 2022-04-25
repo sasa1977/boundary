@@ -545,7 +545,7 @@ defmodule Boundary do
   require Boundary.Definition
   alias Boundary.{Definition, View}
 
-  Code.eval_quoted(Definition.generate([deps: [mix: :runtime], exports: []], __ENV__), [], __ENV__)
+  Code.eval_quoted(Definition.generate([deps: [], exports: [:Definition]], __ENV__), [], __ENV__)
 
   @type t :: %{
           name: name,
