@@ -16,7 +16,6 @@ defmodule Mix.Tasks.Boundary.Spec do
       Boundary.Mix.app_name()
       |> Boundary.view()
       |> Boundary.all()
-      |> Stream.filter(&(&1.app == Boundary.Mix.app_name()))
       |> Enum.sort_by(& &1.name)
       |> Stream.map(&boundary_info/1)
       |> Enum.join("\n")

@@ -136,7 +136,7 @@ defmodule Boundary.Checker do
     graph = :digraph.new([:cyclic])
 
     try do
-      Enum.each(Boundary.all_names(view), &:digraph.add_vertex(graph, &1))
+      Enum.each(Boundary.all(view), &:digraph.add_vertex(graph, &1.name))
 
       for boundary <- Boundary.all(view),
           {dep, _type} <- boundary.deps,

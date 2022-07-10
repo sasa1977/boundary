@@ -20,7 +20,6 @@ defmodule Mix.Tasks.Boundary.Visualize do
 
     view
     |> Boundary.all()
-    |> Stream.filter(&(&1.app == Boundary.Mix.app_name() and (&1.check.in or &1.check.out)))
     |> Enum.group_by(&Boundary.parent(view, &1))
     |> Enum.each(fn {main_boundary, boundaries} ->
       nodes = build_nodes(view, main_boundary, boundaries)

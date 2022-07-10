@@ -53,7 +53,7 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
         boundary.check.out,
         app = Boundary.app(boundary_view, reference.to),
         app not in [:boundary, Boundary.Mix.app_name(), nil],
-        reduce: Enum.into(Boundary.all_names(boundary_view), %{}, &{&1, MapSet.new()}) do
+        reduce: Enum.into(Boundary.all(boundary_view), %{}, &{&1.name, MapSet.new()}) do
       acc ->
         Map.update(acc, boundary.name, MapSet.new([app]), &MapSet.put(&1, app))
     end

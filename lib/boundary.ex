@@ -545,7 +545,7 @@ defmodule Boundary do
   require Boundary.Definition
   alias Boundary.{Definition, View}
 
-  Code.eval_quoted(Definition.generate([deps: [mix: :runtime], exports: []], __ENV__), [], __ENV__)
+  Code.eval_quoted(Definition.generate([deps: [], exports: [:Definition]], __ENV__), [], __ENV__)
 
   @type t :: %{
           name: name,
@@ -590,23 +590,13 @@ defmodule Boundary do
   def view(app), do: View.build(app)
 
   @doc """
-  Returns definitions of all boundaries.
-
-  The result will include boundaries from other applications.
+  Returns definitions of all boundaries of the main app.
 
   You shouldn't access the data in this result directly, as it may change significantly without warnings. Use exported
   functions of this module to acquire the information you need.
   """
   @spec all(view) :: [t]
-  def all(view), do: Map.values(view.classifier.boundaries)
-
-  @doc """
-  Returns the names of all boundaries.
-
-  The result will include boundaries from other applications.
-  """
-  @spec all_names(view) :: [name]
-  def all_names(view), do: Map.keys(view.classifier.boundaries)
+  def all(view), do: view.classifier.boundaries |> Map.values() |> Enum.filter(&(&1.app == view.main_app))
 
   @doc "Returns the definition of the given boundary."
   @spec fetch!(view, name) :: t
