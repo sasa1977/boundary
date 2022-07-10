@@ -1,3 +1,7 @@
+# 0.9.3
+
+- Fix inconsistent behaviour in umbrella/poncho projects.
+
 # 0.9.2
 
 - Properly handle sub-boundary exports on mass export
