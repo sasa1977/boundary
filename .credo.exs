@@ -16,7 +16,8 @@
 
         # disabled checks
         {Credo.Check.Design.TagTODO, false},
-        {Credo.Check.Design.AliasUsage, false}
+        {Credo.Check.Design.AliasUsage, false},
+        {Credo.Check.Readability.MaxLineLength, false}
       ]
     }
   ]
