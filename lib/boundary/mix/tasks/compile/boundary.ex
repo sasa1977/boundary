@@ -161,39 +161,44 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   defp system_module?(_module), do: false
 
-  defp after_compiler({:error, _} = status, _argv), do: status
-
-  defp after_compiler({status, diagnostics}, argv) when status in [:ok, :noop] do
-    # We're reloading the app to make sure we have the latest version. This fixes potential stale state in ElixirLS.
-    Application.unload(Boundary.Mix.app_name())
-    Application.load(Boundary.Mix.app_name())
-
+  defp after_compiler({status, diagnostics} = outcome, argv) do
     tracers = Enum.reject(Code.get_compiler_option(:tracers), &(&1 == __MODULE__))
     Code.put_compiler_option(:tracers, tracers)
-    Xref.flush(Application.spec(Boundary.Mix.app_name(), :modules) || [])
 
-    # Caching of the built view for non-user apps. A user app is the main app of the project, and all local deps
-    # (in-umbrella and path deps). All other apps are library dependencies, and we're caching the boundary view of such
-    # apps, because that view isn't changing, and we want to avoid loading modules of those apps on every compilation,
-    # since that's very slow.
-    user_apps =
-      for {app, [_ | _] = opts} <- Keyword.get(Mix.Project.config(), :deps, []),
-          Enum.any?(opts, &(&1 == {:in_umbrella, true} or match?({:path, _}, &1))),
-          into: MapSet.new([Boundary.Mix.app_name()]),
-          do: app
+    if status in [:ok, :noop] do
+      # We're reloading the app to make sure we have the latest version. This fixes potential stale state in ElixirLS.
+      Application.unload(Boundary.Mix.app_name())
+      Application.load(Boundary.Mix.app_name())
 
-    view =
-      case Boundary.Mix.read_manifest("boundary_view") do
-        nil -> rebuild_view()
-        view -> Boundary.View.refresh(view, user_apps) || rebuild_view()
-      end
+      Xref.flush(Application.spec(Boundary.Mix.app_name(), :modules) || [])
 
-    stored_view = Enum.reduce(user_apps, %{view | unclassified_modules: MapSet.new()}, &Boundary.View.drop_app(&2, &1))
-    Boundary.Mix.write_manifest("boundary_view", stored_view)
+      # Caching of the built view for non-user apps. A user app is the main app of the project, and all local deps
+      # (in-umbrella and path deps). All other apps are library dependencies, and we're caching the boundary view of such
+      # apps, because that view isn't changing, and we want to avoid loading modules of those apps on every compilation,
+      # since that's very slow.
+      user_apps =
+        for {app, [_ | _] = opts} <- Keyword.get(Mix.Project.config(), :deps, []),
+            Enum.any?(opts, &(&1 == {:in_umbrella, true} or match?({:path, _}, &1))),
+            into: MapSet.new([Boundary.Mix.app_name()]),
+            do: app
 
-    errors = check(view, Xref.entries())
-    print_diagnostic_errors(errors)
-    {status(errors, argv), diagnostics ++ errors}
+      view =
+        case Boundary.Mix.read_manifest("boundary_view") do
+          nil -> rebuild_view()
+          view -> Boundary.View.refresh(view, user_apps) || rebuild_view()
+        end
+
+      stored_view =
+        Enum.reduce(user_apps, %{view | unclassified_modules: MapSet.new()}, &Boundary.View.drop_app(&2, &1))
+
+      Boundary.Mix.write_manifest("boundary_view", stored_view)
+
+      errors = check(view, Xref.entries())
+      print_diagnostic_errors(errors)
+      {status(errors, argv), diagnostics ++ errors}
+    else
+      outcome
+    end
   end
 
   defp rebuild_view do
