@@ -397,7 +397,7 @@ defmodule Mix.Tasks.Compile.Boundary do
       details: nil,
       file: "unknown",
       message: message,
-      position: nil,
+      position: 1,
       severity: :warning
     }
     |> Map.merge(Map.new(opts))
