@@ -225,7 +225,8 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   defp location(error) do
     if error.file != nil and error.file != "" do
-      pos = if error.position != nil, do: ":#{error.position}", else: ""
+      line = with tuple when is_tuple(tuple) <- error.position, do: elem(tuple, 0)
+      pos = if line != nil, do: ":#{line}", else: ""
       "\n  #{error.file}#{pos}\n"
     else
       "\n"
@@ -392,14 +393,31 @@ defmodule Mix.Tasks.Compile.Boundary do
   end
 
   def diagnostic(message, opts \\ []) do
-    %Mix.Task.Compiler.Diagnostic{
-      compiler_name: "boundary",
-      details: nil,
-      file: "unknown",
-      message: message,
-      position: 1,
-      severity: :warning
-    }
-    |> Map.merge(Map.new(opts))
+    diagnostic =
+      %Mix.Task.Compiler.Diagnostic{
+        compiler_name: "boundary",
+        details: nil,
+        file: nil,
+        message: message,
+        position: 0,
+        severity: :warning
+      }
+      |> Map.merge(Map.new(opts))
+
+    cond do
+      diagnostic.file == nil ->
+        %{diagnostic | file: "unknown"}
+
+      diagnostic.position == 0 and File.exists?(diagnostic.file) ->
+        num_lines =
+          diagnostic.file
+          |> File.stream!()
+          |> Enum.count()
+
+        %{diagnostic | position: {1, 0, num_lines + 1, 0}}
+
+      true ->
+        diagnostic
+    end
   end
 end
