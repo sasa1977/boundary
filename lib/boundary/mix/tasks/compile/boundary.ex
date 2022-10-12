@@ -87,7 +87,8 @@ defmodule Mix.Tasks.Compile.Boundary do
   @impl Mix.Task.Compiler
   def run(argv) do
     Xref.start_link()
-    Mix.Task.Compiler.after_compiler(:app, &after_compiler(&1, argv))
+    Mix.Task.Compiler.after_compiler(:elixir, &after_elixir_compiler/1)
+    Mix.Task.Compiler.after_compiler(:app, &after_app_compiler(&1, argv))
 
     tracers = Code.get_compiler_option(:tracers)
     Code.put_compiler_option(:tracers, [__MODULE__ | tracers])
@@ -161,11 +162,17 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   defp system_module?(_module), do: false
 
-  defp after_compiler({status, diagnostics} = outcome, argv) do
+  defp after_elixir_compiler(outcome) do
+    # Unloading the tracer after Elixir compiler, irrespective of the outcome. This ensures that the tracer is correctly
+    # unloaded even if the compilation fails.
     tracers = Enum.reject(Code.get_compiler_option(:tracers), &(&1 == __MODULE__))
     Code.put_compiler_option(:tracers, tracers)
+    outcome
+  end
 
-    if status in [:ok, :noop] do
+  defp after_app_compiler(outcome, argv) do
+    # Perform the boundary checks only on a successfully compiled app, to avoid false positives.
+    with {status, diagnostics} when status in [:ok, :noop] <- outcome do
       # We're reloading the app to make sure we have the latest version. This fixes potential stale state in ElixirLS.
       Application.unload(Boundary.Mix.app_name())
       Application.load(Boundary.Mix.app_name())
@@ -196,8 +203,6 @@ defmodule Mix.Tasks.Compile.Boundary do
       errors = check(view, Xref.entries())
       print_diagnostic_errors(errors)
       {status(errors, argv), diagnostics ++ errors}
-    else
-      outcome
     end
   end
 
