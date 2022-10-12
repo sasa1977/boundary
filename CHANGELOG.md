@@ -1,3 +1,7 @@
+# 0.9.4
+
+- Properly unload the tracer on compilation error. Fixes crashes in ElixirLS.
+
 # 0.9.3
 
 - Fix inconsistent behaviour in umbrella/poncho projects.
