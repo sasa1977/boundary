@@ -17,7 +17,7 @@ defmodule Boundary.Definition do
              do: Macro.expand(term, %{env | function: {:boundary, 1}, lexical_tracker: nil})
       end)
       |> Enum.map(fn opt ->
-        with {key, references} when key in ~w/deps exports dirty_refs/a and is_list(references) <- opt,
+        with {key, references} when key in ~w/deps exports dirty_xrefs/a and is_list(references) <- opt,
              do: {key, expand_references(references)}
       end)
 
@@ -120,7 +120,7 @@ defmodule Boundary.Definition do
     |> normalize_check()
     |> normalize_exports(boundary)
     |> normalize_deps()
-    |> Map.update!(:dirty_refs, &MapSet.new/1)
+    |> Map.update!(:dirty_xrefs, &MapSet.new/1)
   end
 
   defp normalize!(user_opts, app, pos) do
@@ -139,7 +139,7 @@ defmodule Boundary.Definition do
       end
 
     user_opts = Map.new(user_opts)
-    valid_keys = ~w/deps exports dirty_refs check type top_level?/a
+    valid_keys = ~w/deps exports dirty_xrefs check type top_level?/a
 
     definition
     |> Map.merge(Map.take(user_opts, valid_keys))
@@ -199,7 +199,7 @@ defmodule Boundary.Definition do
     %{
       deps: [],
       exports: [],
-      dirty_refs: [],
+      dirty_xrefs: [],
       check: [],
       type: :relaxed,
       errors: [],

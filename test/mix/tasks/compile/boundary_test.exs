@@ -191,7 +191,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module_test "call to dirty_ref is allowed",
               """
               defmodule #{module1} do
-                use Boundary, dirty_refs: [#{module2}.Inner]
+                use Boundary, dirty_xrefs: [#{module2}.Inner]
                 def fun1(), do: #{module2}.Inner.fun()
               end
 

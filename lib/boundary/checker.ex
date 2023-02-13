@@ -223,7 +223,7 @@ defmodule Boundary.Checker do
         nil
 
       # explicitly allowed dirty refs
-      Enum.member?(from_boundary.dirty_refs, reference.to) ->
+      Enum.member?(from_boundary.dirty_xrefs, reference.to) ->
         nil
 
       not cross_ref_allowed?(view, from_boundary, to_boundary, reference) ->

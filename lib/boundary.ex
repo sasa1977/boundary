@@ -371,13 +371,13 @@ defmodule Boundary do
 
   A dirty xref is an invocation to another module that won't be checked by boundary. For example, suppose that in your
   context layer you invoke `MySystemWeb.Router.Helpers.some_url(...)`. If you don't have the time to clean up such
-  invocations immediately, you can add the module to the `dirty_refs` list:
+  invocations immediately, you can add the module to the `dirty_xrefs` list:
 
   ```
   defmodule MySystem do
     use Boundary,
       # Invocations to these modules will not be checked.
-      dirty_refs: [MySystemWeb.Router.Helpers, ...]
+      dirty_xrefs: [MySystemWeb.Router.Helpers, ...]
   end
   ```
 
@@ -550,7 +550,7 @@ defmodule Boundary do
           ancestors: [name],
           deps: [{name, mode}],
           exports: [export],
-          dirty_refs: MapSet.t(module),
+          dirty_xrefs: MapSet.t(module),
           check: %{apps: [{atom, mode}], in: boolean, out: boolean, aliases: boolean},
           type: :strict | :relaxed,
           file: String.t(),
