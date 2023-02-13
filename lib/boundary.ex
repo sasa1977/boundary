@@ -42,6 +42,25 @@ defmodule Boundary do
     - `MySystem.Application` code may use `MySystem`, `MySystemWeb`, and `MySystemWeb.Endpoint`
       modules.
 
+  To enforce these rules on project compilation, you need to include the compiler in `mix.exs`:
+
+  ```
+  defmodule MySystem.MixProject do
+    # ...
+
+    def project do
+      [
+        compilers: [:boundary] ++ Mix.compilers(),
+        # ...
+      ]
+    end
+
+    # ...
+  end
+  ```
+
+  See `Mix.Tasks.Compile.Boundary` for more details on compilation warnings.
+
 
   ## Defining a boundary
 
