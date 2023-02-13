@@ -552,6 +552,7 @@ defmodule Boundary do
           ancestors: [name],
           deps: [{name, mode}],
           exports: [export],
+          dirty_refs: MapSet.t(module),
           check: %{apps: [{atom, mode}], in: boolean, out: boolean, aliases: boolean},
           type: :strict | :relaxed,
           file: String.t(),

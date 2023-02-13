@@ -222,6 +222,10 @@ defmodule Boundary.Checker do
         # we're ignoring this case.
         nil
 
+      # explicitly allowed dirty refs
+      Enum.member?(from_boundary.dirty_refs, reference.to) ->
+        nil
+
       not cross_ref_allowed?(view, from_boundary, to_boundary, reference) ->
         tag = if Enum.member?(from_boundary.deps, {to_boundary.name, :compile}), do: :runtime, else: :normal
         {tag, to_boundary.name}
