@@ -209,6 +209,29 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module1 = unique_module_name()
   module2 = unique_module_name()
 
+  module_test "unused dirty xref is reported",
+              """
+              defmodule #{module1} do
+                use Boundary, dirty_xrefs: [#{module2}.Inner]
+              end
+
+              defmodule #{module2} do
+                use Boundary
+
+                defmodule Inner do
+                  def fun(), do: :ok
+                end
+              end
+              """ do
+    assert [%{message: msg}] = warnings
+
+    assert msg ==
+             "module #{unquote(module2)}.Inner doesn't need to be included in the `dirty_xrefs` list for the boundary #{unquote(module1)}"
+  end
+
+  module1 = unique_module_name()
+  module2 = unique_module_name()
+
   module_test "call to an unclassified module is not reported",
               """
               defmodule #{module1} do

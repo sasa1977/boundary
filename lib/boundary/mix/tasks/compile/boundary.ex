@@ -388,6 +388,14 @@ defmodule Mix.Tasks.Compile.Boundary do
     )
   end
 
+  defp to_diagnostic_error({:unused_dirty_xref, boundary, xref}) do
+    diagnostic(
+      "module #{inspect(xref)} doesn't need to be included in the `dirty_xrefs` list for the boundary #{inspect(boundary.name)}",
+      file: Path.relative_to_cwd(boundary.file),
+      position: boundary.line
+    )
+  end
+
   defp module_source(module) do
     module.module_info(:compile)
     |> Keyword.fetch!(:source)

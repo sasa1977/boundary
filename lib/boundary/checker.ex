@@ -11,7 +11,8 @@ defmodule Boundary.Checker do
       invalid_exports(view),
       cycles(view),
       unclassified_modules(view),
-      invalid_references(view, references)
+      invalid_references(view, references),
+      unused_dirty_xrefs(view, references)
     ])
     |> Enum.uniq_by(fn
       # deduping by reference minus type/mode, because even if those vary the error can still be the same
@@ -321,4 +322,26 @@ defmodule Boundary.Checker do
   end
 
   defp export_matches?(_, _, _, _), do: false
+
+  defp unused_dirty_xrefs(view, references) do
+    all_dirty_xrefs =
+      for boundary <- Boundary.all(view),
+          xref <- boundary.dirty_xrefs,
+          into: MapSet.new(),
+          do: {boundary.name, xref}
+
+    unused_dirty_xrefs =
+      for reference <- references,
+          not (Boundary.protocol_impl?(reference.from) and is_nil(Boundary.Definition.classified_to(reference.from))),
+          from_boundary = Boundary.for_module(view, reference.from),
+          reduce: all_dirty_xrefs,
+          do: (xrefs -> MapSet.delete(xrefs, {from_boundary.name, reference.to}))
+
+    unused_dirty_xrefs
+    |> Enum.sort()
+    |> Enum.map(fn {boundary_name, dirty_xref} ->
+      boundary = Boundary.fetch!(view, boundary_name)
+      {:unused_dirty_xref, %{name: boundary.name, file: boundary.file, line: boundary.line}, dirty_xref}
+    end)
+  end
 end
