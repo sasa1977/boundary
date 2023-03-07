@@ -61,19 +61,13 @@ defmodule Boundary.Mix.Xref do
   @impl GenServer
   def init(nil) do
     :ets.new(seen_table(), [:set, :public, :named_table, read_concurrency: true, write_concurrency: true])
-    read_manifest() || build_manifest()
-    {:ok, %{}}
-  end
 
-  defp build_manifest, do: :ets.new(entries_table(), [:named_table, :public, :duplicate_bag, write_concurrency: true])
-
-  defp read_manifest do
-    unless Boundary.Mix.stale_manifest?("boundary_v2") do
-      {:ok, table} = :ets.file2tab(String.to_charlist(Boundary.Mix.manifest_path("boundary_v2")))
-      table
+    case :ets.file2tab(String.to_charlist(Boundary.Mix.manifest_path("boundary_v2"))) do
+      {:ok, table} -> table
+      {:error, _} -> :ets.new(entries_table(), [:named_table, :public, :duplicate_bag, write_concurrency: true])
     end
-  rescue
-    _ -> nil
+
+    {:ok, %{}}
   end
 
   defp stored_modules do
