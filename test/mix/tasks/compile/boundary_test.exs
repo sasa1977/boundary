@@ -1561,6 +1561,22 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
         )
       end)
     end
+
+    test "with warnings as errors" do
+      module1 = unique_module_name()
+
+      TestProject.in_project(fn project ->
+        File.write!(
+          Path.join([project.path, "lib", "mod1.ex"]),
+          """
+          defmodule #{module1} do
+          end
+          """
+        )
+
+        assert TestProject.compile(["--warnings-as-errors"]).errors == ["#{module1} is not included in any boundary"]
+      end)
+    end
   end
 
   defp in_lib_with_boundaries(fun) do

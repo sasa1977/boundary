@@ -86,9 +86,11 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   @impl Mix.Task.Compiler
   def run(argv) do
-    Xref.start_link()
+    {opts, _rest, _errors} = OptionParser.parse(argv, strict: [force: :boolean, warnings_as_errors: :boolean])
+
+    Xref.start_link(Keyword.take(opts, [:force]))
     Mix.Task.Compiler.after_compiler(:elixir, &after_elixir_compiler/1)
-    Mix.Task.Compiler.after_compiler(:app, &after_app_compiler(&1, argv))
+    Mix.Task.Compiler.after_compiler(:app, &after_app_compiler(&1, opts))
 
     tracers = Code.get_compiler_option(:tracers)
     Code.put_compiler_option(:tracers, [__MODULE__ | tracers])
@@ -170,7 +172,7 @@ defmodule Mix.Tasks.Compile.Boundary do
     outcome
   end
 
-  defp after_app_compiler(outcome, argv) do
+  defp after_app_compiler(outcome, opts) do
     # Perform the boundary checks only on a successfully compiled app, to avoid false positives.
     with {status, diagnostics} when status in [:ok, :noop] <- outcome do
       # We're reloading the app to make sure we have the latest version. This fixes potential stale state in ElixirLS.
@@ -190,10 +192,11 @@ defmodule Mix.Tasks.Compile.Boundary do
             do: app
 
       view =
-        case Boundary.Mix.read_manifest("boundary_view") do
-          nil -> rebuild_view()
-          view -> Boundary.View.refresh(view, user_apps) || rebuild_view()
-        end
+        with false <- Keyword.get(opts, :force, false),
+             view when not is_nil(view) <- Boundary.Mix.read_manifest("boundary_view"),
+             view when not is_nil(view) <- Boundary.View.refresh(view, user_apps),
+             do: view,
+             else: (_ -> rebuild_view())
 
       stored_view =
         Enum.reduce(user_apps, %{view | unclassified_modules: MapSet.new()}, &Boundary.View.drop_app(&2, &1))
@@ -202,7 +205,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
       errors = check(view, Xref.entries())
       print_diagnostic_errors(errors)
-      {status(errors, argv), diagnostics ++ errors}
+      {status(errors, opts), diagnostics ++ errors}
     end
   end
 
@@ -212,12 +215,7 @@ defmodule Mix.Tasks.Compile.Boundary do
   end
 
   defp status([], _), do: :ok
-  defp status([_ | _], argv), do: if(warnings_as_errors?(argv), do: :error, else: :ok)
-
-  defp warnings_as_errors?(argv) do
-    {parsed, _argv, _errors} = OptionParser.parse(argv, strict: [warnings_as_errors: :boolean])
-    Keyword.get(parsed, :warnings_as_errors, false)
-  end
+  defp status([_ | _], opts), do: if(Keyword.get(opts, :warnings_as_errors, false), do: :error, else: :ok)
 
   defp print_diagnostic_errors(errors) do
     if errors != [], do: Mix.shell().info("")
