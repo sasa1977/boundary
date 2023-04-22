@@ -157,7 +157,7 @@ defmodule Boundary do
   It's also possible to mass-export multiple modules with a single exports entry.
 
   For example, let's say that we keep Ecto schemas under the `MySystem.Schemas` namespace. Now we
-  want to export all of these modules except `MySystem.Schemas.Base` which is a base module `use`d
+  want to export all of these modules except `MySystem.Schemas.Base` which is a base module used
   by our schemas. We could list each individual schema in the exports section but that becomes
   tedious, and the `use Boundary` expression might become quite long and noisy. Instead, we can
   export all of these modules with the `exports: [{Schemas, except: [Base]}, ...]`. This will
