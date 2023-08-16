@@ -798,7 +798,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module1 = unique_module_name()
   module2 = unique_module_name()
 
-  module_test "boundary can mass-export an export of a sub-boundary",
+  module_test "mass-export of a sub-boundary",
               """
               defmodule #{module1} do
                 use Boundary, exports: [{SubBoundary, []}]
@@ -806,7 +806,10 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
                 defmodule SubBoundary do
                   use Boundary, exports: [Foo]
 
-                  defmodule Foo do def bar, do: :ok end
+                  def foo, do: :ok
+
+                  defmodule Foo do def foo, do: :ok end
+                  defmodule Bar, do: def foo, do: :ok
                 end
               end
 
@@ -814,11 +817,14 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
                 use Boundary, deps: [#{module1}]
 
                 def foo do
-                  #{module1}.SubBoundary.Foo.bar()
+                  #{module1}.SubBoundary.foo()
+                  #{module1}.SubBoundary.Foo.foo()
+                  #{module1}.SubBoundary.Bar.foo()
                 end
               end
               """ do
-    assert warnings == []
+    assert [warning] = warnings
+    assert warning.message =~ "forbidden reference to #{unquote(module1)}.SubBoundary.Bar"
   end
 
   module1 = unique_module_name()
