@@ -176,7 +176,7 @@ defmodule Boundary do
   It's also possible to mass-export multiple modules with a single exports entry.
 
   For example, let's say that we keep Ecto schemas under the `MySystem.Schemas` namespace. Now we
-  want to export all of these modules except `MySystem.Schemas.Base` which is a base module `use`d
+  want to export all of these modules except `MySystem.Schemas.Base` which is a base module used
   by our schemas. We could list each individual schema in the exports section but that becomes
   tedious, and the `use Boundary` expression might become quite long and noisy. Instead, we can
   export all of these modules with the `exports: [{Schemas, except: [Base]}, ...]`. This will
@@ -475,11 +475,9 @@ defmodule Boundary do
   export. In this example, `Articles` and `Accounts` are exported, while `Repo` isn't. The sub-boundaries decide what
   will they depend on themselves.
 
-  ### Exporting From Sub-Boundaries
+  ### Exporting from sub-boundaries
 
-  The parent boundary may also re-export modules that are exported by its sub-boundaries. In the above example, if the
-  `Articles` context exports a struct (or Ecto schema) module named `Article`, then `BlogEngine` can choose to re-export
-  that module.
+  The parent boundary may export modules that are exported by its sub-boundaries:
 
   ```
   defmodule BlogEngine do
@@ -490,6 +488,17 @@ defmodule Boundary do
     use Boundary, deps: [BlogEngine.{Accounts, Repo}], exports: [Article]
   end
   ```
+
+  In this example, `BlogEngine` exports `Articles.Article` which belongs to a sub-boundary.
+
+  If you want to export all exports of a sub-boundary, you can use the mass export syntax:
+
+  ```
+  use Boundary, exports: [{Articles, []}, ...]
+  ```
+
+  This will export the `Articles` module together with all the modules exported by the articles
+  sub-boundary.
 
   The parent boundary may not export a module that isn't exported by its owner boundary.
 
