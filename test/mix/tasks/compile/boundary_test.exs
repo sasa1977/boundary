@@ -1331,7 +1331,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
       TestProject.compile()
 
-      assert TestProject.run_task("xref", ~w[callers #{module2} --format plain]).output == ""
+      assert TestProject.run_task("xref", ~w[callers #{module2} --no-deps-check --format plain]).output == ""
     end)
   end
 
