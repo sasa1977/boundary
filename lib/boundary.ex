@@ -477,54 +477,32 @@ defmodule Boundary do
   export. In this example, `Articles` and `Accounts` are exported, while `Repo` isn't. The sub-boundaries decide what
   will they depend on themselves.
 
-  ### Re-exporting From Sub-Boundaries
+  ### Exporting from sub-boundaries
 
-  The parent boundary can also re-export modules that are exported by its sub-boundaries.
-
-  > The parent boundary is not allowed to re-export modules that are not already exported by its sub-boundaries.
-
-  First, let's provide an example:
-
-  ```
-  defmodule BlogEngine do
-    use Boundary, exports: [Accounts, Articles]
-  end
-
-  defmodule BlogEngine.Articles do
-    use Boundary, deps: [BlogEngine.{Accounts, Repo}], exports: [Article, Comment]
-  end
-  ```
-
-  In above example, the `Articles` context exports two modules - `Article` and `Comment`.
-
-
-  #### re-exporting selected modules from sub-boundaries
-
-  If you want to re-export selected modules, let's say `Article`, you can do:
+  The parent boundary may export modules that are exported by its sub-boundaries:
 
   ```
   defmodule BlogEngine do
     use Boundary, exports: [Accounts, Articles, Articles.Article]
   end
-  ```
 
-  #### re-exporting all modules exported by sub-boundaries
-
-  If you want to re-export all modules, you can do:
-
-  ```
-  defmodule BlogEngine do
-    use Boundary, exports: [Accounts, Articles, Articles.Article, Articles.Comment]
+  defmodule BlogEngine.Articles do
+    use Boundary, deps: [BlogEngine.{Accounts, Repo}], exports: [Article]
   end
   ```
 
-  If you think above code is tedious, you can also do:
+  In this example, `BlogEngine` exports `Articles.Article` which belongs to a sub-boundary.
+
+  If you want to export all exports of a sub-boundary, you can use the mass export syntax:
 
   ```
-  defmodule BlogEngine do
-    use Boundary, exports: [Accounts, Articles, {Articles, []}]
-  end
+  use Boundary, exports: [{Articles, []}, ...]
   ```
+
+  This will export the `Articles` module together with all the modules exported by the articles
+  sub-boundary.
+
+  The parent boundary may not export a module that isn't exported by its owner boundary.
 
   ### Dependencies
 
