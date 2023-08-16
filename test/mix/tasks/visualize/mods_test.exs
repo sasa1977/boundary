@@ -49,19 +49,19 @@ defmodule Mix.Tasks.Boundary.Visualize.ModsTest do
                  "Foo" -> "Bar.Mod";
 
                  subgraph cluster_0 {
-                   label="Boundary Bar";
-                   labelloc=top;
-                   rankdir=LR;
-
-                   "Bar.Mod" [shape=box, label=Mod];
-                 }
-
-                 subgraph cluster_1 {
                    label="Boundary Foo";
                    labelloc=top;
                    rankdir=LR;
 
                    "Foo" [shape=box, label=Foo];
+                 }
+
+                 subgraph cluster_1 {
+                   label="Boundary Bar";
+                   labelloc=top;
+                   rankdir=LR;
+
+                   "Bar.Mod" [shape=box, label=Mod];
                  }
                }
                """

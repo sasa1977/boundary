@@ -1,3 +1,7 @@
+# 0.10.0
+
+- Added the support for ignoring "dirty" xrefs via the `dirty_xrefs` option. See `Boundary` module docs for details.
+
 # 0.9.4
 
 - Properly unload the tracer on compilation error. Fixes crashes in ElixirLS.

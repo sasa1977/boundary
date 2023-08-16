@@ -157,8 +157,11 @@ defmodule Boundary.Checker do
 
   defp invalid_references(view, references) do
     for reference <- references,
-        # ignore references from unclassified protocol impls
-        not (Boundary.protocol_impl?(reference.from) and is_nil(Boundary.Definition.classified_to(reference.from))),
+        not unclassified_protocol_impl?(reference),
+
+        # Ignore protocol impl refs to protocol. These refs always exist, but due to classification
+        # of the impl, they may belong to different boundaries
+        not reference_to_implemented_protocol?(reference),
         from_boundary = Boundary.for_module(view, reference.from),
         to_boundaries = to_boundaries(view, from_boundary, reference),
         {type, to_boundary_name} <- [reference_error(view, reference, from_boundary, to_boundaries)] do
@@ -171,6 +174,12 @@ defmodule Boundary.Checker do
        }}
     end
   end
+
+  defp unclassified_protocol_impl?(reference),
+    do: Boundary.protocol_impl?(reference.from) and Boundary.Definition.classified_to(reference.from) == nil
+
+  defp reference_to_implemented_protocol?(reference),
+    do: function_exported?(reference.from, :__impl__, 1) and reference.from.__impl__(:protocol) == reference.to
 
   defp to_boundaries(view, from_boundary, reference) do
     case Boundary.for_module(view, reference.to) do
