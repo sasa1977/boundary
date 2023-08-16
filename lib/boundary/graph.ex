@@ -59,8 +59,10 @@ defmodule Boundary.Graph do
     graph.subgraphs
     |> Enum.reverse()
     |> Enum.with_index()
-    |> Enum.map(fn {subgraph, index} -> dot(subgraph, indent: spaces + 2, type: {:subgraph, index}) end)
-    |> Enum.join("\n")
+    |> Enum.map_join(
+      "\n",
+      fn {subgraph, index} -> dot(subgraph, indent: spaces + 2, type: {:subgraph, index}) end
+    )
   end
 
   defp nodes(graph, tab) do
@@ -87,7 +89,7 @@ defmodule Boundary.Graph do
   defp attributes([]), do: ""
 
   defp attributes(attributes),
-    do: " [#{Enum.join(Enum.map(attributes, fn {k, v} -> "#{k}=#{v}" end), ", ")}]"
+    do: " [#{Enum.map_join(attributes, ", ", fn {k, v} -> "#{k}=#{v}" end)}]"
 
   defp format_dot(dot_string) do
     dot_string

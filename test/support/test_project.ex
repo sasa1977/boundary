@@ -31,10 +31,8 @@ defmodule Boundary.TestProject do
     end
   end
 
-  def compile do
-    result = run_task("compile", ["--return-errors"])
-    {warnings, result} = Map.pop!(result, :result)
-    Map.put(result, :warnings, warnings)
+  def compile(opts \\ []) do
+    run_task("compile", ["--return-errors" | opts])
   end
 
   def run_task(task, args \\ []) do
@@ -47,10 +45,11 @@ defmodule Boundary.TestProject do
 
     receive do
       {^ref, result} ->
-        result =
+        {warnings, errors} =
           case result do
-            :ok -> []
-            {:ok, result} -> result
+            :ok -> {[], []}
+            {:ok, result} -> {result, []}
+            {:error, errors} -> {[], Enum.map(errors, & &1.message)}
           end
 
         output =
@@ -64,7 +63,7 @@ defmodule Boundary.TestProject do
           |> Enum.take_while(&(not is_nil(&1)))
           |> to_string
 
-        %{result: result, output: output}
+        %{output: output, warnings: warnings, errors: errors}
     after
       0 -> raise("result not received")
     end

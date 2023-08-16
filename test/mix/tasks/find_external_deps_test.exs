@@ -28,8 +28,7 @@ defmodule Mix.Tasks.Boundary.FindExternalDepsTest do
       output =
         TestProject.run_task("boundary.find_external_deps").output
         |> String.split("\n")
-        |> Enum.map(&String.trim_trailing/1)
-        |> Enum.join("\n")
+        |> Enum.map_join("\n", &String.trim_trailing/1)
 
       assert output =~
                """

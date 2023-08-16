@@ -16,14 +16,9 @@ defmodule Boundary.Mix do
   @spec manifest_path(String.t()) :: String.t()
   def manifest_path(name), do: Path.join(Mix.Project.manifest_path(Mix.Project.config()), "compile.#{name}")
 
-  @spec stale_manifest?(String.t()) :: boolean
-  def stale_manifest?(name), do: Mix.Utils.stale?([Mix.Project.config_mtime()], [manifest_path(name)])
-
   @spec read_manifest(String.t()) :: term
   def read_manifest(name) do
-    manifest = manifest_path(name)
-
-    unless stale_manifest?(name), do: manifest |> File.read!() |> :erlang.binary_to_term()
+    name |> manifest_path() |> File.read!() |> :erlang.binary_to_term()
   rescue
     _ -> nil
   end
