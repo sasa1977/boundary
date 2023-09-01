@@ -1,12 +1,10 @@
 defmodule Boundary.Mix.Classifier do
   @moduledoc false
 
-  @type t :: %{boundaries: %{Boundary.name() => Boundary.t()}, modules: %{module() => Boundary.name()}}
-
-  @spec new :: t
+  @spec new :: Boundary.classifier()
   def new, do: %{boundaries: %{}, modules: %{}}
 
-  @spec delete(t, atom) :: t
+  @spec delete(Boundary.classifier(), atom) :: Boundary.classifier()
   def delete(classifier, app) do
     boundaries_to_delete =
       classifier.boundaries
@@ -25,7 +23,7 @@ defmodule Boundary.Mix.Classifier do
     %{classifier | boundaries: boundaries, modules: modules}
   end
 
-  @spec classify(t, [module], [Boundary.t()]) :: t
+  @spec classify(Boundary.classifier(), [module], [Boundary.t()]) :: Boundary.classifier()
   def classify(classifier, modules, boundaries) do
     trie = build_trie(boundaries)
 

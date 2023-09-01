@@ -2,16 +2,7 @@ defmodule Boundary.Mix.View do
   @moduledoc false
   alias Boundary.Mix.Classifier
 
-  @type t :: %{
-          version: String.t(),
-          main_app: Application.app(),
-          classifier: Classifier.t(),
-          unclassified_modules: MapSet.t(module),
-          module_to_app: %{module => Application.app()},
-          external_deps: MapSet.t(module)
-        }
-
-  @spec build() :: t
+  @spec build() :: Boundary.view()
   def build do
     main_app = Boundary.Mix.app_name()
 
@@ -34,7 +25,7 @@ defmodule Boundary.Mix.View do
     }
   end
 
-  @spec refresh(t, [atom]) :: t | nil
+  @spec refresh(Boundary.view(), [atom]) :: Boundary.view() | nil
   def refresh(%{version: unquote(Mix.Project.config()[:version])} = view, apps) do
     module_to_app =
       for {app, _description, _vsn} <- Application.loaded_applications(),
@@ -68,7 +59,7 @@ defmodule Boundary.Mix.View do
 
   def refresh(_, _), do: nil
 
-  @spec drop_app(t, atom) :: t
+  @spec drop_app(Boundary.view(), atom) :: Boundary.view()
   def drop_app(view, app) do
     modules_to_delete = for {module, ^app} <- view.module_to_app, do: module
     module_to_app = Map.drop(view.module_to_app, modules_to_delete)

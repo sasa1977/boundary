@@ -569,7 +569,16 @@ defmodule Boundary do
           errors: [term]
         }
 
-  @type view :: map
+  @type view :: %{
+          version: String.t(),
+          main_app: Application.app(),
+          classifier: classifier,
+          unclassified_modules: MapSet.t(module),
+          module_to_app: %{module => Application.app()},
+          external_deps: MapSet.t(module)
+        }
+
+  @type classifier :: %{boundaries: %{Boundary.name() => Boundary.t()}, modules: %{module() => Boundary.name()}}
 
   @type name :: module
   @type export :: module | {module, [except: [module]]}
