@@ -3,7 +3,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   use Boundary, classify_to: Boundary.Mix
   use Mix.Task.Compiler
-  alias Boundary.Mix.Xref
+  alias Boundary.Mix.CompilerState
 
   @moduledoc """
   Verifies cross-module function calls according to defined boundaries.
@@ -88,7 +88,7 @@ defmodule Mix.Tasks.Compile.Boundary do
   def run(argv) do
     {opts, _rest, _errors} = OptionParser.parse(argv, strict: [force: :boolean, warnings_as_errors: :boolean])
 
-    Xref.start_link(Keyword.take(opts, [:force]))
+    CompilerState.start_link(Keyword.take(opts, [:force]))
     Mix.Task.Compiler.after_compiler(:elixir, &after_elixir_compiler/1)
     Mix.Task.Compiler.after_compiler(:app, &after_app_compiler(&1, opts))
 
@@ -132,7 +132,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
     unless env.module in [nil, to_module] or system_module?(to_module) or
              not String.starts_with?(Atom.to_string(to_module), "Elixir.") do
-      Xref.record(
+      CompilerState.record_references(
         env.module,
         %{
           from_function: env.function,
@@ -149,7 +149,7 @@ defmodule Mix.Tasks.Compile.Boundary do
   end
 
   defp initialize_module(module),
-    do: unless(is_nil(module), do: Xref.initialize_module(module))
+    do: unless(is_nil(module), do: CompilerState.initialize_module(module))
 
   # Building the list of "system modules", which we'll exclude from the traced data, to reduce the collected data and
   # processing time.
@@ -179,7 +179,7 @@ defmodule Mix.Tasks.Compile.Boundary do
       Application.unload(Boundary.Mix.app_name())
       Application.load(Boundary.Mix.app_name())
 
-      Xref.flush(Application.spec(Boundary.Mix.app_name(), :modules) || [])
+      CompilerState.flush(Application.spec(Boundary.Mix.app_name(), :modules) || [])
 
       # Caching of the built view for non-user apps. A user app is the main app of the project, and all local deps
       # (in-umbrella and path deps). All other apps are library dependencies, and we're caching the boundary view of such
@@ -193,7 +193,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
       view = Boundary.Mix.View.refresh(user_apps, Keyword.take(opts, ~w/force/a))
 
-      errors = check(view, Xref.entries())
+      errors = check(view, CompilerState.references())
       print_diagnostic_errors(errors)
       {status(errors, opts), diagnostics ++ errors}
     end

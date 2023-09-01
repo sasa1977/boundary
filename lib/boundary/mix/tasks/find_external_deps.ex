@@ -12,7 +12,7 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
   use Boundary, classify_to: Boundary.Mix
   use Mix.Task
 
-  alias Boundary.Mix.Xref
+  alias Boundary.Mix.CompilerState
 
   @impl Mix.Task
   def run(_argv) do
@@ -46,9 +46,9 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
   end
 
   defp find_external_deps(boundary_view) do
-    Xref.start_link()
+    CompilerState.start_link()
 
-    for reference <- Xref.entries(),
+    for reference <- CompilerState.references(),
         boundary = Boundary.for_module(boundary_view, reference.from),
         boundary.check.out,
         app = Boundary.app(boundary_view, reference.to),

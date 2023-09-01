@@ -15,7 +15,7 @@ defmodule Mix.Tasks.Boundary.Visualize.Mods do
   use Mix.Task
 
   alias Boundary.Graph
-  alias Boundary.Mix.Xref
+  alias Boundary.Mix.CompilerState
 
   @impl Mix.Task
   def run(argv) do
@@ -30,7 +30,7 @@ defmodule Mix.Tasks.Boundary.Visualize.Mods do
     boundaries = Enum.map(argv, &Module.concat([&1]))
 
     state =
-      for reference <- Xref.entries(),
+      for reference <- CompilerState.references(),
           boundary_from = Boundary.for_module(view, reference.from),
           not is_nil(boundary_from),
           boundary_from.name in boundaries,

@@ -597,7 +597,17 @@ defmodule Boundary do
           type: :normal | :runtime | :not_exported | :invalid_external_dep_call,
           from_boundary: name,
           to_boundary: name,
-          reference: Boundary.Mix.Xref.entry()
+          reference: ref()
+        }
+
+  @type ref :: %{
+          to: module,
+          from: module,
+          from_function: {function :: atom, arity :: non_neg_integer} | nil,
+          type: :call | :struct_expansion | :alias_reference,
+          mode: :compile | :runtime,
+          file: String.t(),
+          line: non_neg_integer
         }
 
   @doc false

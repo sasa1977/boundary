@@ -1,16 +1,6 @@
-defmodule Boundary.Mix.Xref do
+defmodule Boundary.Mix.CompilerState do
   @moduledoc false
   use GenServer
-
-  @type entry :: %{
-          to: module,
-          from: module,
-          from_function: {function :: atom, arity :: non_neg_integer} | nil,
-          type: :call | :struct_expansion | :alias_reference,
-          mode: :compile | :runtime,
-          file: String.t(),
-          line: non_neg_integer
-        }
 
   @spec start_link(force: boolean) :: GenServer.on_start()
   def start_link(opts \\ []) do
@@ -23,15 +13,15 @@ defmodule Boundary.Mix.Xref do
     result
   end
 
-  @spec record(module, map) :: :ok
-  def record(from, entry) do
-    :ets.insert(entries_table(), {from, entry})
+  @spec record_references(module, map) :: :ok
+  def record_references(from, entry) do
+    :ets.insert(references_table(), {from, entry})
     :ok
   end
 
   @spec initialize_module(module) :: :ok
   def initialize_module(module) do
-    if :ets.insert_new(seen_table(), {module}), do: :ets.delete(entries_table(), module)
+    if :ets.insert_new(seen_table(), {module}), do: :ets.delete(references_table(), module)
     :ok
   end
 
@@ -41,20 +31,20 @@ defmodule Boundary.Mix.Xref do
 
     stored_modules()
     |> Stream.reject(&MapSet.member?(app_modules, &1))
-    |> Enum.each(&:ets.delete(entries_table(), &1))
+    |> Enum.each(&:ets.delete(references_table(), &1))
 
     app_modules
     |> Enum.map(&Task.async(fn -> compress_entries(&1) end))
     |> Enum.each(&Task.await(&1, :infinity))
 
     :ets.delete_all_objects(seen_table())
-    :ets.tab2file(entries_table(), to_charlist(Boundary.Mix.manifest_path("boundary_v2")))
+    :ets.tab2file(references_table(), to_charlist(Boundary.Mix.manifest_path("boundary_references")))
   end
 
-  @doc "Returns a lazy stream where each element is of type `t:Reference.t()`"
-  @spec entries :: Enumerable.t()
-  def entries do
-    :ets.tab2list(entries_table())
+  @doc "Returns a lazy stream where each element is of type `t:Boundary.ref()`"
+  @spec references :: Enumerable.t()
+  def references do
+    :ets.tab2list(references_table())
     |> Enum.map(fn {from_module, info} -> Map.put(info, :from, from_module) end)
   end
 
@@ -63,29 +53,29 @@ defmodule Boundary.Mix.Xref do
     :ets.new(seen_table(), [:set, :public, :named_table, read_concurrency: true, write_concurrency: true])
 
     with false <- Keyword.get(opts, :force, false),
-         {:ok, table} <- :ets.file2tab(String.to_charlist(Boundary.Mix.manifest_path("boundary_v2"))),
+         {:ok, table} <- :ets.file2tab(String.to_charlist(Boundary.Mix.manifest_path("boundary_references"))),
          do: table,
-         else: (_ -> :ets.new(entries_table(), [:named_table, :public, :duplicate_bag, write_concurrency: true]))
+         else: (_ -> :ets.new(references_table(), [:named_table, :public, :duplicate_bag, write_concurrency: true]))
 
     {:ok, %{}}
   end
 
   defp stored_modules do
     Stream.unfold(
-      :ets.first(entries_table()),
+      :ets.first(references_table()),
       fn
         :"$end_of_table" -> nil
-        key -> {key, :ets.next(entries_table(), key)}
+        key -> {key, :ets.next(references_table(), key)}
       end
     )
   end
 
   defp compress_entries(module) do
-    :ets.take(entries_table(), module)
+    :ets.take(references_table(), module)
     |> Enum.map(fn {^module, entry} -> entry end)
     |> drop_leading_aliases()
     |> dedup_entries()
-    |> Enum.each(&:ets.insert(entries_table(), {module, &1}))
+    |> Enum.each(&:ets.insert(references_table(), {module, &1}))
   end
 
   defp drop_leading_aliases([entry, next_entry | rest]) do
@@ -115,5 +105,5 @@ defmodule Boundary.Mix.Xref do
   end
 
   defp seen_table, do: :"#{__MODULE__}.#{Boundary.Mix.app_name()}.Seen"
-  defp entries_table, do: :"#{__MODULE__}.#{Boundary.Mix.app_name()}.Entries"
+  defp references_table, do: :"#{__MODULE__}.#{Boundary.Mix.app_name()}.References"
 end
