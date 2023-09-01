@@ -13,6 +13,11 @@ defmodule Boundary.Mix do
     :ok
   end
 
+  @spec app_modules(Application.app()) :: [module]
+  def app_modules(app),
+    # we're currently supporting only Elixir modules
+    do: Enum.filter(Application.spec(app, :modules) || [], &String.starts_with?(Atom.to_string(&1), "Elixir."))
+
   @spec manifest_path(String.t()) :: String.t()
   def manifest_path(name), do: Path.join(Mix.Project.manifest_path(Mix.Project.config()), "compile.#{name}")
 

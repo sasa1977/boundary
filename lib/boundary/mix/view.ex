@@ -4,20 +4,20 @@ defmodule Boundary.Mix.View do
 
   @type t :: %{
           version: String.t(),
-          main_app: app,
+          main_app: Application.app(),
           classifier: Classifier.t(),
           unclassified_modules: MapSet.t(module),
-          module_to_app: %{module => app},
+          module_to_app: %{module => Application.app()},
           external_deps: MapSet.t(module)
         }
 
-  @type app :: atom
+  @spec build() :: t
+  def build do
+    main_app = Boundary.Mix.app_name()
 
-  @spec build(app) :: t
-  def build(main_app) do
     module_to_app =
       for {app, _description, _vsn} <- Application.loaded_applications(),
-          module <- app_modules(app),
+          module <- Boundary.Mix.app_modules(app),
           into: %{},
           do: {module, app}
 
@@ -38,11 +38,11 @@ defmodule Boundary.Mix.View do
   def refresh(%{version: unquote(Mix.Project.config()[:version])} = view, apps) do
     module_to_app =
       for {app, _description, _vsn} <- Application.loaded_applications(),
-          module <- app_modules(app),
+          module <- Boundary.Mix.app_modules(app),
           into: view.module_to_app,
           do: {module, app}
 
-    main_app_modules = app_modules(view.main_app)
+    main_app_modules = Boundary.Mix.app_modules(view.main_app)
     main_app_boundaries = load_app_boundaries(view.main_app, main_app_modules, module_to_app)
 
     if MapSet.equal?(view.external_deps, all_external_deps(view.main_app, main_app_boundaries, module_to_app)) do
@@ -51,7 +51,7 @@ defmodule Boundary.Mix.View do
           apps,
           %{view | module_to_app: module_to_app},
           fn app, view ->
-            app_modules = app_modules(app)
+            app_modules = Boundary.Mix.app_modules(app)
             module_to_app = for module <- app_modules, into: view.module_to_app, do: {module, app}
             app_boundaries = load_app_boundaries(app, app_modules, module_to_app)
             classifier = Classifier.classify(view.classifier, app_modules, app_boundaries)
@@ -77,7 +77,7 @@ defmodule Boundary.Mix.View do
   end
 
   defp classify(main_app, module_to_app) do
-    main_app_modules = app_modules(main_app)
+    main_app_modules = Boundary.Mix.app_modules(main_app)
     main_app_boundaries = load_app_boundaries(main_app, main_app_modules, module_to_app)
 
     classifier = classify_external_deps(main_app_boundaries, module_to_app)
@@ -138,7 +138,7 @@ defmodule Boundary.Mix.View do
     Enum.map(
       for(boundary <- main_app_boundaries, {app, _} <- boundary.check.apps, into: MapSet.new(), do: app),
       fn app ->
-        modules = app_modules(app)
+        modules = Boundary.Mix.app_modules(app)
 
         boundaries =
           with [] <- load_app_boundaries(app, modules, module_to_app) do
@@ -160,16 +160,10 @@ defmodule Boundary.Mix.View do
 
   defp unclassified_modules(main_app, classified_modules) do
     # gather unclassified modules of this app
-    for module <- app_modules(main_app),
+    for module <- Boundary.Mix.app_modules(main_app),
         not Map.has_key?(classified_modules, module),
         not Boundary.protocol_impl?(module),
         into: MapSet.new(),
         do: module
   end
-
-  @doc false
-  @spec app_modules(Application.app()) :: [module]
-  def app_modules(app),
-    # we're currently supporting only Elixir modules
-    do: Enum.filter(Application.spec(app, :modules) || [], &String.starts_with?(Atom.to_string(&1), "Elixir."))
 end

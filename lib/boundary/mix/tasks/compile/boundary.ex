@@ -211,7 +211,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   defp rebuild_view do
     Boundary.Mix.load_app()
-    Boundary.Mix.View.build(Boundary.Mix.app_name())
+    Boundary.Mix.View.build()
   end
 
   defp status([], _), do: :ok
