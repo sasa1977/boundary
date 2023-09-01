@@ -550,7 +550,7 @@ defmodule Boundary do
   """
 
   require Boundary.Definition
-  alias Boundary.{Definition, View}
+  alias Boundary.Definition
 
   Code.eval_quoted(Definition.generate([deps: [], exports: [:Definition]], __ENV__), [], __ENV__)
 
@@ -593,9 +593,6 @@ defmodule Boundary do
 
   @doc false
   defmacro __using__(opts), do: Definition.generate(opts, __CALLER__)
-
-  @spec view(atom) :: view
-  def view(app), do: View.build(app)
 
   @doc """
   Returns definitions of all boundaries of the main app.

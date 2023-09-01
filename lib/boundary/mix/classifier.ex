@@ -1,4 +1,4 @@
-defmodule Boundary.Classifier do
+defmodule Boundary.Mix.Classifier do
   @moduledoc false
 
   @type t :: %{boundaries: %{Boundary.name() => Boundary.t()}, modules: %{module() => Boundary.name()}}

@@ -19,7 +19,7 @@ defmodule Mix.Tasks.Boundary.FindExternalDeps do
     Mix.Task.run("compile")
     Boundary.Mix.load_app()
 
-    view = Boundary.view(Boundary.Mix.app_name())
+    view = Boundary.Mix.View.build(Boundary.Mix.app_name())
 
     message =
       view

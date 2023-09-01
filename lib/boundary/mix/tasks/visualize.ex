@@ -16,7 +16,7 @@ defmodule Mix.Tasks.Boundary.Visualize do
 
     File.mkdir(@output_folder)
 
-    view = Boundary.view(Boundary.Mix.app_name())
+    view = Boundary.Mix.View.build(Boundary.Mix.app_name())
 
     view
     |> Boundary.all()

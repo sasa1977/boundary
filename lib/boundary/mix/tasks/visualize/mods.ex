@@ -26,7 +26,7 @@ defmodule Mix.Tasks.Boundary.Visualize.Mods do
 
     Boundary.Mix.load_app()
 
-    view = Boundary.view(Boundary.Mix.app_name())
+    view = Boundary.Mix.View.build(Boundary.Mix.app_name())
     boundaries = Enum.map(argv, &Module.concat([&1]))
 
     state =

@@ -1,6 +1,6 @@
-defmodule Boundary.View do
+defmodule Boundary.Mix.View do
   @moduledoc false
-  alias Boundary.Classifier
+  alias Boundary.Mix.Classifier
 
   @type t :: %{
           version: String.t(),

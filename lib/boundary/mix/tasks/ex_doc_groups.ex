@@ -47,8 +47,8 @@ defmodule Mix.Tasks.Boundary.ExDocGroups do
     Boundary.Mix.load_app()
 
     app = Boundary.Mix.app_name()
-    modules = Boundary.View.app_modules(app)
-    view = Boundary.view(app)
+    modules = Boundary.Mix.View.app_modules(app)
+    view = Boundary.Mix.View.build(app)
 
     mapping =
       for module <- modules,

@@ -194,12 +194,12 @@ defmodule Mix.Tasks.Compile.Boundary do
       view =
         with false <- Keyword.get(opts, :force, false),
              view when not is_nil(view) <- Boundary.Mix.read_manifest("boundary_view"),
-             view when not is_nil(view) <- Boundary.View.refresh(view, user_apps),
+             view when not is_nil(view) <- Boundary.Mix.View.refresh(view, user_apps),
              do: view,
              else: (_ -> rebuild_view())
 
       stored_view =
-        Enum.reduce(user_apps, %{view | unclassified_modules: MapSet.new()}, &Boundary.View.drop_app(&2, &1))
+        Enum.reduce(user_apps, %{view | unclassified_modules: MapSet.new()}, &Boundary.Mix.View.drop_app(&2, &1))
 
       Boundary.Mix.write_manifest("boundary_view", stored_view)
 
@@ -211,7 +211,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   defp rebuild_view do
     Boundary.Mix.load_app()
-    Boundary.View.build(Boundary.Mix.app_name())
+    Boundary.Mix.View.build(Boundary.Mix.app_name())
   end
 
   defp status([], _), do: :ok
