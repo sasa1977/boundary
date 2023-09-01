@@ -25,8 +25,29 @@ defmodule Boundary.Mix.View do
     }
   end
 
-  @spec refresh(Boundary.view(), [atom]) :: Boundary.view() | nil
-  def refresh(%{version: unquote(Mix.Project.config()[:version])} = view, apps) do
+  @spec refresh(Application.app(), force: boolean) :: Boundary.view()
+  def refresh(user_apps, opts) do
+    view =
+      with false <- Keyword.get(opts, :force, false),
+           view = Boundary.Mix.read_manifest("boundary_view"),
+           %{version: unquote(Mix.Project.config()[:version])} <- view,
+           %{} = view <- do_refresh(view, user_apps) do
+        view
+      else
+        _ ->
+          Boundary.Mix.load_app()
+          build()
+      end
+
+    stored_view =
+      Enum.reduce(user_apps, %{view | unclassified_modules: MapSet.new()}, &drop_app(&2, &1))
+
+    Boundary.Mix.write_manifest("boundary_view", stored_view)
+
+    view
+  end
+
+  defp do_refresh(%{version: unquote(Mix.Project.config()[:version])} = view, apps) do
     module_to_app =
       for {app, _description, _vsn} <- Application.loaded_applications(),
           module <- Boundary.Mix.app_modules(app),
@@ -57,10 +78,7 @@ defmodule Boundary.Mix.View do
     end
   end
 
-  def refresh(_, _), do: nil
-
-  @spec drop_app(Boundary.view(), atom) :: Boundary.view()
-  def drop_app(view, app) do
+  defp drop_app(view, app) do
     modules_to_delete = for {module, ^app} <- view.module_to_app, do: module
     module_to_app = Map.drop(view.module_to_app, modules_to_delete)
     classifier = Classifier.delete(view.classifier, app)
