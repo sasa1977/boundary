@@ -576,7 +576,8 @@ defmodule Boundary do
           unclassified_modules: MapSet.t(module),
           module_to_app: %{module => Application.app()},
           external_deps: MapSet.t(module),
-          boundary_defs: %{module => %{atom => any}}
+          boundary_defs: %{module => %{atom => any}},
+          protocol_impls: MapSet.t(module)
         }
 
   @type classifier :: %{boundaries: %{Boundary.name() => Boundary.t()}, modules: %{module() => Boundary.name()}}
@@ -656,8 +657,12 @@ defmodule Boundary do
   def app(view, module), do: Map.get(view.module_to_app, module)
 
   @doc "Returns true if the module is an implementation of some protocol."
-  @spec protocol_impl?(module) :: boolean
-  def protocol_impl?(module), do: function_exported?(module, :__impl__, 1)
+  @spec protocol_impl?(view, module) :: boolean
+  def protocol_impl?(view, module) do
+    if app(view, module) == view.main_app,
+      do: MapSet.member?(view.protocol_impls, module),
+      else: function_exported?(module, :__impl__, 1)
+  end
 
   @doc "Returns the immediate parent of the boundary, or nil if the boundary is a top-level boundary."
   @spec parent(view, t) :: t | nil

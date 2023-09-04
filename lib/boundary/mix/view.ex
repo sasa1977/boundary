@@ -19,11 +19,20 @@ defmodule Boundary.Mix.View do
       version: unquote(Mix.Project.config()[:version]),
       main_app: main_app,
       classifier: classifier,
-      unclassified_modules: unclassified_modules(main_app, classifier.modules),
+      unclassified_modules: nil,
       module_to_app: module_to_app,
       external_deps: all_external_deps(main_app, main_app_boundaries, module_to_app),
-      boundary_defs: CompilerState.boundary_defs(main_app)
+      boundary_defs: nil,
+      protocol_impls: nil
     }
+    |> load_main_app_cache()
+    |> then(&Map.update!(&1, :unclassified_modules, fn _ -> unclassified_modules(&1) end))
+  end
+
+  defp load_main_app_cache(view) do
+    boundary_defs = CompilerState.boundary_defs(view.main_app)
+    protocol_impls = CompilerState.protocol_impls(view.main_app)
+    %{view | boundary_defs: boundary_defs, protocol_impls: protocol_impls}
   end
 
   @spec refresh(Application.app(), force: boolean) :: Boundary.view()
@@ -41,7 +50,11 @@ defmodule Boundary.Mix.View do
       end
 
     stored_view =
-      Enum.reduce(user_apps, %{view | unclassified_modules: MapSet.new(), boundary_defs: %{}}, &drop_app(&2, &1))
+      Enum.reduce(
+        user_apps,
+        %{view | unclassified_modules: MapSet.new(), boundary_defs: %{}, protocol_impls: %{}},
+        &drop_app(&2, &1)
+      )
 
     Boundary.Mix.write_manifest("boundary_view", stored_view)
 
@@ -49,7 +62,7 @@ defmodule Boundary.Mix.View do
   end
 
   defp do_refresh(%{version: unquote(Mix.Project.config()[:version])} = view, apps) do
-    view = %{view | boundary_defs: CompilerState.boundary_defs(view.main_app)}
+    view = load_main_app_cache(view)
 
     module_to_app =
       for {app, _description, _vsn} <- Application.loaded_applications(),
@@ -74,7 +87,7 @@ defmodule Boundary.Mix.View do
           end
         )
 
-      unclassified_modules = unclassified_modules(view.main_app, view.classifier.modules)
+      unclassified_modules = unclassified_modules(view)
       %{view | unclassified_modules: unclassified_modules}
     else
       nil
@@ -172,11 +185,11 @@ defmodule Boundary.Mix.View do
     )
   end
 
-  defp unclassified_modules(main_app, classified_modules) do
+  defp unclassified_modules(view) do
     # gather unclassified modules of this app
-    for module <- Boundary.Mix.app_modules(main_app),
-        not Map.has_key?(classified_modules, module),
-        not Boundary.protocol_impl?(module),
+    for module <- Boundary.Mix.app_modules(view.main_app),
+        not Map.has_key?(view.classifier.modules, module),
+        not Boundary.protocol_impl?(view, module),
         into: MapSet.new(),
         do: module
   end

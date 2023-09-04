@@ -123,6 +123,11 @@ defmodule Mix.Tasks.Compile.Boundary do
     :ok
   end
 
+  def trace({:on_module, _bytecode, _ignore}, env) do
+    CompilerState.add_module_meta(env.module, :protocol?, Module.defines?(env.module, {:__impl__, 1}, :def))
+    :ok
+  end
+
   def trace(_event, _env), do: :ok
 
   defp record(to_module, meta, env, mode, type) do

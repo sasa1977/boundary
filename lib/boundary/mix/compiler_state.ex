@@ -89,6 +89,21 @@ defmodule Boundary.Mix.CompilerState do
     end
   end
 
+  @doc """
+  Returns a mapset with all protocol implementation modules (define with `defimpl`) in the given app.
+
+  If no cache exists, `nil` is returned.
+  """
+  @spec protocol_impls(Application.app()) :: MapSet.t(module) | nil
+  def protocol_impls(app) do
+    if metas = module_metas(app) do
+      for {module, properties} <- metas,
+          {:protocol?, true} <- properties,
+          into: MapSet.new(),
+          do: module
+    end
+  end
+
   defp module_metas(app) do
     table = modules_table(app)
 
