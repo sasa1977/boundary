@@ -40,7 +40,7 @@ defmodule Boundary.Mix.CompilerState do
   def flush(app_modules) do
     app_modules = MapSet.new(app_modules)
 
-    for module <- stored_modules(),
+    for module <- ets_keys(references_table()),
         not MapSet.member?(app_modules, module),
         table <- [references_table(), modules_table()],
         do: :ets.delete(table, module)
@@ -74,6 +74,33 @@ defmodule Boundary.Mix.CompilerState do
     :ok
   end
 
+  @doc """
+  Returns an enumerable stream of cached raw boundary definitions
+
+  If no cache exists, `nil` is returned.
+  """
+  @spec boundary_defs(Application.app()) :: Enumerable.t({module, %{atom => any}}) | nil
+  def boundary_defs(app) do
+    if metas = module_metas(app) do
+      for {module, properties} <- metas,
+          {:boundary_def, def} <- properties,
+          into: %{},
+          do: {module, def}
+    end
+  end
+
+  defp module_metas(app) do
+    table = modules_table(app)
+
+    if :ets.info(table) == :undefined do
+      nil
+    else
+      table
+      |> ets_keys()
+      |> Stream.map(fn module -> {module, :ets.lookup_element(table, module, 2)} end)
+    end
+  end
+
   @impl GenServer
   def init(opts) do
     :ets.new(seen_table(), [:set, :public, :named_table, read_concurrency: true, write_concurrency: true])
@@ -91,12 +118,12 @@ defmodule Boundary.Mix.CompilerState do
     {:ok, %{}}
   end
 
-  defp stored_modules do
+  defp ets_keys(table) do
     Stream.unfold(
-      :ets.first(references_table()),
+      :ets.first(table),
       fn
         :"$end_of_table" -> nil
-        key -> {key, :ets.next(references_table(), key)}
+        key -> {key, :ets.next(table, key)}
       end
     )
   end
@@ -137,7 +164,7 @@ defmodule Boundary.Mix.CompilerState do
 
   defp seen_table, do: :"#{__MODULE__}.#{app_name()}.Seen"
   defp references_table, do: :"#{__MODULE__}.#{app_name()}.References"
-  defp modules_table, do: :"#{__MODULE__}.#{app_name()}.Modules"
+  defp modules_table(app \\ app_name()), do: :"#{__MODULE__}.#{app}.Modules"
 
   defp app_name, do: Keyword.fetch!(Mix.Project.config(), :app)
 end

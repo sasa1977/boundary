@@ -1,6 +1,6 @@
 defmodule Boundary.Mix.View do
   @moduledoc false
-  alias Boundary.Mix.Classifier
+  alias Boundary.Mix.{Classifier, CompilerState}
 
   @spec build() :: Boundary.view()
   def build do
@@ -21,7 +21,8 @@ defmodule Boundary.Mix.View do
       classifier: classifier,
       unclassified_modules: unclassified_modules(main_app, classifier.modules),
       module_to_app: module_to_app,
-      external_deps: all_external_deps(main_app, main_app_boundaries, module_to_app)
+      external_deps: all_external_deps(main_app, main_app_boundaries, module_to_app),
+      boundary_defs: CompilerState.boundary_defs(main_app)
     }
   end
 
@@ -40,7 +41,7 @@ defmodule Boundary.Mix.View do
       end
 
     stored_view =
-      Enum.reduce(user_apps, %{view | unclassified_modules: MapSet.new()}, &drop_app(&2, &1))
+      Enum.reduce(user_apps, %{view | unclassified_modules: MapSet.new(), boundary_defs: %{}}, &drop_app(&2, &1))
 
     Boundary.Mix.write_manifest("boundary_view", stored_view)
 
@@ -48,6 +49,8 @@ defmodule Boundary.Mix.View do
   end
 
   defp do_refresh(%{version: unquote(Mix.Project.config()[:version])} = view, apps) do
+    view = %{view | boundary_defs: CompilerState.boundary_defs(view.main_app)}
+
     module_to_app =
       for {app, _description, _vsn} <- Application.loaded_applications(),
           module <- Boundary.Mix.app_modules(app),
@@ -66,7 +69,7 @@ defmodule Boundary.Mix.View do
             app_modules = Boundary.Mix.app_modules(app)
             module_to_app = for module <- app_modules, into: view.module_to_app, do: {module, app}
             app_boundaries = load_app_boundaries(app, app_modules, module_to_app)
-            classifier = Classifier.classify(view.classifier, app_modules, app_boundaries)
+            classifier = Classifier.classify(view.classifier, app, app_modules, app_boundaries)
             %{view | classifier: classifier, module_to_app: module_to_app}
           end
         )
@@ -90,14 +93,14 @@ defmodule Boundary.Mix.View do
     main_app_boundaries = load_app_boundaries(main_app, main_app_modules, module_to_app)
 
     classifier = classify_external_deps(main_app_boundaries, module_to_app)
-    Classifier.classify(classifier, main_app_modules, main_app_boundaries)
+    Classifier.classify(classifier, main_app, main_app_modules, main_app_boundaries)
   end
 
   defp classify_external_deps(main_app_boundaries, module_to_app) do
     Enum.reduce(
       load_external_boundaries(main_app_boundaries, module_to_app),
       Classifier.new(),
-      &Classifier.classify(&2, &1.modules, &1.boundaries)
+      &Classifier.classify(&2, &1.app, &1.modules, &1.boundaries)
     )
   end
 
@@ -110,7 +113,9 @@ defmodule Boundary.Mix.View do
   end
 
   defp load_app_boundaries(app_name, modules, module_to_app) do
-    for module <- modules, boundary = Boundary.Definition.get(module) do
+    boundary_defs = CompilerState.boundary_defs(app_name)
+
+    for module <- modules, boundary = Boundary.Definition.get(module, boundary_defs) do
       check_apps =
         for {dep_name, _mode} <- boundary.deps,
             app = Map.get(module_to_app, dep_name),
@@ -162,7 +167,7 @@ defmodule Boundary.Mix.View do
             end)
           end
 
-        %{modules: modules, boundaries: boundaries}
+        %{app: app, modules: modules, boundaries: boundaries}
       end
     )
   end

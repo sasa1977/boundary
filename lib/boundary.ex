@@ -575,7 +575,8 @@ defmodule Boundary do
           classifier: classifier,
           unclassified_modules: MapSet.t(module),
           module_to_app: %{module => Application.app()},
-          external_deps: MapSet.t(module)
+          external_deps: MapSet.t(module),
+          boundary_defs: %{module => %{atom => any}}
         }
 
   @type classifier :: %{boundaries: %{Boundary.name() => Boundary.t()}, modules: %{module() => Boundary.name()}}
