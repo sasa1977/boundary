@@ -35,7 +35,7 @@ defmodule Boundary.Mix.View do
     %{view | boundary_defs: boundary_defs, protocol_impls: protocol_impls}
   end
 
-  @spec refresh(Application.app(), force: boolean) :: Boundary.view()
+  @spec refresh([Application.app()], force: boolean) :: Boundary.view()
   def refresh(user_apps, opts) do
     view =
       with false <- Keyword.get(opts, :force, false),

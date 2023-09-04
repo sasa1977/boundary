@@ -4,7 +4,7 @@ defmodule Boundary.Mix.Classifier do
   @spec new :: Boundary.classifier()
   def new, do: %{boundaries: %{}, modules: %{}}
 
-  @spec delete(Boundary.classifier(), atom) :: Boundary.classifier()
+  @spec delete(Boundary.classifier(), Application.app()) :: Boundary.classifier()
   def delete(classifier, app) do
     boundaries_to_delete =
       classifier.boundaries
