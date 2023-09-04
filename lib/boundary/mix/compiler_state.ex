@@ -2,15 +2,21 @@ defmodule Boundary.Mix.CompilerState do
   @moduledoc false
   use GenServer
 
-  @spec start_link(force: boolean) :: GenServer.on_start()
+  @spec start_link(force: boolean) :: {:ok, pid}
   def start_link(opts \\ []) do
     # The GenServer name (and ets tables) must contain app name, to properly work in umbrellas.
-    result = GenServer.start_link(__MODULE__, opts, name: :"#{__MODULE__}.#{Boundary.Mix.app_name()}")
+    name = :"#{__MODULE__}.#{Boundary.Mix.app_name()}"
 
-    if match?({:ok, _pid}, result) or match?({:error, {:already_started, _pid}}, result),
-      do: :ets.delete_all_objects(seen_table())
+    pid =
+      case GenServer.start_link(__MODULE__, opts, name: name) do
+        {:ok, pid} -> pid
+        # this can happen in ElixirLS, since the process remains alive after the compilation run
+        {:error, {:already_started, pid}} -> pid
+      end
 
-    result
+    :ets.delete_all_objects(seen_table())
+
+    {:ok, pid}
   end
 
   @spec record_references(module, map) :: :ok
