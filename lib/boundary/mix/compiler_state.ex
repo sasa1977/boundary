@@ -4,11 +4,8 @@ defmodule Boundary.Mix.CompilerState do
 
   @spec start_link(force: boolean) :: {:ok, pid}
   def start_link(opts \\ []) do
-    # The GenServer name (and ets tables) must contain app name, to properly work in umbrellas.
-    name = :"#{__MODULE__}.#{Boundary.Mix.app_name()}"
-
     pid =
-      case GenServer.start_link(__MODULE__, opts, name: name) do
+      case GenServer.start_link(__MODULE__, opts, name: name()) do
         {:ok, pid} -> pid
         # this can happen in ElixirLS, since the process remains alive after the compilation run
         {:error, {:already_started, pid}} -> pid
@@ -19,6 +16,10 @@ defmodule Boundary.Mix.CompilerState do
     {:ok, pid}
   end
 
+  defp name,
+    # The GenServer name (and ets tables) must contain app name, to properly work in umbrellas.
+    do: :"#{__MODULE__}.#{app_name()}"
+
   @spec record_references(module, map) :: :ok
   def record_references(from, entry) do
     :ets.insert(references_table(), {from, entry})
@@ -27,7 +28,11 @@ defmodule Boundary.Mix.CompilerState do
 
   @spec initialize_module(module) :: :ok
   def initialize_module(module) do
-    if :ets.insert_new(seen_table(), {module}), do: :ets.delete(references_table(), module)
+    if :ets.insert_new(seen_table(), {module}) do
+      :ets.delete(references_table(), module)
+      :ets.delete(modules_table(), module)
+    end
+
     :ok
   end
 
@@ -35,9 +40,10 @@ defmodule Boundary.Mix.CompilerState do
   def flush(app_modules) do
     app_modules = MapSet.new(app_modules)
 
-    stored_modules()
-    |> Stream.reject(&MapSet.member?(app_modules, &1))
-    |> Enum.each(&:ets.delete(references_table(), &1))
+    for module <- stored_modules(),
+        not MapSet.member?(app_modules, module),
+        table <- [references_table(), modules_table()],
+        do: :ets.delete(table, module)
 
     app_modules
     |> Enum.map(&Task.async(fn -> compress_entries(&1) end))
@@ -45,6 +51,7 @@ defmodule Boundary.Mix.CompilerState do
 
     :ets.delete_all_objects(seen_table())
     :ets.tab2file(references_table(), to_charlist(Boundary.Mix.manifest_path("boundary_references")))
+    :ets.tab2file(modules_table(), to_charlist(Boundary.Mix.manifest_path("boundary_modules")))
   end
 
   @doc "Returns a lazy stream where each element is of type `t:Boundary.ref()`"
@@ -52,6 +59,19 @@ defmodule Boundary.Mix.CompilerState do
   def references do
     :ets.tab2list(references_table())
     |> Enum.map(fn {from_module, info} -> Map.put(info, :from, from_module) end)
+  end
+
+  @doc """
+  Stores module meta.
+
+  The data is stored in memory, and later flushed to the manifest file.
+  """
+  @spec add_module_meta(module, any, any) :: :ok
+  def add_module_meta(module, key, value) do
+    with pid when is_pid(pid) <- GenServer.whereis(name()),
+         do: :ets.insert(modules_table(), {module, {key, value}})
+
+    :ok
   end
 
   @impl GenServer
@@ -62,6 +82,11 @@ defmodule Boundary.Mix.CompilerState do
          {:ok, table} <- :ets.file2tab(String.to_charlist(Boundary.Mix.manifest_path("boundary_references"))),
          do: table,
          else: (_ -> :ets.new(references_table(), [:named_table, :public, :duplicate_bag, write_concurrency: true]))
+
+    with false <- Keyword.get(opts, :force, false),
+         {:ok, table} <- :ets.file2tab(String.to_charlist(Boundary.Mix.manifest_path("boundary_modules"))),
+         do: table,
+         else: (_ -> :ets.new(modules_table(), [:named_table, :public, :duplicate_bag, write_concurrency: true]))
 
     {:ok, %{}}
   end
@@ -110,6 +135,9 @@ defmodule Boundary.Mix.CompilerState do
     |> Enum.sort_by(&{&1.file, &1.line})
   end
 
-  defp seen_table, do: :"#{__MODULE__}.#{Boundary.Mix.app_name()}.Seen"
-  defp references_table, do: :"#{__MODULE__}.#{Boundary.Mix.app_name()}.References"
+  defp seen_table, do: :"#{__MODULE__}.#{app_name()}.Seen"
+  defp references_table, do: :"#{__MODULE__}.#{app_name()}.References"
+  defp modules_table, do: :"#{__MODULE__}.#{app_name()}.Modules"
+
+  defp app_name, do: Keyword.fetch!(Mix.Project.config(), :app)
 end

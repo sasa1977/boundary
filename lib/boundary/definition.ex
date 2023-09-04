@@ -55,17 +55,10 @@ defmodule Boundary.Definition do
       protocol? = Module.defines?(__MODULE__, {:__impl__, 1}, :def)
       mix_task? = String.starts_with?(inspect(__MODULE__), "Mix.Tasks.")
 
-      Module.put_attribute(
-        __MODULE__,
-        Boundary,
-        %{
-          opts: @opts,
-          pos: @pos,
-          app: @app,
-          protocol?: protocol?,
-          mix_task?: mix_task?
-        }
-      )
+      data = %{opts: @opts, pos: @pos, app: @app, protocol?: protocol?, mix_task?: mix_task?}
+
+      Boundary.Mix.CompilerState.add_module_meta(__MODULE__, :boundary_def, data)
+      Module.put_attribute(__MODULE__, Boundary, data)
     end
   end
 

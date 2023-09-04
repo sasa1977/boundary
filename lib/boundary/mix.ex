@@ -1,7 +1,10 @@
 defmodule Boundary.Mix do
   @moduledoc false
 
-  use Boundary, deps: [Boundary, Mix]
+  use Boundary,
+    deps: [Boundary, Mix],
+    # needs to be exported because modules which `use Boundary` invoke `CompilerState` during compilation
+    exports: [CompilerState]
 
   @spec app_name :: atom
   def app_name, do: Keyword.fetch!(Mix.Project.config(), :app)
