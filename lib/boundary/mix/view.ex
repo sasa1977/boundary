@@ -37,9 +37,11 @@ defmodule Boundary.Mix.View do
 
   @spec refresh([Application.app()], force: boolean) :: Boundary.view()
   def refresh(user_apps, opts) do
+    manifest_file = "boundary_view_v2"
+
     view =
       with false <- Keyword.get(opts, :force, false),
-           view = Boundary.Mix.read_manifest("boundary_view"),
+           view = Boundary.Mix.read_manifest(manifest_file),
            %{version: unquote(Mix.Project.config()[:version])} <- view,
            %{} = view <- do_refresh(view, user_apps) do
         view
@@ -56,7 +58,7 @@ defmodule Boundary.Mix.View do
         &drop_app(&2, &1)
       )
 
-    Boundary.Mix.write_manifest("boundary_view", stored_view)
+    Boundary.Mix.write_manifest(manifest_file, stored_view)
 
     view
   end
