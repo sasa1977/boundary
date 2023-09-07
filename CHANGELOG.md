@@ -1,3 +1,7 @@
+# 0.10.1
+
+- Improved compiler performance. On a large project (7k+ files, 480k LOC), the running time is reduced from about 50 seconds to about 1 second.
+
 # 0.10.0
 
 - Added the support for ignoring "dirty" xrefs via the `dirty_xrefs` option. See `Boundary` module docs for details.
