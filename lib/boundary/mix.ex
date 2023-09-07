@@ -1,7 +1,10 @@
 defmodule Boundary.Mix do
   @moduledoc false
 
-  use Boundary, deps: [Boundary, Mix]
+  use Boundary,
+    deps: [Boundary, Mix],
+    # needs to be exported because modules which `use Boundary` invoke `CompilerState` during compilation
+    exports: [CompilerState]
 
   @spec app_name :: atom
   def app_name, do: Keyword.fetch!(Mix.Project.config(), :app)
@@ -12,6 +15,11 @@ defmodule Boundary.Mix do
     load_compile_time_deps()
     :ok
   end
+
+  @spec app_modules(Application.app()) :: [module]
+  def app_modules(app),
+    # we're currently supporting only Elixir modules
+    do: Enum.filter(Application.spec(app, :modules) || [], &String.starts_with?(Atom.to_string(&1), "Elixir."))
 
   @spec manifest_path(String.t()) :: String.t()
   def manifest_path(name), do: Path.join(Mix.Project.manifest_path(Mix.Project.config()), "compile.#{name}")

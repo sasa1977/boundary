@@ -3,7 +3,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   use Boundary, classify_to: Boundary.Mix
   use Mix.Task.Compiler
-  alias Boundary.Mix.Xref
+  alias Boundary.Mix.CompilerState
 
   @moduledoc """
   Verifies cross-module function calls according to defined boundaries.
@@ -88,7 +88,7 @@ defmodule Mix.Tasks.Compile.Boundary do
   def run(argv) do
     {opts, _rest, _errors} = OptionParser.parse(argv, strict: [force: :boolean, warnings_as_errors: :boolean])
 
-    Xref.start_link(Keyword.take(opts, [:force]))
+    CompilerState.start_link(Keyword.take(opts, [:force]))
     Mix.Task.Compiler.after_compiler(:elixir, &after_elixir_compiler/1)
     Mix.Task.Compiler.after_compiler(:app, &after_app_compiler(&1, opts))
 
@@ -123,6 +123,11 @@ defmodule Mix.Tasks.Compile.Boundary do
     :ok
   end
 
+  def trace({:on_module, _bytecode, _ignore}, env) do
+    CompilerState.add_module_meta(env.module, :protocol?, Module.defines?(env.module, {:__impl__, 1}, :def))
+    :ok
+  end
+
   def trace(_event, _env), do: :ok
 
   defp record(to_module, meta, env, mode, type) do
@@ -132,7 +137,7 @@ defmodule Mix.Tasks.Compile.Boundary do
 
     unless env.module in [nil, to_module] or system_module?(to_module) or
              not String.starts_with?(Atom.to_string(to_module), "Elixir.") do
-      Xref.record(
+      CompilerState.record_references(
         env.module,
         %{
           from_function: env.function,
@@ -149,7 +154,7 @@ defmodule Mix.Tasks.Compile.Boundary do
   end
 
   defp initialize_module(module),
-    do: unless(is_nil(module), do: Xref.initialize_module(module))
+    do: unless(is_nil(module), do: CompilerState.initialize_module(module))
 
   # Building the list of "system modules", which we'll exclude from the traced data, to reduce the collected data and
   # processing time.
@@ -179,7 +184,7 @@ defmodule Mix.Tasks.Compile.Boundary do
       Application.unload(Boundary.Mix.app_name())
       Application.load(Boundary.Mix.app_name())
 
-      Xref.flush(Application.spec(Boundary.Mix.app_name(), :modules) || [])
+      CompilerState.flush(Application.spec(Boundary.Mix.app_name(), :modules) || [])
 
       # Caching of the built view for non-user apps. A user app is the main app of the project, and all local deps
       # (in-umbrella and path deps). All other apps are library dependencies, and we're caching the boundary view of such
@@ -191,27 +196,12 @@ defmodule Mix.Tasks.Compile.Boundary do
             into: MapSet.new([Boundary.Mix.app_name()]),
             do: app
 
-      view =
-        with false <- Keyword.get(opts, :force, false),
-             view when not is_nil(view) <- Boundary.Mix.read_manifest("boundary_view"),
-             view when not is_nil(view) <- Boundary.View.refresh(view, user_apps),
-             do: view,
-             else: (_ -> rebuild_view())
+      view = Boundary.Mix.View.refresh(user_apps, Keyword.take(opts, ~w/force/a))
 
-      stored_view =
-        Enum.reduce(user_apps, %{view | unclassified_modules: MapSet.new()}, &Boundary.View.drop_app(&2, &1))
-
-      Boundary.Mix.write_manifest("boundary_view", stored_view)
-
-      errors = check(view, Xref.entries())
+      errors = check(view, CompilerState.references())
       print_diagnostic_errors(errors)
       {status(errors, opts), diagnostics ++ errors}
     end
-  end
-
-  defp rebuild_view do
-    Boundary.Mix.load_app()
-    Boundary.View.build(Boundary.Mix.app_name())
   end
 
   defp status([], _), do: :ok

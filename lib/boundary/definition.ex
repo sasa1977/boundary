@@ -55,28 +55,21 @@ defmodule Boundary.Definition do
       protocol? = Module.defines?(__MODULE__, {:__impl__, 1}, :def)
       mix_task? = String.starts_with?(inspect(__MODULE__), "Mix.Tasks.")
 
-      Module.put_attribute(
-        __MODULE__,
-        Boundary,
-        %{
-          opts: @opts,
-          pos: @pos,
-          app: @app,
-          protocol?: protocol?,
-          mix_task?: mix_task?
-        }
-      )
+      data = %{opts: @opts, pos: @pos, app: @app, protocol?: protocol?, mix_task?: mix_task?}
+
+      Boundary.Mix.CompilerState.add_module_meta(__MODULE__, :boundary_def, data)
+      Module.put_attribute(__MODULE__, Boundary, data)
     end
   end
 
-  def get(boundary) do
-    with definition when not is_nil(definition) <- definition(boundary) do
+  def get(boundary, defs) do
+    with definition when not is_nil(definition) <- definition(boundary, defs) do
       case Keyword.pop(definition.opts, :classify_to, nil) do
         {nil, opts} ->
           normalize(definition.app, boundary, opts, definition.pos)
 
         {classify_to, opts} ->
-          target_definition = definition(classify_to)
+          target_definition = definition(classify_to, defs)
 
           cond do
             is_nil(target_definition) or Keyword.get(target_definition.opts, :classify_to) != nil ->
@@ -96,8 +89,8 @@ defmodule Boundary.Definition do
     end
   end
 
-  def classified_to(module) do
-    with definition when not is_nil(definition) <- definition(module),
+  def classified_to(module, defs) do
+    with definition when not is_nil(definition) <- definition(module, defs),
          {:ok, boundary} <- Keyword.fetch(definition.opts, :classify_to),
          true <- definition.protocol? or definition.mix_task? do
       %{boundary: boundary, file: definition.pos.file, line: definition.pos.line}
@@ -106,12 +99,14 @@ defmodule Boundary.Definition do
     end
   end
 
-  defp definition(boundary) do
+  defp definition(boundary, nil) do
     with true <- :code.get_object_code(boundary) != :error,
          [definition] <- Keyword.get(boundary.__info__(:attributes), Boundary),
          do: definition,
          else: (_ -> nil)
   end
+
+  defp definition(boundary, defs), do: Map.get(defs, boundary)
 
   @doc false
   def normalize(app, boundary, definition, pos \\ %{file: nil, line: nil}) do

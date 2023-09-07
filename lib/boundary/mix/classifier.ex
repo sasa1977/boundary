@@ -1,12 +1,10 @@
-defmodule Boundary.Classifier do
+defmodule Boundary.Mix.Classifier do
   @moduledoc false
 
-  @type t :: %{boundaries: %{Boundary.name() => Boundary.t()}, modules: %{module() => Boundary.name()}}
-
-  @spec new :: t
+  @spec new :: Boundary.classifier()
   def new, do: %{boundaries: %{}, modules: %{}}
 
-  @spec delete(t, atom) :: t
+  @spec delete(Boundary.classifier(), Application.app()) :: Boundary.classifier()
   def delete(classifier, app) do
     boundaries_to_delete =
       classifier.boundaries
@@ -25,8 +23,8 @@ defmodule Boundary.Classifier do
     %{classifier | boundaries: boundaries, modules: modules}
   end
 
-  @spec classify(t, [module], [Boundary.t()]) :: t
-  def classify(classifier, modules, boundaries) do
+  @spec classify(Boundary.classifier(), Application.app(), [module], [Boundary.t()]) :: Boundary.classifier()
+  def classify(classifier, app, modules, boundaries) do
     trie = build_trie(boundaries)
 
     classifier = %{
@@ -42,8 +40,10 @@ defmodule Boundary.Classifier do
           |> Enum.into(classifier.boundaries, &{&1.name, &1})
     }
 
+    boundary_defs = Boundary.Mix.CompilerState.boundary_defs(app)
+
     for module <- modules,
-        boundary = find_boundary(trie, module),
+        boundary = find_boundary(trie, module, boundary_defs),
         reduce: classifier do
       classifier -> Map.update!(classifier, :modules, &Map.put(&1, module, boundary.name))
     end
@@ -66,24 +66,25 @@ defmodule Boundary.Classifier do
 
   defp new_trie, do: %{boundary: nil, children: %{}}
 
-  defp find_boundary(trie, module) when is_atom(module) do
-    case Boundary.Definition.classified_to(module) do
+  defp find_boundary(trie, module, boundary_defs) when is_atom(module) do
+    case Boundary.Definition.classified_to(module, boundary_defs) do
       nil ->
-        find_boundary(trie, Module.split(module))
+        find_boundary(trie, Module.split(module), boundary_defs)
 
       classified_to ->
         # If we can't find `classified_to`, it's an error in definition (like e.g. classifying to a reclassified
         # boundary). This error has already been reported (see `Boundary.Definition.get/1`), and here we treat the
         # boundary as if it was not reclassified.
-        find_boundary(trie, Module.split(classified_to.boundary)) || find_boundary(trie, Module.split(module))
+        find_boundary(trie, Module.split(classified_to.boundary), boundary_defs) ||
+          find_boundary(trie, Module.split(module), boundary_defs)
     end
   end
 
-  defp find_boundary(_trie, []), do: nil
+  defp find_boundary(_trie, [], _boundary_defs), do: nil
 
-  defp find_boundary(trie, [part | rest]) do
+  defp find_boundary(trie, [part | rest], boundary_defs) do
     case Map.fetch(trie.children, part) do
-      {:ok, child_trie} -> find_boundary(child_trie, rest) || child_trie.boundary
+      {:ok, child_trie} -> find_boundary(child_trie, rest, boundary_defs) || child_trie.boundary
       :error -> nil
     end
   end

@@ -157,11 +157,11 @@ defmodule Boundary.Checker do
 
   defp invalid_references(view, references) do
     for reference <- references,
-        not unclassified_protocol_impl?(reference),
+        not unclassified_protocol_impl?(view, reference),
 
         # Ignore protocol impl refs to protocol. These refs always exist, but due to classification
         # of the impl, they may belong to different boundaries
-        not reference_to_implemented_protocol?(reference),
+        not reference_to_implemented_protocol?(view, reference),
         from_boundary = Boundary.for_module(view, reference.from),
         to_boundaries = to_boundaries(view, from_boundary, reference),
         {type, to_boundary_name} <- [reference_error(view, reference, from_boundary, to_boundaries)] do
@@ -175,11 +175,13 @@ defmodule Boundary.Checker do
     end
   end
 
-  defp unclassified_protocol_impl?(reference),
-    do: Boundary.protocol_impl?(reference.from) and Boundary.Definition.classified_to(reference.from) == nil
+  defp unclassified_protocol_impl?(view, reference) do
+    Boundary.protocol_impl?(view, reference.from) and
+      Boundary.Definition.classified_to(reference.from, view.boundary_defs) == nil
+  end
 
-  defp reference_to_implemented_protocol?(reference),
-    do: function_exported?(reference.from, :__impl__, 1) and reference.from.__impl__(:protocol) == reference.to
+  defp reference_to_implemented_protocol?(view, reference),
+    do: Boundary.protocol_impl?(view, reference.from) and reference.from.__impl__(:protocol) == reference.to
 
   defp to_boundaries(view, from_boundary, reference) do
     case Boundary.for_module(view, reference.to) do
@@ -226,7 +228,7 @@ defmodule Boundary.Checker do
       to_boundary == from_boundary ->
         nil
 
-      Boundary.protocol_impl?(reference.to) ->
+      Boundary.protocol_impl?(view, reference.to) ->
         # We can enter here when there's `defimpl SomeProtocol, for: Type`. In this case, the caller
         # is `SomeProtocol`, while the callee is `SomeProtocol.Type`. This is never an error, so
         # we're ignoring this case.
@@ -341,7 +343,7 @@ defmodule Boundary.Checker do
 
     unused_dirty_xrefs =
       for reference <- references,
-          not (Boundary.protocol_impl?(reference.from) and is_nil(Boundary.Definition.classified_to(reference.from))),
+          not unclassified_protocol_impl?(view, reference),
           from_boundary = Boundary.for_module(view, reference.from),
           reduce: all_dirty_xrefs,
           do: (xrefs -> MapSet.delete(xrefs, {from_boundary.name, reference.to}))

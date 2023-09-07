@@ -550,7 +550,7 @@ defmodule Boundary do
   """
 
   require Boundary.Definition
-  alias Boundary.{Definition, View}
+  alias Boundary.Definition
 
   Code.eval_quoted(Definition.generate([deps: [], exports: [:Definition]], __ENV__), [], __ENV__)
 
@@ -569,7 +569,18 @@ defmodule Boundary do
           errors: [term]
         }
 
-  @type view :: map
+  @type view :: %{
+          version: String.t(),
+          main_app: Application.app(),
+          classifier: classifier,
+          unclassified_modules: MapSet.t(module),
+          module_to_app: %{module => Application.app()},
+          external_deps: MapSet.t(module),
+          boundary_defs: %{module => %{atom => any}},
+          protocol_impls: MapSet.t(module)
+        }
+
+  @type classifier :: %{boundaries: %{Boundary.name() => Boundary.t()}, modules: %{module() => Boundary.name()}}
 
   @type name :: module
   @type export :: module | {module, [except: [module]]}
@@ -588,14 +599,21 @@ defmodule Boundary do
           type: :normal | :runtime | :not_exported | :invalid_external_dep_call,
           from_boundary: name,
           to_boundary: name,
-          reference: Boundary.Mix.Xref.entry()
+          reference: ref()
+        }
+
+  @type ref :: %{
+          to: module,
+          from: module,
+          from_function: {function :: atom, arity :: non_neg_integer} | nil,
+          type: :call | :struct_expansion | :alias_reference,
+          mode: :compile | :runtime,
+          file: String.t(),
+          line: non_neg_integer
         }
 
   @doc false
   defmacro __using__(opts), do: Definition.generate(opts, __CALLER__)
-
-  @spec view(atom) :: view
-  def view(app), do: View.build(app)
 
   @doc """
   Returns definitions of all boundaries of the main app.
@@ -639,8 +657,12 @@ defmodule Boundary do
   def app(view, module), do: Map.get(view.module_to_app, module)
 
   @doc "Returns true if the module is an implementation of some protocol."
-  @spec protocol_impl?(module) :: boolean
-  def protocol_impl?(module), do: function_exported?(module, :__impl__, 1)
+  @spec protocol_impl?(view, module) :: boolean
+  def protocol_impl?(view, module) do
+    if app(view, module) == view.main_app,
+      do: MapSet.member?(view.protocol_impls, module),
+      else: function_exported?(module, :__impl__, 1)
+  end
 
   @doc "Returns the immediate parent of the boundary, or nil if the boundary is a top-level boundary."
   @spec parent(view, t) :: t | nil
