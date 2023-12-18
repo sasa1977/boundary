@@ -394,31 +394,14 @@ defmodule Mix.Tasks.Compile.Boundary do
   end
 
   def diagnostic(message, opts \\ []) do
-    diagnostic =
-      %Mix.Task.Compiler.Diagnostic{
-        compiler_name: "boundary",
-        details: nil,
-        file: nil,
-        message: message,
-        position: 0,
-        severity: :warning
-      }
-      |> Map.merge(Map.new(opts))
-
-    cond do
-      diagnostic.file == nil ->
-        %{diagnostic | file: "unknown"}
-
-      diagnostic.position == 0 and File.exists?(diagnostic.file) ->
-        num_lines =
-          diagnostic.file
-          |> File.stream!()
-          |> Enum.count()
-
-        %{diagnostic | position: {1, 0, num_lines + 1, 0}}
-
-      true ->
-        diagnostic
-    end
+    %Mix.Task.Compiler.Diagnostic{
+      compiler_name: "boundary",
+      details: nil,
+      file: nil,
+      message: message,
+      position: 0,
+      severity: :warning
+    }
+    |> struct(opts)
   end
 end
