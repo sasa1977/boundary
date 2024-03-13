@@ -72,7 +72,7 @@ defmodule Boundary.Mix.View do
           into: view.module_to_app,
           do: {module, app}
 
-    main_app_modules = Boundary.Mix.app_modules(view.main_app)
+    main_app_modules = main_app_modules(view.main_app)
     main_app_boundaries = load_app_boundaries(view.main_app, main_app_modules, module_to_app)
 
     if MapSet.equal?(view.external_deps, all_external_deps(view.main_app, main_app_boundaries, module_to_app)) do
@@ -104,7 +104,7 @@ defmodule Boundary.Mix.View do
   end
 
   defp classify(main_app, module_to_app) do
-    main_app_modules = Boundary.Mix.app_modules(main_app)
+    main_app_modules = main_app_modules(main_app)
     main_app_boundaries = load_app_boundaries(main_app, main_app_modules, module_to_app)
 
     classifier = classify_external_deps(main_app_boundaries, module_to_app)
@@ -189,10 +189,24 @@ defmodule Boundary.Mix.View do
 
   defp unclassified_modules(view) do
     # gather unclassified modules of this app
-    for module <- Boundary.Mix.app_modules(view.main_app),
+    for module <- main_app_modules(view.main_app),
         not Map.has_key?(view.classifier.modules, module),
         not Boundary.protocol_impl?(view, module),
         into: MapSet.new(),
         do: module
+  end
+
+  defp main_app_modules(app) do
+    # We take only explicitly defined modules which we've seen in the compilation tracer. This
+    # allows us to drop some implicit modules, such as protocol implementations which are injected
+    # via `@derive`.
+
+    MapSet.intersection(
+      # all app modules
+      MapSet.new(Boundary.Mix.app_modules(app)),
+
+      # encountered modules (explicitly defined via defmodule, defimpl, or some other macro)
+      MapSet.new(CompilerState.encountered_modules(app))
+    )
   end
 end
