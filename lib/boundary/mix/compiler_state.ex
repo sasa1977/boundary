@@ -104,7 +104,7 @@ defmodule Boundary.Mix.CompilerState do
     end
   end
 
-  @spec encountered_modules(Application.app()) :: [module]
+  @spec encountered_modules(Application.app()) :: Enumerable.t(module)
   def encountered_modules(app), do: ets_keys(modules_table(app))
 
   defp module_metas(app) do

@@ -23,7 +23,8 @@ defmodule Boundary.Mix.Classifier do
     %{classifier | boundaries: boundaries, modules: modules}
   end
 
-  @spec classify(Boundary.classifier(), Application.app(), [module], [Boundary.t()]) :: Boundary.classifier()
+  @spec classify(Boundary.classifier(), Application.app(), Enumerable.t(module), [Boundary.t()]) ::
+          Boundary.classifier()
   def classify(classifier, app, modules, boundaries) do
     trie = build_trie(boundaries)
 
