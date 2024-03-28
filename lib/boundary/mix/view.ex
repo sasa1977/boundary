@@ -8,7 +8,7 @@ defmodule Boundary.Mix.View do
 
     module_to_app =
       for {app, _description, _vsn} <- Application.loaded_applications(),
-          module <- Boundary.Mix.app_modules(app),
+          module <- app_modules(app, main_app),
           into: %{},
           do: {module, app}
 
@@ -68,7 +68,7 @@ defmodule Boundary.Mix.View do
 
     module_to_app =
       for {app, _description, _vsn} <- Application.loaded_applications(),
-          module <- Boundary.Mix.app_modules(app),
+          module <- app_modules(app, view.main_app),
           into: view.module_to_app,
           do: {module, app}
 
@@ -81,7 +81,8 @@ defmodule Boundary.Mix.View do
           apps,
           %{view | module_to_app: module_to_app},
           fn app, view ->
-            app_modules = Boundary.Mix.app_modules(app)
+            app_modules = app_modules(app, view.main_app)
+
             module_to_app = for module <- app_modules, into: view.module_to_app, do: {module, app}
             app_boundaries = load_app_boundaries(app, app_modules, module_to_app)
             classifier = Classifier.classify(view.classifier, app, app_modules, app_boundaries)
@@ -195,6 +196,9 @@ defmodule Boundary.Mix.View do
         into: MapSet.new(),
         do: module
   end
+
+  defp app_modules(main_app, main_app), do: main_app_modules(main_app)
+  defp app_modules(app, _main_app), do: Boundary.Mix.app_modules(app)
 
   defp main_app_modules(app) do
     # We take only explicitly defined modules which we've seen in the compilation tracer. This
