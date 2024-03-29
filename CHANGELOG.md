@@ -1,3 +1,7 @@
+# 0.10.3
+
+- Fixed false positives introduced in 0.10.2 (https://github.com/sasa1977/boundary/issues/64)
+
 # 0.10.2
 
 - Ignore implicitly defined modules, such as protocol impls added via `@derive`.
