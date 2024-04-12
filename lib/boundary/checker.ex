@@ -163,6 +163,8 @@ defmodule Boundary.Checker do
         # of the impl, they may belong to different boundaries
         not reference_to_implemented_protocol?(view, reference),
         from_boundary = Boundary.for_module(view, reference.from),
+        from_boundary != nil,
+        from_boundary.check.aliases or reference.type != :alias_reference,
         to_boundaries = to_boundaries(view, from_boundary, reference),
         {type, to_boundary_name} <- [reference_error(view, reference, from_boundary, to_boundaries)] do
       {:invalid_reference,
@@ -220,9 +222,6 @@ defmodule Boundary.Checker do
   defp reference_error(view, reference, from_boundary, to_boundary) do
     cond do
       not to_boundary.check.in ->
-        nil
-
-      reference.type == :alias_reference and not from_boundary.check.aliases ->
         nil
 
       to_boundary == from_boundary ->
