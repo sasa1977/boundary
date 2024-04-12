@@ -316,8 +316,14 @@ defmodule Boundary.Checker do
   defp compile_time_reference?(%{from: module, from_function: {name, arity}}), do: macro_exported?(module, name, arity)
   defp compile_time_reference?(_), do: false
 
-  defp cross_app_ref?(view, reference),
-    do: Boundary.app(view, reference.from) != Boundary.app(view, reference.to)
+  defp cross_app_ref?(view, reference) do
+    to_app = Boundary.app(view, reference.to)
+
+    # to_app may be nil if no module is defined with the given alias
+    # such call is treated as an in-app call
+    to_app != nil and
+      to_app != Boundary.app(view, reference.from)
+  end
 
   defp exported?(view, boundary, module) do
     boundary.implicit? or module == boundary.name or
