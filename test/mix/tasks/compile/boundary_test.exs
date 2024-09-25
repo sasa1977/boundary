@@ -1147,13 +1147,21 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module1 = unique_module_name()
   module2 = unique_module_name()
 
-  module_test "exporting all modules",
+  module_test "exporting all modules and submodules",
               """
               defmodule #{module1} do
                 use Boundary, exports: :all
 
                 defmodule Schemas.Foo do def fun(), do: :ok end
                 defmodule Schemas.Bar do def fun(), do: :ok end
+              end
+
+              defmodule #{module1}.Subdomain do
+                use Boundary, exports: :all
+              end
+
+              defmodule #{module1}.Subdomain.Module do
+                def fun(), do: :ok
               end
 
               defmodule #{module2} do
@@ -1163,6 +1171,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
                   #{module1}.Schemas.Foo.fun()
                   #{module1}.Schemas.Bar.fun()
                   #{module1}.Schemas.Base.fun()
+                  #{module1}.Subdomain.Module.fun()
                 end
               end
               """ do

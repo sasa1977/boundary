@@ -331,6 +331,10 @@ defmodule Boundary.Checker do
 
   defp export_matches?(_view, _boundary, module, module), do: true
 
+  defp export_matches?(_view, _boundary, {root, []}, module) do
+    String.starts_with?(to_string(module), to_string(root))
+  end
+
   defp export_matches?(view, boundary, {root, opts}, module) do
     String.starts_with?(to_string(module), to_string(root)) and
       not Enum.any?(Keyword.get(opts, :except, []), &(Module.concat(root, &1) == module)) and
