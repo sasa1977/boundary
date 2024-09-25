@@ -1154,14 +1154,16 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
                 defmodule Schemas.Foo do def fun(), do: :ok end
                 defmodule Schemas.Bar do def fun(), do: :ok end
-              end
 
-              defmodule #{module1}.Subdomain do
-                use Boundary, exports: :all
-              end
+                defmodule Subdomain do
+                  use Boundary, exports: :all
 
-              defmodule #{module1}.Subdomain.Module do
-                def fun(), do: :ok
+                  def fun(), do: :ok
+
+                  defmodule Module do
+                    def fun(), do: :ok
+                  end
+                end
               end
 
               defmodule #{module2} do
@@ -1171,6 +1173,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
                   #{module1}.Schemas.Foo.fun()
                   #{module1}.Schemas.Bar.fun()
                   #{module1}.Schemas.Base.fun()
+                  #{module1}.Subdomain.fun()
                   #{module1}.Subdomain.Module.fun()
                 end
               end

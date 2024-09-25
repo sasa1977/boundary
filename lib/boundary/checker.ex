@@ -127,8 +127,14 @@ defmodule Boundary.Checker do
         |> Stream.take_while(&(not is_nil(&1)))
         |> Enum.find(&(Enum.at(&1.ancestors, 0) == boundary.name))
         |> case do
-          nil -> false
-          child_subboundary -> export in [child_subboundary.name | child_subboundary.exports]
+          nil ->
+            false
+
+          %{exports: [{_, []}]} = child_subboundary ->
+            String.starts_with?(to_string(export), to_string(child_subboundary.name))
+
+          child_subboundary ->
+            export in [child_subboundary.name | child_subboundary.exports]
         end
     end
   end
@@ -330,10 +336,6 @@ defmodule Boundary.Checker do
   end
 
   defp export_matches?(_view, _boundary, module, module), do: true
-
-  defp export_matches?(_view, _boundary, {root, []}, module) do
-    String.starts_with?(to_string(module), to_string(root))
-  end
 
   defp export_matches?(view, boundary, {root, opts}, module) do
     String.starts_with?(to_string(module), to_string(root)) and
