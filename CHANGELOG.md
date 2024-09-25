@@ -1,3 +1,7 @@
+# 0.10.4
+
+- Properly ignore aliases in strict boundaries
+
 # 0.10.3
 
 - Fixed false positives introduced in 0.10.2 (https://github.com/sasa1977/boundary/issues/64)

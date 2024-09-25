@@ -1,7 +1,7 @@
 defmodule Boundary.MixProject do
   use Mix.Project
 
-  @version "0.10.3"
+  @version "0.10.4"
 
   def project do
     [
