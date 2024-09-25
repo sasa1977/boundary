@@ -130,8 +130,9 @@ defmodule Boundary.Checker do
           nil ->
             false
 
-          %{exports: [{_, []}]} = child_subboundary ->
-            String.starts_with?(to_string(export), to_string(child_subboundary.name))
+          # If the export's `owner_boundary` exports all modules, include sub-modules
+          %{exports: [{export_module, []}]} ->
+            String.starts_with?(to_string(export), to_string(export_module))
 
           child_subboundary ->
             export in [child_subboundary.name | child_subboundary.exports]

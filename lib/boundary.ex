@@ -182,8 +182,9 @@ defmodule Boundary do
   export all of these modules with the `exports: [{Schemas, except: [Base]}, ...]`. This will
   export all `MySystem.Schemas.*` modules, except for `MySystem.Schemas.Base`.
 
-  You can also export all modules of the boundary with `use Boundary, exports: :all`. To exclude
-  some modules from the export list use, `use Boundary, exports: {:all, except: [SomeMod, ...]}`.
+  You can also export all modules of the boundary with `use Boundary, exports: :all`. This will also
+  export all sub-modules of the boundary. To exclude some modules from the export list use,
+  `use Boundary, exports: {:all, except: [SomeMod, ...]}`.
 
   Mass export is not advised in most situations. Prefer explicitly listing exported modules. If
   your export list is long, it's a possible indication of an overly fragmented interface. Consider
