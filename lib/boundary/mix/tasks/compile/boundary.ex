@@ -72,6 +72,7 @@ defmodule Mix.Tasks.Compile.Boundary do
   warning: forbidden reference to MySystemWeb
     (references from MySystem to MySystemWeb are not allowed)
     lib/my_system/user.ex:3
+    See https://hexdocs.pm/boundary/Mix.Tasks.Compile.Boundary.html for details.
   ```
 
   Since the compiler emits warnings, `mix compile` will still succeed, and you can normally start
@@ -314,7 +315,8 @@ defmodule Mix.Tasks.Compile.Boundary do
           "(references from #{inspect(error.from_boundary)} to #{inspect(error.to_boundary)} are not allowed)"
       end
 
-    message = "forbidden reference to #{inspect(error.reference.to)}\n  #{reason}"
+    docs_link = "See https://hexdocs.pm/boundary/Mix.Tasks.Compile.Boundary.html for details."
+    message = "forbidden reference to #{inspect(error.reference.to)}\n  #{reason}\n  #{docs_link}"
 
     diagnostic(message, file: Path.relative_to_cwd(error.reference.file), position: error.reference.line)
   end

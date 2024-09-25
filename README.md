@@ -83,7 +83,7 @@ defmodule MySystem.MixProject do
 
   def project do
     [
-      compilers: [:boundary, :phoenix, :gettext] ++ Mix.compilers(),
+      compilers: [:boundary] ++ Mix.compilers(),
       # ...
     ]
   end
