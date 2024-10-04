@@ -1147,13 +1147,27 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   module1 = unique_module_name()
   module2 = unique_module_name()
 
-  module_test "exporting all modules",
+  module_test "exporting all modules and exports of all nested boundaries",
               """
               defmodule #{module1} do
                 use Boundary, exports: :all
 
                 defmodule Schemas.Foo do def fun(), do: :ok end
                 defmodule Schemas.Bar do def fun(), do: :ok end
+
+                defmodule SubModule do
+                  use Boundary, exports: [Module]
+
+                  def fun(), do: :ok
+
+                  defmodule Module do
+                    def fun(), do: :ok
+
+                    defmodule Private do
+                      def fun(), do: :ok
+                    end
+                  end
+                end
               end
 
               defmodule #{module2} do
@@ -1163,10 +1177,16 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
                   #{module1}.Schemas.Foo.fun()
                   #{module1}.Schemas.Bar.fun()
                   #{module1}.Schemas.Base.fun()
+                  #{module1}.SubModule.fun()
+                  #{module1}.SubModule.Module.fun()
+                  #{module1}.SubModule.Module.Private.fun()
                 end
               end
               """ do
-    assert warnings == []
+    assert [warning] = warnings
+
+    assert warning.message =~
+             "forbidden reference to #{unquote(module1)}.SubModule.Module.Private"
   end
 
   module1 = unique_module_name()

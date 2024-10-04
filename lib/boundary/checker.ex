@@ -127,8 +127,15 @@ defmodule Boundary.Checker do
         |> Stream.take_while(&(not is_nil(&1)))
         |> Enum.find(&(Enum.at(&1.ancestors, 0) == boundary.name))
         |> case do
-          nil -> false
-          child_subboundary -> export in [child_subboundary.name | child_subboundary.exports]
+          nil ->
+            false
+
+          # If the export's `owner_boundary` exports all modules, include sub-modules
+          %{exports: [{export_module, []}]} ->
+            String.starts_with?(to_string(export), to_string(export_module))
+
+          child_subboundary ->
+            export in [child_subboundary.name | child_subboundary.exports]
         end
     end
   end
