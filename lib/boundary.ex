@@ -42,6 +42,10 @@ defmodule Boundary do
     - `MySystem.Application` code may use `MySystem`, `MySystemWeb`, and `MySystemWeb.Endpoint`
       modules.
 
+  All other cross-boundary calls are not permitted.  In Phoenix projects this means you will 
+  require additional configuration to satisfy boundaries for modules generated inside 
+  `test/support/` folder. See the "Controlling Checks" section for more details.
+
   To enforce these rules on project compilation, you need to include the compiler in `mix.exs`:
 
   ```
