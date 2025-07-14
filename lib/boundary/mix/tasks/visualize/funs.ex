@@ -41,14 +41,10 @@ defmodule Mix.Tasks.Boundary.Visualize.Funs do
 
   @doc false
   def trace({local, _meta, callee_fun, _arity}, env) when local in ~w/local_function local_macro/a do
-    {caller_fun, _arity} =
-      case env.function do
-        nil -> {:__module__, 0} # fallback name for non-function scope
-        tuple -> tuple
-      end
-
-    if inspect(env.module) == :persistent_term.get({__MODULE__, :module}) and caller_fun != callee_fun,
-      do: :ets.insert(__MODULE__, {caller_fun, callee_fun})
+    with {caller_fun, _arity} <- env.function,
+         true <- inspect(env.module) == :persistent_term.get({__MODULE__, :module}),
+         true <- caller_fun != callee_fun,
+         do: :ets.insert(__MODULE__, {caller_fun, callee_fun})
 
     :ok
   end
