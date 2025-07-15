@@ -18,7 +18,7 @@ jobs:
           elixir-version: 1.15.4
 
       - name: Restore cached deps
-        uses: actions/cache@v1
+        uses: actions/cache@v4
         with:
           path: deps
           key: deps-${{ env.CACHE_VERSION }}-${{ github.ref }}-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
@@ -27,7 +27,7 @@ jobs:
             deps-${{ env.CACHE_VERSION }}-
 
       - name: Restore cached build
-        uses: actions/cache@v1
+        uses: actions/cache@v4
         with:
           path: _build
           key: build-${{ env.CACHE_VERSION }}-${{ github.ref }}-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
