@@ -129,7 +129,7 @@ defmodule Boundary.Checker do
     end
   end
 
-  defp exported_by_child_subboundary?(view, boundary, export) do
+  defp exported_by_child_subboundary?(view, boundary, export, parent_opts \\ []) do
     case Boundary.for_module(view, export) do
       nil ->
         false
@@ -149,7 +149,10 @@ defmodule Boundary.Checker do
             String.starts_with?(to_string(export), to_string(export_module))
 
           child_subboundary ->
-            export in [child_subboundary.name | child_subboundary.exports]
+            # When the parent uses `:all_including_sub_boundaries`, delegate to the child's export rules
+            export in [child_subboundary.name | child_subboundary.exports] or
+              (Keyword.get(parent_opts, :include_sub_boundaries, false) and
+                 exported?(view, child_subboundary, export))
         end
     end
   end
@@ -355,7 +358,8 @@ defmodule Boundary.Checker do
   defp export_matches?(view, boundary, {root, opts}, module) do
     String.starts_with?(to_string(module), to_string(root)) and
       not Enum.any?(Keyword.get(opts, :except, []), &(Module.concat(root, &1) == module)) and
-      (Boundary.for_module(view, module) == boundary or exported_by_child_subboundary?(view, boundary, module))
+      (Boundary.for_module(view, module) == boundary or
+         exported_by_child_subboundary?(view, boundary, module, opts))
   end
 
   defp export_matches?(_, _, _, _), do: false

@@ -186,6 +186,12 @@ defmodule Boundary do
   export all sub-modules of the boundary. To exclude some modules from the export list use,
   `use Boundary, exports: {:all, except: [SomeMod, ...]}`.
 
+  If the boundary has sub-boundaries, by default, the sub-boundary's exports are not re-exported
+  through the parent. If you want to re-export the sub-boundary's exports (so that consumers
+  of the parent boundary can reach into the sub-boundary's public modules), use
+  `use Boundary, exports: :all_including_sub_boundaries`. You can also further refine the export,
+  like: `use Boundary, exports: {:all_including_sub_boundaries, except: [SomeMod, ...]}`.
+
   Mass export is not advised in most situations. Prefer explicitly listing exported modules. If
   your export list is long, it's a possible indication of an overly fragmented interface. Consider
   instead consolidating the interface in the main boundary module, which would act as a facade.

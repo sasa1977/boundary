@@ -1220,6 +1220,95 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
   module1 = unique_module_name()
 
+  module_test "sub-boundary exports: {:all_including_sub_boundaries, except: [...]} is accessible via parent dep",
+              """
+              defmodule #{module1} do
+                use Boundary, exports: :all_including_sub_boundaries
+              end
+
+              defmodule #{module1}.Accounts do
+                use Boundary, exports: {:all, except: [ImplementationDetails]}
+              end
+
+              defmodule #{module1}.Accounts.User do
+                defstruct [:id]
+              end
+
+              defmodule #{module1}.Accounts.ImplementationDetails do
+                def fun(), do: :ok
+              end
+
+              defmodule #{module1}.Web do
+                use Boundary, deps: [#{module1}]
+
+                def user_id(%#{module1}.Accounts.User{} = user), do: user.id
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
+
+  module_test "sub-boundary exports: :all_including_sub_boundaries carries over exclusions",
+              """
+              defmodule #{module1} do
+                use Boundary, exports: :all_including_sub_boundaries
+              end
+
+              defmodule #{module1}.Accounts do
+                use Boundary, exports: {:all, except: [ImplementationDetails]}
+              end
+
+              defmodule #{module1}.Accounts.ImplementationDetails do
+                def fun(), do: :ok
+              end
+
+              defmodule #{module1}.Web do
+                use Boundary, deps: [#{module1}]
+
+                def foo, do: #{module1}.Accounts.ImplementationDetails.fun()
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "forbidden reference to #{unquote(module1)}.Accounts.ImplementationDetails"
+  end
+
+  module1 = unique_module_name()
+
+  module_test "exports: {:all_including_sub_boundaries, except: [...]} re-exports sub-boundary modules but honors the exclusion",
+              """
+              defmodule #{module1} do
+                use Boundary, exports: {:all_including_sub_boundaries, except: [Accounts.ImplementationDetails]}
+              end
+
+              defmodule #{module1}.Accounts do
+                use Boundary, exports: :all
+              end
+
+              defmodule #{module1}.Accounts.User do
+                defstruct [:id]
+              end
+
+              defmodule #{module1}.Accounts.ImplementationDetails do
+                def fun(), do: :ok
+              end
+
+              defmodule #{module1}.Web do
+                use Boundary, deps: [#{module1}]
+
+                # Allowed: re-exported through the parent via :all_including_sub_boundaries
+                def user_id(%#{module1}.Accounts.User{} = user), do: user.id
+
+                # Forbidden: excluded by the parent's `except`
+                def detail, do: #{module1}.Accounts.ImplementationDetails.fun()
+              end
+              """ do
+    assert [warning] = warnings
+    assert warning.message =~ "forbidden reference to #{unquote(module1)}.Accounts.ImplementationDetails"
+  end
+
+  module1 = unique_module_name()
+
   module_test "can't disable checks in a sub-boundary",
               """
               defmodule #{module1} do
