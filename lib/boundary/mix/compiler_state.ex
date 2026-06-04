@@ -40,18 +40,38 @@ defmodule Boundary.Mix.CompilerState do
   def flush(app_modules) do
     app_modules = MapSet.new(app_modules)
 
-    for module <- ets_keys(references_table()),
-        not MapSet.member?(app_modules, module),
-        table <- [references_table(), modules_table()],
-        do: :ets.delete(table, module)
+    # Remove entries for modules that are no longer part of the app (e.g. their source was deleted).
+    deleted_any? =
+      Enum.reduce(ets_keys(references_table()), false, fn module, acc ->
+        if MapSet.member?(app_modules, module) do
+          acc
+        else
+          Enum.each([references_table(), modules_table()], &:ets.delete(&1, module))
+          true
+        end
+      end)
 
-    app_modules
+    # Only modules that were (re)compiled this run hold uncompressed entries; everything else was loaded
+    # from the manifest already compressed. Compressing those again would just reproduce identical data.
+    recompiled_modules =
+      seen_table()
+      |> ets_keys()
+      |> Enum.filter(&MapSet.member?(app_modules, &1))
+
+    recompiled_modules
     |> Enum.map(&Task.async(fn -> compress_entries(&1) end))
     |> Enum.each(&Task.await(&1, :infinity))
 
     :ets.delete_all_objects(seen_table())
-    :ets.tab2file(references_table(), to_charlist(Boundary.Mix.manifest_path("boundary_references")))
-    :ets.tab2file(modules_table(), to_charlist(Boundary.Mix.manifest_path("boundary_modules")))
+
+    # If nothing was recompiled or removed, the in-memory tables are identical to the manifests on disk,
+    # so there's no point rewriting them.
+    if deleted_any? or recompiled_modules != [] do
+      :ets.tab2file(references_table(), to_charlist(Boundary.Mix.manifest_path("boundary_references")))
+      :ets.tab2file(modules_table(), to_charlist(Boundary.Mix.manifest_path("boundary_modules")))
+    else
+      :ok
+    end
   end
 
   @doc "Returns a lazy stream where each element is of type `t:Boundary.ref()`"
