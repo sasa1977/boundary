@@ -96,8 +96,8 @@ defmodule Boundary.Checker do
 
   defp invalid_exports(view, all) do
     for boundary <- all,
-        export <- exports_to_check(boundary),
-        error = validate_export(view, boundary, export),
+        {export, opts} <- exports_to_check(boundary),
+        error = validate_export(view, boundary, export, opts),
         into: MapSet.new(),
         do: error
   end
@@ -106,19 +106,19 @@ defmodule Boundary.Checker do
     Enum.flat_map(
       boundary.exports,
       fn
-        export when is_atom(export) -> [export]
-        {root, opts} -> Enum.map(Keyword.get(opts, :except, []), &Module.concat(root, &1))
+        export when is_atom(export) -> [{export, []}]
+        {root, opts} -> Enum.map(Keyword.get(opts, :except, []), &{Module.concat(root, &1), opts})
       end
     )
   end
 
-  defp validate_export(view, boundary, export) do
+  defp validate_export(view, boundary, export, opts) do
     cond do
       is_nil(Boundary.app(view, export)) ->
         {:unknown_export, %{name: export, file: boundary.file, line: boundary.line}}
 
       # boundary can re-export exports of its descendants
-      exported_by_child_subboundary?(view, boundary, export) ->
+      exported_by_child_subboundary?(view, boundary, export, opts) ->
         nil
 
       (Boundary.for_module(view, export) || %{name: nil}).name != boundary.name ->
@@ -129,7 +129,7 @@ defmodule Boundary.Checker do
     end
   end
 
-  defp exported_by_child_subboundary?(view, boundary, export, parent_opts \\ []) do
+  defp exported_by_child_subboundary?(view, boundary, export, parent_opts) do
     case Boundary.for_module(view, export) do
       nil ->
         false
@@ -149,7 +149,6 @@ defmodule Boundary.Checker do
             String.starts_with?(to_string(export), to_string(export_module))
 
           child_subboundary ->
-            # When the parent uses `:all_including_sub_boundaries`, delegate to the child's export rules
             export in [child_subboundary.name | child_subboundary.exports] or
               (Keyword.get(parent_opts, :include_sub_boundaries, false) and
                  exported?(view, child_subboundary, export))

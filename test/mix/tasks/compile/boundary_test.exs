@@ -1220,10 +1220,10 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
   module1 = unique_module_name()
 
-  module_test "sub-boundary exports: {:all_including_sub_boundaries, except: [...]} is accessible via parent dep",
+  module_test "sub-boundary exports: {:all, except: [...]} is accessible via parent dep",
               """
               defmodule #{module1} do
-                use Boundary, exports: :all_including_sub_boundaries
+                use Boundary, exports: :all
               end
 
               defmodule #{module1}.Accounts do
@@ -1249,10 +1249,10 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
   module1 = unique_module_name()
 
-  module_test "sub-boundary exports: :all_including_sub_boundaries carries over exclusions",
+  module_test "sub-boundary exports: :all carries over exclusions",
               """
               defmodule #{module1} do
-                use Boundary, exports: :all_including_sub_boundaries
+                use Boundary, exports: :all
               end
 
               defmodule #{module1}.Accounts do
@@ -1275,10 +1275,10 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
   module1 = unique_module_name()
 
-  module_test "exports: {:all_including_sub_boundaries, except: [...]} re-exports sub-boundary modules but honors the exclusion",
+  module_test "exports: {:all, except: [...]} re-exports sub-boundary modules but honors the exclusion",
               """
               defmodule #{module1} do
-                use Boundary, exports: {:all_including_sub_boundaries, except: [Accounts.ImplementationDetails]}
+                use Boundary, exports: {:all, except: [Accounts.ImplementationDetails]}
               end
 
               defmodule #{module1}.Accounts do
@@ -1296,7 +1296,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
               defmodule #{module1}.Web do
                 use Boundary, deps: [#{module1}]
 
-                # Allowed: re-exported through the parent via :all_including_sub_boundaries
+                # Allowed: re-exported through the parent via :all
                 def user_id(%#{module1}.Accounts.User{} = user), do: user.id
 
                 # Forbidden: excluded by the parent's `except`
