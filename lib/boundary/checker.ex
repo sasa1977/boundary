@@ -96,8 +96,8 @@ defmodule Boundary.Checker do
 
   defp invalid_exports(view, all) do
     for boundary <- all,
-        {export, opts} <- exports_to_check(boundary),
-        error = validate_export(view, boundary, export, opts),
+        export <- exports_to_check(boundary),
+        error = validate_export(view, boundary, export),
         into: MapSet.new(),
         do: error
   end
@@ -106,19 +106,19 @@ defmodule Boundary.Checker do
     Enum.flat_map(
       boundary.exports,
       fn
-        export when is_atom(export) -> [{export, []}]
-        {root, opts} -> Enum.map(Keyword.get(opts, :except, []), &{Module.concat(root, &1), opts})
+        export when is_atom(export) -> [export]
+        {root, opts} -> Enum.map(Keyword.get(opts, :except, []), &Module.concat(root, &1))
       end
     )
   end
 
-  defp validate_export(view, boundary, export, opts) do
+  defp validate_export(view, boundary, export) do
     cond do
       is_nil(Boundary.app(view, export)) ->
         {:unknown_export, %{name: export, file: boundary.file, line: boundary.line}}
 
       # boundary can re-export exports of its descendants
-      exported_by_child_subboundary?(view, boundary, export, opts) ->
+      exported_by_child_subboundary?(view, boundary, export) ->
         nil
 
       (Boundary.for_module(view, export) || %{name: nil}).name != boundary.name ->
@@ -129,7 +129,7 @@ defmodule Boundary.Checker do
     end
   end
 
-  defp exported_by_child_subboundary?(view, boundary, export, parent_opts) do
+  defp exported_by_child_subboundary?(view, boundary, export) do
     case Boundary.for_module(view, export) do
       nil ->
         false
@@ -141,17 +141,8 @@ defmodule Boundary.Checker do
         |> Stream.take_while(&(not is_nil(&1)))
         |> Enum.find(&(Enum.at(&1.ancestors, 0) == boundary.name))
         |> case do
-          nil ->
-            false
-
-          # If the export's `owner_boundary` exports all modules, include sub-modules
-          %{exports: [{export_module, []}]} ->
-            String.starts_with?(to_string(export), to_string(export_module))
-
-          child_subboundary ->
-            export in [child_subboundary.name | child_subboundary.exports] or
-              (Keyword.get(parent_opts, :include_sub_boundaries, false) and
-                 exported?(view, child_subboundary, export))
+          nil -> false
+          child_subboundary -> exported?(view, child_subboundary, export)
         end
     end
   end
@@ -357,8 +348,7 @@ defmodule Boundary.Checker do
   defp export_matches?(view, boundary, {root, opts}, module) do
     String.starts_with?(to_string(module), to_string(root)) and
       not Enum.any?(Keyword.get(opts, :except, []), &(Module.concat(root, &1) == module)) and
-      (Boundary.for_module(view, module) == boundary or
-         exported_by_child_subboundary?(view, boundary, module, opts))
+      (Boundary.for_module(view, module) == boundary or exported_by_child_subboundary?(view, boundary, module))
   end
 
   defp export_matches?(_, _, _, _), do: false

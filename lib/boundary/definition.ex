@@ -149,7 +149,7 @@ defmodule Boundary.Definition do
     do: normalize_exports(%{definition | exports: {:all, []}}, boundary)
 
   defp normalize_exports(%{exports: {:all, opts}} = definition, boundary),
-    do: %{definition | exports: [{boundary, Keyword.put(opts, :include_sub_boundaries, true)}]}
+    do: %{definition | exports: [{boundary, opts}]}
 
   defp normalize_exports(definition, boundary) do
     update_in(
