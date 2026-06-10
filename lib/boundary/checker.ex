@@ -3,17 +3,31 @@ defmodule Boundary.Checker do
   @moduledoc false
 
   def errors(view, references) do
-    Enum.concat([
-      invalid_config(view),
-      invalid_ignores(view),
-      ancestor_with_ignored_checks(view),
-      invalid_deps(view),
-      invalid_exports(view),
-      cycles(view),
-      unclassified_modules(view),
-      invalid_references(view, references),
-      unused_dirty_xrefs(view, references)
-    ])
+    references_count = length(references)
+    chunked_references = Enum.chunk_every(references, max(ceil(references_count / System.schedulers_online()), 1))
+    all = Boundary.all(view)
+
+    # Each check is a pure read over `view`/`references`, so they're safe to run
+    # concurrently.
+    #
+    # The invalid_references check is linear in the count of the references, but each reference
+    # can be checked independently of all others. Since there may be hundreds of thousands of them,
+    # we chunk the references so the chunks can run concurrently.
+    jobs =
+      [
+        fn -> invalid_config(all) end,
+        fn -> invalid_ignores(view, all) end,
+        fn -> ancestor_with_ignored_checks(view, all) end,
+        fn -> invalid_deps(view, all) end,
+        fn -> invalid_exports(view, all) end,
+        fn -> cycles(all) end,
+        fn -> unclassified_modules(view) end,
+        fn -> unused_dirty_xrefs(view, all, references) end
+      ] ++ Enum.map(chunked_references, &fn -> invalid_references(view, &1) end)
+
+    jobs
+    |> Task.async_stream(& &1.(), timeout: :infinity)
+    |> Stream.flat_map(fn {:ok, errors} -> errors end)
     |> Enum.uniq_by(fn
       # deduping by reference minus type/mode, because even if those vary the error can still be the same
       {:invalid_reference, data} -> update_in(data.reference, &Map.drop(&1, [:type, :mode]))
@@ -21,26 +35,26 @@ defmodule Boundary.Checker do
     end)
   end
 
-  defp invalid_deps(view) do
-    for boundary <- Boundary.all(view),
+  defp invalid_deps(view, all) do
+    for boundary <- all,
         {dep, type} <- boundary.deps,
         error = validate_dep(view, boundary, dep, type),
         error != :ok,
         do: error
   end
 
-  defp invalid_config(view), do: view |> Boundary.all() |> Enum.flat_map(& &1.errors)
+  defp invalid_config(all), do: Enum.flat_map(all, & &1.errors)
 
-  defp invalid_ignores(view) do
-    for boundary <- Boundary.all(view),
+  defp invalid_ignores(view, all) do
+    for boundary <- all,
         boundary.app == view.main_app,
         not boundary.check.in or not boundary.check.out,
         not Enum.empty?(boundary.ancestors),
         do: {:invalid_ignores, boundary}
   end
 
-  defp ancestor_with_ignored_checks(view) do
-    for boundary <- Boundary.all(view),
+  defp ancestor_with_ignored_checks(view, all) do
+    for boundary <- all,
         boundary.app == view.main_app,
         ancestor <- Enum.map(boundary.ancestors, &Boundary.fetch!(view, &1)),
         not ancestor.check.in or not ancestor.check.out,
@@ -80,8 +94,8 @@ defmodule Boundary.Checker do
        else: {:forbidden_dep, %{name: to_boundary.name, file: from_boundary.file, line: from_boundary.line}}
   end
 
-  defp invalid_exports(view) do
-    for boundary <- Boundary.all(view),
+  defp invalid_exports(view, all) do
+    for boundary <- all,
         export <- exports_to_check(boundary),
         error = validate_export(view, boundary, export),
         into: MapSet.new(),
@@ -140,13 +154,13 @@ defmodule Boundary.Checker do
     end
   end
 
-  defp cycles(view) do
+  defp cycles(all) do
     graph = :digraph.new([:cyclic])
 
     try do
-      Enum.each(Boundary.all(view), &:digraph.add_vertex(graph, &1.name))
+      Enum.each(all, &:digraph.add_vertex(graph, &1.name))
 
-      for boundary <- Boundary.all(view),
+      for boundary <- all,
           {dep, _type} <- boundary.deps,
           do: :digraph.add_edge(graph, boundary.name, dep)
 
@@ -346,9 +360,9 @@ defmodule Boundary.Checker do
 
   defp export_matches?(_, _, _, _), do: false
 
-  defp unused_dirty_xrefs(view, references) do
+  defp unused_dirty_xrefs(view, all, references) do
     all_dirty_xrefs =
-      for boundary <- Boundary.all(view),
+      for boundary <- all,
           xref <- boundary.dirty_xrefs,
           into: MapSet.new(),
           do: {boundary.name, xref}
