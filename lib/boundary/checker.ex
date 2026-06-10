@@ -4,14 +4,7 @@ defmodule Boundary.Checker do
 
   def errors(view, references) do
     references_count = length(references)
-
-    chunked_references =
-      if references_count > 0 do
-        Enum.chunk_every(references, ceil(references_count / System.schedulers_online()))
-      else
-        []
-      end
-
+    chunked_references = Enum.chunk_every(references, max(ceil(references_count / System.schedulers_online()), 1))
     all = Boundary.all(view)
 
     # Each check is a pure read over `view`/`references`, so they're safe to run
@@ -32,10 +25,8 @@ defmodule Boundary.Checker do
         fn -> unused_dirty_xrefs(view, all, references) end
       ] ++ Enum.map(chunked_references, &fn -> invalid_references(view, &1) end)
 
-    # We keep `ordered: true` so the downstream `uniq_by` (which keeps
-    # the first occurrence) sees results in the same order as the serial version.
     jobs
-    |> Task.async_stream(& &1.(), ordered: true, timeout: :infinity)
+    |> Task.async_stream(& &1.(), timeout: :infinity)
     |> Stream.flat_map(fn {:ok, errors} -> errors end)
     |> Enum.uniq_by(fn
       # deduping by reference minus type/mode, because even if those vary the error can still be the same
