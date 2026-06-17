@@ -184,7 +184,9 @@ defmodule Boundary do
 
   You can also export all modules of the boundary with `use Boundary, exports: :all`. This will also
   export all sub-modules of the boundary. To exclude some modules from the export list use,
-  `use Boundary, exports: {:all, except: [SomeMod, ...]}`.
+  `use Boundary, exports: {:all, except: [SomeMod, ...]}`. If the boundary contains sub-boundaries,
+  then all the exports of those sub-boundaries are also exported. Internal sub-boundary modules are
+  not exported.
 
   Mass export is not advised in most situations. Prefer explicitly listing exported modules. If
   your export list is long, it's a possible indication of an overly fragmented interface. Consider
