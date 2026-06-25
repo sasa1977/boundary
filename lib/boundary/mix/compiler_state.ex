@@ -160,17 +160,28 @@ defmodule Boundary.Mix.CompilerState do
 
     # An older version of boundary stored the cache as single files instead of a directory; remove
     # those leftovers so we can use the path as a directory.
-    if File.regular?(dir), do: File.rm!(dir)
+    if File.regular?(dir) do
+      File.rm!(dir)
+    end
 
     with {:ok, files} <- File.ls(dir) do
-      Enum.each(files, fn file ->
-        %{references: references, modules: modules} =
-          dir |> Path.join(file) |> File.read!() |> :erlang.binary_to_term()
-
-        :ets.insert(references_table(), references)
-        :ets.insert(modules_table(), modules)
-      end)
+      files
+      |> Task.async_stream(&load_cache_file(dir, &1),
+        timeout: :infinity,
+        max_concurrency: 2 * System.schedulers_online()
+      )
+      |> Stream.run()
     end
+  end
+
+  defp load_cache_file(dir, file) do
+    %{references: references, modules: modules} =
+      Path.join(dir, file)
+      |> File.read!()
+      |> :erlang.binary_to_term()
+
+    :ets.insert(references_table(), references)
+    :ets.insert(modules_table(), modules)
   end
 
   # Writes a single module's entries (both references and meta) to its own cache file. An empty file
