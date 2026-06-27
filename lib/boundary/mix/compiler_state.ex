@@ -40,38 +40,40 @@ defmodule Boundary.Mix.CompilerState do
   def flush(app_modules) do
     app_modules = MapSet.new(app_modules)
 
-    # Remove entries for modules that are no longer part of the app (e.g. their source was deleted).
-    deleted_any? =
-      Enum.reduce(ets_keys(references_table()), false, fn module, acc ->
-        if MapSet.member?(app_modules, module) do
-          acc
-        else
-          Enum.each([references_table(), modules_table()], &:ets.delete(&1, module))
-          true
-        end
-      end)
+    # Remove entries for modules that are no longer part of the app (e.g. their source was deleted),
+    # along with their on-disk cache file.
+    [references_table(), modules_table()]
+    |> Stream.flat_map(&ets_keys/1)
+    |> Stream.uniq()
+    |> Stream.reject(&MapSet.member?(app_modules, &1))
+    |> Enum.each(fn module ->
+      Enum.each([references_table(), modules_table()], &:ets.delete(&1, module))
+      File.rm(module_cache_file(module))
+    end)
 
     # Only modules that were (re)compiled this run hold uncompressed entries; everything else was loaded
-    # from the manifest already compressed. Compressing those again would just reproduce identical data.
+    # from the cache already compressed. Compressing those again would just reproduce identical data.
     recompiled_modules =
       seen_table()
       |> ets_keys()
       |> Enum.filter(&MapSet.member?(app_modules, &1))
 
+    File.mkdir_p!(cache_dir())
+
+    # Each module's entries are stored in their own cache file, so we only rewrite the modules that
+    # were actually recompiled this run.
     recompiled_modules
-    |> Enum.map(&Task.async(fn -> compress_entries(&1) end))
+    |> Enum.map(fn module ->
+      Task.async(fn ->
+        compress_entries(module)
+        store_module(module)
+      end)
+    end)
     |> Enum.each(&Task.await(&1, :infinity))
 
     :ets.delete_all_objects(seen_table())
 
-    # If nothing was recompiled or removed, the in-memory tables are identical to the manifests on disk,
-    # so there's no point rewriting them.
-    if deleted_any? or recompiled_modules != [] do
-      :ets.tab2file(references_table(), to_charlist(Boundary.Mix.manifest_path("boundary_references")))
-      :ets.tab2file(modules_table(), to_charlist(Boundary.Mix.manifest_path("boundary_modules")))
-    else
-      :ok
-    end
+    :ok
   end
 
   @doc "Returns a lazy stream where each element is of type `t:Boundary.ref()`"
@@ -142,18 +144,66 @@ defmodule Boundary.Mix.CompilerState do
   @impl GenServer
   def init(opts) do
     :ets.new(seen_table(), [:set, :public, :named_table, read_concurrency: true, write_concurrency: true])
+    :ets.new(references_table(), [:named_table, :public, :duplicate_bag, write_concurrency: true])
+    :ets.new(modules_table(), [:named_table, :public, :duplicate_bag, write_concurrency: true])
 
-    with false <- Keyword.get(opts, :force, false),
-         {:ok, table} <- :ets.file2tab(String.to_charlist(Boundary.Mix.manifest_path("boundary_references"))),
-         do: table,
-         else: (_ -> :ets.new(references_table(), [:named_table, :public, :duplicate_bag, write_concurrency: true]))
-
-    with false <- Keyword.get(opts, :force, false),
-         {:ok, table} <- :ets.file2tab(String.to_charlist(Boundary.Mix.manifest_path("boundary_modules"))),
-         do: table,
-         else: (_ -> :ets.new(modules_table(), [:named_table, :public, :duplicate_bag, write_concurrency: true]))
+    if Keyword.get(opts, :force, false),
+      do: File.rm_rf!(cache_dir()),
+      else: load_cache()
 
     {:ok, %{}}
+  end
+
+  # Populate the ETS tables from the per-module cache files written by `flush/1`.
+  defp load_cache do
+    dir = cache_dir()
+
+    # An older version of boundary stored the cache as single files instead of a directory; remove
+    # those leftovers so we can use the path as a directory.
+    if File.regular?(dir) do
+      File.rm!(dir)
+    end
+
+    with {:ok, files} <- File.ls(dir) do
+      files
+      |> Task.async_stream(&load_cache_file(dir, &1),
+        timeout: :infinity,
+        max_concurrency: 2 * System.schedulers_online()
+      )
+      |> Stream.run()
+    end
+  end
+
+  defp load_cache_file(dir, file) do
+    %{references: references, modules: modules} =
+      Path.join(dir, file)
+      |> File.read!()
+      |> :erlang.binary_to_term()
+
+    :ets.insert(references_table(), references)
+    :ets.insert(modules_table(), modules)
+  end
+
+  # Writes a single module's entries (both references and meta) to its own cache file. An empty file
+  # is never left behind: if the module has no entries, any stale file is removed instead.
+  defp store_module(module) do
+    path = module_cache_file(module)
+
+    case {:ets.lookup(references_table(), module), :ets.lookup(modules_table(), module)} do
+      {[], []} ->
+        File.rm(path)
+
+      {references, modules} ->
+        File.write!(path, :erlang.term_to_binary(%{references: references, modules: modules}))
+    end
+  end
+
+  defp cache_dir, do: Boundary.Mix.manifest_path("boundary_module_cache")
+
+  # A hash keeps the file name a fixed, filesystem-safe length and avoids collisions between module
+  # names that differ only in case on case-insensitive filesystems.
+  defp module_cache_file(module) do
+    Path.join(cache_dir(), Base.encode16(:crypto.hash(:sha256, :erlang.term_to_binary(module))))
   end
 
   defp ets_keys(table) do
