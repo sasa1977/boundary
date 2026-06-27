@@ -11,7 +11,7 @@ defmodule Mix.Tasks.Boundary.ExDocGroups do
           [
             …,
             aliases: aliases(),
-            docs: docs()
+            docs: &docs/0
           ]
         end
 
