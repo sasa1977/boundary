@@ -1,3 +1,8 @@
+# 0.11.0
+
+- `exports: all` exports all exports of sub-boundaries
+- Fixed a crash in the visualize funs task
+
 # 0.10.4
 
 - Properly ignore aliases in strict boundaries

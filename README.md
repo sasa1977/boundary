@@ -36,7 +36,7 @@ defmodule MySystem.MixProject do
 
   defp deps do
     [
-      {:boundary, "~> 0.10", runtime: false},
+      {:boundary, "~> 0.11", runtime: false},
       # ...
     ]
   end
