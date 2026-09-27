@@ -73,7 +73,7 @@ The configuration specifies the following rules:
   - Modules residing in the `MySystemWeb` boundary are allowed to invoke functions from modules exported by the `MySystem` boundary.
   - Modules residing in the `MySystem.Application` namespace are allowed to invoke functions from modules exported by `MySystem` and `MySystemWeb` boundaries.
 
-All other cross-boundary calls are not permitted.
+All other cross-boundary calls are not permitted.  In Phoenix projects this means you will require additional configuration to satisfy boundaries for modules generated inside `test/support/` folder. See the "Controlling Checks" section of the documentation for more details.
 
 Next, you need to add the mix compiler:
 
