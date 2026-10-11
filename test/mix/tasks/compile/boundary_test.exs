@@ -874,6 +874,28 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   end
 
   module1 = unique_module_name()
+  module2 = unique_module_name()
+
+  module_test "mass-export of a sub-boundary with :all shorthand",
+              """
+              defmodule #{module1} do
+                use Boundary, exports: [{SubBoundary, :all}]
+
+                defmodule SubBoundary do
+                  use Boundary, exports: [Foo]
+                  defmodule Foo do def foo, do: :ok end
+                end
+              end
+
+              defmodule #{module2} do
+                use Boundary, deps: [#{module1}]
+                def foo, do: #{module1}.SubBoundary.Foo.foo()
+              end
+              """ do
+    assert warnings == []
+  end
+
+  module1 = unique_module_name()
 
   module_test "boundary can't export a non-exported module of a sub-boundary",
               """
