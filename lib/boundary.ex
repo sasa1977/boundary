@@ -182,6 +182,11 @@ defmodule Boundary do
   export all of these modules with the `exports: [{Schemas, except: [Base]}, ...]`. This will
   export all `MySystem.Schemas.*` modules, except for `MySystem.Schemas.Base`.
 
+  To export the namespace without exclusions, use `exports: [{Schemas, :all}]`. This is equivalent
+  to `{Schemas, []}` or `{Schemas, except: []}` and includes the `Schemas` module itself. If the
+  namespace contains sub-boundaries, only their roots and exported modules are included; private
+  sub-boundary modules remain private.
+
   You can also export all modules of the boundary with `use Boundary, exports: :all`. This will also
   export all sub-modules of the boundary. To exclude some modules from the export list use,
   `use Boundary, exports: {:all, except: [SomeMod, ...]}`. If the boundary contains sub-boundaries,
@@ -497,11 +502,12 @@ defmodule Boundary do
   If you want to export all exports of a sub-boundary, you can use the mass export syntax:
 
   ```
-  use Boundary, exports: [{Articles, []}, ...]
+  use Boundary, exports: [{Articles, :all}, ...]
   ```
 
   This will export the `Articles` module together with all the modules exported by the articles
-  sub-boundary.
+  sub-boundary. The `{Articles, :all}` shorthand is equivalent to `{Articles, []}` or
+  `{Articles, except: []}`. Private modules of the sub-boundary remain private.
 
   The parent boundary may not export a module that isn't exported by its owner boundary.
 

@@ -159,6 +159,7 @@ defmodule Boundary.Definition do
   end
 
   defp normalize_export(boundary, export) when is_atom(export), do: Module.concat(boundary, export)
+  defp normalize_export(boundary, {export, :all}), do: normalize_export(boundary, {export, []})
   defp normalize_export(boundary, {export, opts}), do: {Module.concat(boundary, export), opts}
 
   defp normalize_check(definition) do
