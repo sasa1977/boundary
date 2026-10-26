@@ -24,9 +24,9 @@ defmodule Boundary.Definition do
     pos = Macro.escape(%{file: env.file, line: env.line})
 
     quote bind_quoted: [opts: opts, app: Keyword.fetch!(Mix.Project.config(), :app), pos: pos] do
-      @opts opts
-      @pos pos
-      @app app
+      @_boundary_definition_opts opts
+      @_boundary_definition_pos pos
+      @_boundary_definition_app app
 
       # Definition will be injected before compile, because we need to check if this module is
       # a protocol, which we can only do right before the module is about to be compiled.
@@ -55,7 +55,13 @@ defmodule Boundary.Definition do
       protocol? = Module.defines?(__MODULE__, {:__impl__, 1}, :def)
       mix_task? = String.starts_with?(inspect(__MODULE__), "Mix.Tasks.")
 
-      data = %{opts: @opts, pos: @pos, app: @app, protocol?: protocol?, mix_task?: mix_task?}
+      data = %{
+        opts: @_boundary_definition_opts,
+        pos: @_boundary_definition_pos,
+        app: @_boundary_definition_app,
+        protocol?: protocol?,
+        mix_task?: mix_task?
+      }
 
       Boundary.Mix.CompilerState.add_module_meta(__MODULE__, :boundary_def, data)
       Module.put_attribute(__MODULE__, Boundary, data)

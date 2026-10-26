@@ -667,6 +667,109 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     assert warning.position == 8
   end
 
+  test "keeps Boundary state separate from attributes owned by another DSL" do
+    attribute_owner = unique_module_name()
+    provider = unique_module_name()
+    consumer = unique_module_name()
+    invalid_boundary = unique_module_name()
+    source_file = "attribute_collision.ex"
+
+    source = """
+    defmodule #{attribute_owner} do
+      defmacro __using__(_opts) do
+        quote do
+          @opts [owner: :generic_dsl]
+          @pos %{file: "owner.dsl", line: 999}
+          @app :generic_dsl
+          @before_compile unquote(__MODULE__)
+          @after_compile unquote(__MODULE__)
+        end
+      end
+
+      defmacro __before_compile__(env) do
+        expected = {[owner: :generic_dsl], %{file: "owner.dsl", line: 999}, :generic_dsl}
+
+        actual = {
+          Module.get_attribute(env.module, :opts),
+          Module.get_attribute(env.module, :pos),
+          Module.get_attribute(env.module, :app)
+        }
+
+        unless actual == expected do
+          raise "another DSL's module attributes were overwritten: " <> inspect(actual)
+        end
+
+        quote do
+          :ok
+        end
+      end
+
+      def __after_compile__(env, _bytecode) do
+        [boundary_definition] = env.module.__info__(:attributes) |> Keyword.fetch!(Boundary)
+
+        unless boundary_definition.app == Mix.Project.config()[:app] do
+          raise "Boundary's persisted application metadata was overwritten"
+        end
+      end
+    end
+
+    defmodule #{provider} do
+      use Boundary, exports: [Public]
+      use #{attribute_owner}
+
+      defmodule Public do
+        def call, do: :ok
+      end
+
+      defmodule Internal do
+        def call, do: :ok
+      end
+    end
+
+    defmodule #{consumer} do
+      use #{attribute_owner}
+      use Boundary, deps: [#{provider}]
+
+      def call_exported, do: #{provider}.Public.call()
+      def call_internal, do: #{provider}.Internal.call()
+    end
+
+    defmodule #{invalid_boundary} do
+      use Boundary, foo: :bar
+      use #{attribute_owner}
+    end
+    """
+
+    TestProject.in_project(fn project ->
+      File.write!(Path.join([project.path, "lib", source_file]), source)
+
+      result = TestProject.compile()
+
+      assert result.errors == []
+      assert length(result.warnings) == 3
+
+      owner_warning = Enum.find(result.warnings, &(&1.message == "#{attribute_owner} is not included in any boundary"))
+      assert owner_warning
+      assert owner_warning.file == "lib/#{source_file}"
+
+      forbidden_warning =
+        Enum.find(result.warnings, &String.contains?(&1.message, "forbidden reference to #{provider}.Internal"))
+
+      assert forbidden_warning
+      assert forbidden_warning.file == "lib/#{source_file}"
+
+      internal_line = Enum.find_index(String.split(source, "\n"), &String.contains?(&1, "def call_internal")) + 1
+      assert forbidden_warning.position == internal_line
+
+      option_warning = Enum.find(result.warnings, &(&1.message == "unknown option :foo"))
+      assert option_warning
+      assert option_warning.file == "lib/#{source_file}"
+
+      option_line = Enum.find_index(String.split(source, "\n"), &String.contains?(&1, "use Boundary, foo: :bar")) + 1
+      assert option_warning.position == option_line
+    end)
+  end
+
   module1 = unique_module_name()
 
   module_test "reports invalid option",
