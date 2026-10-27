@@ -1,3 +1,8 @@
+# 0.12.0
+
+- Support `:all` shorthand in mass export entries
+- Avoid temporary module attributes to prevent collisions with other macros
+
 # 0.11.0
 
 - `exports: all` exports all exports of sub-boundaries
