@@ -22,15 +22,19 @@ defmodule Boundary.Mix.CompilerState do
 
   @spec record_references(module, map) :: :ok
   def record_references(from, entry) do
-    :ets.insert(references_table(), {from, entry})
+    with pid when is_pid(pid) <- GenServer.whereis(name()),
+         do: :ets.insert(references_table(), {from, entry})
+
     :ok
   end
 
   @spec initialize_module(module) :: :ok
   def initialize_module(module) do
-    if :ets.insert_new(seen_table(), {module}) do
-      :ets.delete(references_table(), module)
-      :ets.delete(modules_table(), module)
+    with pid when is_pid(pid) <- GenServer.whereis(name()) do
+      if :ets.insert_new(seen_table(), {module}) do
+        :ets.delete(references_table(), module)
+        :ets.delete(modules_table(), module)
+      end
     end
 
     :ok

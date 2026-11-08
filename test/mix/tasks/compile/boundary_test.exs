@@ -30,6 +30,44 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
     TestProject.in_project(fn _project -> assert TestProject.compile().warnings == [] end)
   end
 
+  test "compiles an app without boundaries when the boundary tracer is still installed" do
+    module1 = unique_module_name()
+    module2 = unique_module_name()
+    tracers = Code.get_compiler_option(:tracers)
+
+    try do
+      TestProject.in_project([mix_opts: [compilers: []]], fn project ->
+        # Build the path dependency before installing the tracer. The next compile is then
+        # an app that never started CompilerState.
+        assert TestProject.compile().errors == []
+
+        Code.put_compiler_option(:tracers, [Mix.Tasks.Compile.Boundary | tracers])
+
+        File.write!(
+          Path.join([project.path, "lib", "mod1.ex"]),
+          """
+          defmodule #{module1} do
+            def fun(), do: #{module2}.fun()
+          end
+          """
+        )
+
+        File.write!(
+          Path.join([project.path, "lib", "mod2.ex"]),
+          """
+          defmodule #{module2} do
+            def fun(), do: :ok
+          end
+          """
+        )
+
+        assert TestProject.compile().errors == []
+      end)
+    after
+      Code.put_compiler_option(:tracers, tracers)
+    end
+  end
+
   module1 = unique_module_name()
 
   module_test "in-boundary calls are allowed",
