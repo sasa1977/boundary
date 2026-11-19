@@ -31,6 +31,8 @@ defmodule Mix.Tasks.Compile.Boundary do
   end
   ```
 
+  Make sure that the `:boundary` compiler is provided before both `:elixir` and `:app`.
+
   When developing a library, it's advised to use this compiler only in `:dev` and `:test`
   environments:
 
@@ -87,6 +89,8 @@ defmodule Mix.Tasks.Compile.Boundary do
 
   @impl Mix.Task.Compiler
   def run(argv) do
+    validate_compiler_order!()
+
     {opts, _rest, _errors} = OptionParser.parse(argv, strict: [force: :boolean, warnings_as_errors: :boolean])
 
     CompilerState.start_link(Keyword.take(opts, [:force]))
@@ -97,6 +101,18 @@ defmodule Mix.Tasks.Compile.Boundary do
     Code.put_compiler_option(:tracers, [__MODULE__ | tracers])
 
     {:ok, []}
+  end
+
+  defp validate_compiler_order! do
+    compilers = Keyword.get_lazy(Mix.Project.config(), :compilers, &Mix.compilers/0)
+    relevant_compilers = Enum.filter(compilers, &(&1 in [:boundary, :elixir, :app]))
+
+    if relevant_compilers != [:boundary, :elixir, :app] do
+      Mix.raise(
+        "Invalid compiler configuration for #{inspect(Boundary.Mix.app_name())}. " <>
+          "Both :elixir and :app compilers must appear after :boundary."
+      )
+    end
   end
 
   @doc false

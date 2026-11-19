@@ -27,7 +27,26 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
   end
 
   test "works with an empty project" do
-    TestProject.in_project(fn _project -> assert TestProject.compile().warnings == [] end)
+    TestProject.in_project(fn _project -> assert %{warnings: [], errors: []} = TestProject.compile() end)
+  end
+
+  for compilers <- [
+        [:elixir, :boundary, :app],
+        [:elixir, :app, :boundary],
+        [:app, :boundary, :elixir],
+        [:boundary, :app],
+        [:boundary, :elixir]
+      ] do
+    test "rejects compiler order #{inspect(compilers)}" do
+      TestProject.in_project([mix_opts: [compilers: unquote(compilers)]], fn project ->
+        tracers = Code.get_compiler_option(:tracers)
+        error = assert_raise Mix.Error, fn -> TestProject.compile() end
+
+        assert error.message =~ inspect(project.app)
+        assert error.message =~ "Both :elixir and :app compilers must appear after :boundary."
+        assert Code.get_compiler_option(:tracers) == tracers
+      end)
+    end
   end
 
   module1 = unique_module_name()
@@ -1747,7 +1766,7 @@ defmodule Mix.Tasks.Compile.BoundaryTest do
 
   defp in_lib_without_boundaries(fun) do
     TestProject.in_project(
-      [mix_opts: [deps: [], compilers: []]],
+      [mix_opts: [deps: [], compilers: Mix.compilers()]],
       fn project ->
         File.write!(
           Path.join([project.path, "lib", "code.ex"]),

@@ -92,6 +92,8 @@ defmodule MySystem.MixProject do
 end
 ```
 
+Make sure that the `:boundary` compiler is provided before both `:elixir` and `:app`.
+
 Boundary rules are validated during compilation. For example, if we have the following code:
 
 ```elixir
